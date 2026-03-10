@@ -173,7 +173,7 @@ var inspectorBookings = (inspector is null
     ? Enumerable.Empty<SummaryRow>()
     : Bookings.Where(b =>
         !string.Equals(b.AssignedTo, "Unassigned", StringComparison.OrdinalIgnoreCase) &&
-        string.Equals(b.AssignedTo, inspector.DisplayName, StringComparison.Ordinal)))
+        string.Equals(b.AssignedTo, inspector.DisplayName, StringComparison.OrdinalIgnoreCase)))
     .ToList();
 
             if (!inspectorBookings.Any())
