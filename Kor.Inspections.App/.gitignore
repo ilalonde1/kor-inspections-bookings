@@ -1,0 +1,14 @@
+# Build outputs
+[Bb]in/
+[Oo]bj/
+**/[Bb]in/
+**/[Oo]bj/
+
+# Publish outputs
+publish/
+Publish/
+artifacts/
+Properties/PublishProfiles/*.pubxml.user
+
+# IDE/local cache
+.vs/

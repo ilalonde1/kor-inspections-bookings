@@ -1,0 +1,59 @@
+﻿@page
+@using Kor.Inspections.App.Services
+@model Kor.Inspections.App.Pages.ConfirmModel
+@{
+    ViewData["Title"] = "Booking Confirmed";
+}
+
+<h2>Booking Confirmed</h2>
+
+@if (Model.Booking != null)
+{
+    <p>Thank you. Your field review request has been received.</p>
+
+    <ul>
+        <li>Job: @Model.Booking.ProjectNumber</li>
+        <li>Address: @Model.Booking.ProjectAddress</li>
+        <li>Contact: @Model.Booking.ContactName (@Model.Booking.ContactPhone)</li>
+        <li>
+            Date and time (local):
+            @{
+                // IMPORTANT: use the same timezone source as the rest of the app
+                var tz = Model.TimeZone;
+                var localStart = TimeZoneInfo.ConvertTimeFromUtc(Model.Booking.StartUtc, tz);
+                var localEnd = TimeZoneInfo.ConvertTimeFromUtc(Model.Booking.EndUtc, tz); // THIS WAS MISSING
+            }
+            @localStart.ToString("yyyy-MM-dd")
+            @BookingDisplayHelper.GetTimeDisplay(
+            Model.TimePreference,
+                localStart,
+                localEnd)
+    </li>
+    </ul>
+
+    <p>
+        You can cancel this booking using the link below (please keep it for your records):<br /><br />
+    
+        <a href="@Model.CancelUrl"
+           style="display:inline-block;
+                  padding:10px 18px;
+                  background-color:#dc3545;
+                  color:#fff;
+                  text-decoration:none;
+                  border-radius:6px;
+                  font-weight:600;">
+            Cancel / Manage Booking
+        </a>
+ 
+    </p>
+    <p style="margin-top:20px;">
+        <strong>
+            Any issues, contact Tyler —
+            <a href="tel:16048163327">604-816-3327</a>
+        </strong>
+    </p>
+}
+else
+{
+    <p>Booking not found.</p>
+}

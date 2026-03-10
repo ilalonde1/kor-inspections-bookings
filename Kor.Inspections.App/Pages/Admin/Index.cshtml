@@ -1,0 +1,442 @@
+@page "/admin"
+@using Kor.Inspections.App.Services
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@model Kor.Inspections.App.Pages.Admin.IndexModel
+@{
+    var inspectorMobileToolsEnabled =
+        !string.Equals(
+            Configuration["Features:InspectorMobileToolsEnabled"],
+            "false",
+            StringComparison.OrdinalIgnoreCase);
+
+    ViewData["Title"] = "Upcoming Field Reviews";
+    ViewData["InspectorMode"] = inspectorMobileToolsEnabled ? "true" : "false";
+}
+
+<h2>Field Reviews</h2>
+
+    <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center;">
+        <a asp-page="./Index"
+           asp-route-view="active"
+           asp-route-sort="@Model.Sort"
+           asp-route-dir="@Model.Dir"
+           asp-route-project="@Model.Project"
+           asp-route-inspector="@Model.Inspector"
+           asp-route-dateFrom="@Model.DateFrom"
+           asp-route-dateTo="@Model.DateTo"
+           class="btn-smooth"
+           style="display:inline-block;@(string.Equals(Model.View, "all", StringComparison.OrdinalIgnoreCase) ? "" : "font-weight:600;")">
+            Active
+        </a>
+        <a asp-page="./Index"
+           asp-route-view="all"
+           asp-route-sort="@Model.Sort"
+           asp-route-dir="@Model.Dir"
+           asp-route-project="@Model.Project"
+           asp-route-inspector="@Model.Inspector"
+           asp-route-dateFrom="@Model.DateFrom"
+           asp-route-dateTo="@Model.DateTo"
+           class="btn-smooth"
+           style="display:inline-block;@(string.Equals(Model.View, "all", StringComparison.OrdinalIgnoreCase) ? "font-weight:600;" : "")">
+            All
+        </a>
+    </div>
+
+    <form method="get" class="admin-filter-form" style="margin-bottom:15px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <input type="hidden" name="view" value="@Model.View" />
+        <input type="hidden" name="sort" value="@Model.Sort" />
+        <input type="hidden" name="dir" value="@Model.Dir" />
+        <input type="text" name="project" value="@Model.Project" placeholder="Filter by project" class="form-control" style="width:220px;" />
+        <input type="text" name="inspector" value="@Model.Inspector" placeholder="Filter by inspector" class="form-control" style="width:220px;" />
+        <input type="date" name="dateFrom" value="@Model.DateFrom" class="form-control" style="width:180px;" />
+        <input type="date" name="dateTo" value="@Model.DateTo" class="form-control" style="width:180px;" />
+        <button type="submit" class="btn-smooth">Apply</button>
+    </form>
+    <div class="helper-text-muted" style="margin-bottom:12px;">Default range starts today and ends in 7 days unless you set custom dates.</div>
+
+    <div style="margin-bottom:15px;">
+        <a asp-page="/Admin/Summary"
+           asp-route-date="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")"
+           class="btn-smooth"
+           style="display:inline-block;">
+            View Tomorrow's Summary
+        </a>
+    </div>
+
+    @if (!Model.Bookings.Any())
+    {
+        <p>No bookings found for the selected filters.</p>
+    }
+    else
+    {
+        <div class="admin-table-container">
+            <div class="table-responsive-mobile">
+            <table class="admin-table" style="text-align:left;">
+                <thead>
+                    <tr>
+
+                        <th class="col-date">
+                            <a asp-page="./Index"
+                               asp-route-sort="date"
+                               asp-route-dir="@Model.ToggleDir("date")"
+                               asp-route-view="@Model.View"
+                               asp-route-project="@Model.Project"
+                               asp-route-inspector="@Model.Inspector"
+                               asp-route-dateFrom="@Model.DateFrom"
+                               asp-route-dateTo="@Model.DateTo"
+                               class="sort-link">
+                                Date ⇅
+                            </a>
+                        </th>
+
+                        <th class="col-time">Time</th>
+
+                        <th class="col-job">
+                            <a asp-page="./Index"
+                               asp-route-sort="job"
+                               asp-route-dir="@Model.ToggleDir("job")"
+                               asp-route-view="@Model.View"
+                               asp-route-project="@Model.Project"
+                               asp-route-inspector="@Model.Inspector"
+                               asp-route-dateFrom="@Model.DateFrom"
+                               asp-route-dateTo="@Model.DateTo"
+                               class="sort-link">
+                                Job ⇅
+                            </a>
+                        </th>
+
+                        <th class="col-address">Site Address</th>
+                        <th class="col-contact">Contact</th>
+                        <th class="col-comments">Details</th>
+
+                        <th class="col-status">
+                            <a asp-page="./Index"
+                               asp-route-sort="status"
+                               asp-route-dir="@Model.ToggleDir("status")"
+                               asp-route-view="@Model.View"
+                               asp-route-project="@Model.Project"
+                               asp-route-inspector="@Model.Inspector"
+                               asp-route-dateFrom="@Model.DateFrom"
+                               asp-route-dateTo="@Model.DateTo"
+                               class="sort-link">
+                                Status ⇅
+                            </a>
+                        </th>
+
+                        <th class="col-assigned">
+                            <a asp-page="./Index"
+                               asp-route-sort="assigned"
+                               asp-route-dir="@Model.ToggleDir("assigned")"
+                               asp-route-view="@Model.View"
+                               asp-route-project="@Model.Project"
+                               asp-route-inspector="@Model.Inspector"
+                               asp-route-dateFrom="@Model.DateFrom"
+                               asp-route-dateTo="@Model.DateTo"
+                               class="sort-link">
+                                Assigned ⇅
+                            </a>
+                        </th>
+
+                        <th class="col-actions">Actions</th>
+
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var b in Model.Bookings)
+                    {
+                        <tr class="booking-row" data-status="@b.Status" data-booking-id="@b.BookingId">
+
+                            <td>@b.StartLocal.ToString("yyyy-MM-dd")</td>
+
+                            <td>
+                                @{
+                                    var timeDisplay = BookingDisplayHelper.GetTimeDisplay(
+                                    b.TimePreference,
+                                    b.StartLocal,
+                                    b.EndLocal);
+                                }
+
+                                @if (b.TimePreference == "AM")
+                                {
+                                    <span class="pill-anytime pill-am">@timeDisplay</span>
+                                }
+                                else if (b.TimePreference == "PM")
+                                {
+                                    <span class="pill-anytime pill-pm">@timeDisplay</span>
+                                }
+                                else
+                                {
+                                    @timeDisplay
+                                }
+                            </td>
+
+                            <td>@b.ProjectNumber</td>
+
+                            <td class="project-address">@b.ProjectAddress</td>
+
+                            <td>
+                                <strong>@b.ContactName</strong><br />
+                                <span class="phone contact-phone">@FormatPhone(b.ContactPhone)</span><br />
+                                <span class="phone">@b.ContactEmail</span>
+                            </td>
+
+                            <td class="comments">
+                                @(string.IsNullOrWhiteSpace(b.Comments) ? "-" : b.Comments)
+                            </td>
+
+                            <td>
+                                <span class="pill pill-@b.Status">@b.Status</span>
+                            </td>
+
+                            <td>@b.AssignedTo</td>
+
+                            <td>
+
+                                <form method="post" asp-page-handler="Assign" class="assign-inline">
+                                    <input type="hidden" name="id" value="@b.BookingId" />
+
+                                    <select name="assignedTo">
+                                        <option value="Unassigned">Unassigned</option>
+
+                                        @foreach (var inspector in Model.Inspectors)
+                                        {
+                                            <option value="@inspector.DisplayName"
+                                                    selected="@(inspector.DisplayName == b.AssignedTo)">
+                                                @inspector.DisplayName
+                                            </option>
+                                        }
+                                    </select>
+
+                                    <button class="admin-btn admin-btn-set">Assign</button>
+                                </form>
+
+                                <div class="action-stack">
+
+                                    <form method="post"
+                                          asp-page-handler="Cancel"
+                                          onsubmit="return confirm('Cancel this booking?');">
+                                        <input type="hidden" name="id" value="@b.BookingId" />
+                                        <button class="admin-btn admin-btn-cancel">Cancel</button>
+                                    </form>
+
+                                </div>
+
+                            </td>
+
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            </div>
+        </div>
+    }
+
+    @if (inspectorMobileToolsEnabled)
+    {
+        <div class="mobile-today-panel" id="adminMobileTodayPanel" hidden>
+            <h3>Today's Inspections</h3>
+            <button id="mobileRouteBtn" class="btn btn-success"> Navigate Today's Route </button>
+            <div id="mobileTodayList"></div>
+        </div>
+
+        <div class="mobile-inspector-bar" id="adminMobileInspectorBar" hidden>
+            <a class="btn btn-primary mobile-call" href="#">Call</a>
+            <a class="btn btn-secondary mobile-map" href="#">Map</a>
+            <a class="btn btn-dark mobile-view" href="#">Details</a>
+        </div>
+    }
+
+@functions {
+    private string FormatPhone(string phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone))
+            return "";
+
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+
+        if (digits.Length != 10)
+            return phone;
+
+        return $"({digits[..3]})-{digits.Substring(3, 3)}-{digits.Substring(6)}";
+    }
+}
+
+@section Scripts {
+@if (inspectorMobileToolsEnabled)
+{
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    if (window.__korAdminMobileInitialized) return;
+    window.__korAdminMobileInitialized = true;
+
+    if (
+        !document.body.classList.contains("mobile-mode") ||
+        !document.body.classList.contains("inspector-mode")
+    ) return;
+
+    const todayPanel = document.getElementById("adminMobileTodayPanel");
+    const inspectorBar = document.getElementById("adminMobileInspectorBar");
+    if (todayPanel) todayPanel.hidden = false;
+    if (inspectorBar) inspectorBar.hidden = false;
+
+    const rows = Array.from(document.querySelectorAll("tr.booking-row"));
+    const list = document.getElementById("mobileTodayList");
+    const callBtn = document.querySelector(".mobile-call");
+    const mapBtn = document.querySelector(".mobile-map");
+    const viewBtn = document.querySelector(".mobile-view");
+    const routeBtn = document.getElementById("mobileRouteBtn");
+
+    if (!rows.length || !list) return;
+
+    let activeRow = rows[0];
+
+    function getPhone(row) {
+        const phoneEl = row.querySelector(".contact-phone");
+        const raw = (phoneEl ? phoneEl.textContent : "").trim();
+        if (!raw) return "";
+        let cleaned = raw.replace(/[\s()-]/g, "");
+        cleaned = cleaned.replace(/[^\d+]/g, "");
+        if (cleaned.startsWith("+")) {
+            cleaned = "+" + cleaned.slice(1).replace(/\D/g, "");
+        } else {
+            cleaned = cleaned.replace(/\D/g, "");
+        }
+        return /\d/.test(cleaned) ? cleaned : "";
+    }
+
+    function getAddress(row) {
+        const addrEl =
+            row.querySelector("[data-address]") ||
+            row.querySelector(".inspection-address") ||
+            row.querySelector(".project-address");
+        return (addrEl ? addrEl.textContent : "").trim();
+    }
+
+    function disableButton(btn) {
+        if (!btn) return;
+        btn.classList.add("disabled");
+        btn.setAttribute("aria-disabled", "true");
+        btn.removeAttribute("href");
+        btn.removeAttribute("target");
+        btn.removeAttribute("rel");
+        btn.onclick = function (e) { e.preventDefault(); };
+    }
+
+    function enableButton(btn, href, isExternal) {
+        if (!btn) return;
+        btn.classList.remove("disabled");
+        btn.removeAttribute("aria-disabled");
+        btn.setAttribute("href", href);
+        if (isExternal) {
+            btn.setAttribute("target", "_blank");
+            btn.setAttribute("rel", "noopener");
+        } else {
+            btn.removeAttribute("target");
+            btn.removeAttribute("rel");
+        }
+        btn.onclick = null;
+    }
+
+    function wireActions() {
+        const phone = getPhone(activeRow);
+        const addr = getAddress(activeRow);
+
+        if (phone) enableButton(callBtn, "tel:" + phone, false);
+        else disableButton(callBtn);
+
+        if (addr) enableButton(mapBtn, "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(addr), true);
+        else disableButton(mapBtn);
+    }
+
+    function logMobileAction(evt) {
+        if (!evt) return;
+        const url = "?handler=MobileActionLog&evt=" + encodeURIComponent(evt);
+        fetch(url, {
+            method: "GET",
+            cache: "no-store",
+            keepalive: true
+        }).catch(function () { });
+    }
+
+    rows.forEach((row) => {
+        const dateText = (row.querySelector("td:nth-child(1)")?.textContent || "").trim();
+        const timeText = (row.querySelector("td:nth-child(2)")?.textContent || "").trim().replace(/\s+/g, " ");
+        const projectText = (row.querySelector("td:nth-child(3)")?.textContent || "").trim();
+        const addressText = (row.querySelector(".project-address")?.textContent || "").trim();
+        const text = [dateText, timeText, projectText, addressText].filter(Boolean).join(" | ");
+        if (!text) return;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btn-outline-primary mobile-today-item-btn";
+        btn.textContent = text.substring(0, 80);
+        row.dataset.mobileListId = String(list.childElementCount);
+        btn.dataset.mobileListId = row.dataset.mobileListId;
+        btn.addEventListener("click", function () {
+            activeRow = row;
+            rows.forEach(r => r.classList.remove("mobile-active-row"));
+            row.classList.add("mobile-active-row");
+            list.querySelectorAll(".mobile-today-item-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            row.scrollIntoView({ behavior: "smooth", block: "start" });
+            wireActions();
+        });
+        list.appendChild(btn);
+    });
+
+    if (viewBtn) {
+        viewBtn.addEventListener("click", function (e) {
+            e.preventDefault();
+            rows.forEach(r => r.classList.remove("mobile-active-row"));
+            activeRow.classList.add("mobile-active-row");
+            const activeBtn = list.querySelector(`.mobile-today-item-btn[data-mobile-list-id="${activeRow.dataset.mobileListId}"]`);
+            if (activeBtn) {
+                list.querySelectorAll(".mobile-today-item-btn").forEach(b => b.classList.remove("active"));
+                activeBtn.classList.add("active");
+                activeBtn.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+            activeRow.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+    }
+
+    if (callBtn) {
+        callBtn.addEventListener("click", function () {
+            logMobileAction("mobile_call_clicked");
+        });
+    }
+
+    if (mapBtn) {
+        mapBtn.addEventListener("click", function () {
+            logMobileAction("mobile_map_clicked");
+        });
+    }
+
+    if (routeBtn) {
+        routeBtn.addEventListener("click", function () {
+            logMobileAction("mobile_route_clicked");
+            const addresses = rows
+                .map(getAddress)
+                .filter(Boolean);
+            if (!addresses.length) return;
+            const origin = encodeURIComponent(addresses[0]);
+            const destination = encodeURIComponent(addresses[addresses.length - 1]);
+            const waypoints = addresses.slice(1, -1).map(encodeURIComponent).join("|");
+            const url =
+                "https://www.google.com/maps/dir/?api=1" +
+                "&origin=" + origin +
+                "&destination=" + destination +
+                (waypoints ? "&waypoints=" + waypoints : "");
+            window.open(url, "_blank");
+        });
+    }
+
+    rows[0].classList.add("mobile-active-row");
+    const firstBtn = list.querySelector(".mobile-today-item-btn");
+    if (firstBtn) firstBtn.classList.add("active");
+    wireActions();
+});
+</script>
+}
+
+}
+

@@ -1,0 +1,140 @@
+@page
+@model Kor.Inspections.App.Pages.Inspections.ByProjectModel
+@{
+    ViewData["Title"] = "Project Inspections";
+}
+
+<h2>Project Inspections</h2>
+<p class="text-muted">Read-only list of inspections for this project.</p>
+
+@if (!Model.HasRequiredQuery)
+{
+    <p class="text-danger">Project number and email are required.</p>
+}
+else
+{
+    <p class="text-muted small">
+        Project: <strong>@Model.ProjectNumber</strong><br />
+        Email: <strong>@Model.Email</strong>
+    </p>
+
+    <form method="post">
+        @Html.AntiForgeryToken()
+    </form>
+
+    <div id="inspectionsStatus" class="text-muted">Loading inspections...</div>
+
+    <div class="table-responsive">
+    <table id="inspectionsTable" class="table table-sm table-striped" hidden>
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Scheduled</th>
+                <th>Assigned Inspector</th>
+                <th>Contact</th>
+                <th>Address</th>
+                <th>Comments</th>
+            </tr>
+        </thead>
+        <tbody id="inspectionsBody"></tbody>
+    </table>
+    </div>
+}
+
+@if (Model.HasRequiredQuery)
+{
+    <style>
+        #inspectionsTable th,
+        #inspectionsTable td {
+            white-space: nowrap;
+        }
+    </style>
+
+    <script>
+        (function () {
+            const projectNumber = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ProjectNumber));
+            const email = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Email));
+            const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+            const token = tokenInput ? tokenInput.value : "";
+
+            const statusEl = document.getElementById("inspectionsStatus");
+            const tableEl = document.getElementById("inspectionsTable");
+            const bodyEl = document.getElementById("inspectionsBody");
+
+            function escapeHtml(value) {
+                return String(value ?? "")
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll('"', "&quot;")
+                    .replaceAll("'", "&#39;");
+            }
+
+            function asLocal(value) {
+                if (!value) return "";
+                const d = new Date(value);
+                if (Number.isNaN(d.getTime())) return "";
+                return new Intl.DateTimeFormat(undefined, {
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit"
+                }).format(d);
+            }
+
+            async function load() {
+                try {
+                    const response = await fetch("/?handler=LookupInspections", {
+                        method: "POST",
+                        headers: {
+                            "RequestVerificationToken": token,
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ projectNumber: projectNumber, email: email })
+                    });
+
+                    const text = await response.text();
+                    const data = text ? JSON.parse(text) : null;
+
+                    if (!response.ok || (data && data.error)) {
+                        const message = (data && data.error) || `Request failed (${response.status}).`;
+                        statusEl.textContent = message;
+                        return;
+                    }
+
+                    if (!Array.isArray(data) || data.length === 0) {
+                        statusEl.textContent = "No inspections found.";
+                        return;
+                    }
+
+                    const rows = data.map(i => {
+                        const status = escapeHtml(i.status || "");
+                        const start = escapeHtml(asLocal(i.startUtc));
+                        const assigned = escapeHtml(i.assignedTo || "Unassigned");
+                        const contact = escapeHtml(`${i.contactName || ""} (${i.contactEmail || ""})`);
+                        const address = escapeHtml(i.address || "");
+                        const comments = escapeHtml(i.comments || "");
+
+                        return `<tr>
+                            <td>${status}</td>
+                            <td>${start}</td>
+                            <td>${assigned}</td>
+                            <td>${contact}</td>
+                            <td>${address}</td>
+                            <td>${comments}</td>
+                        </tr>`;
+                    }).join("");
+
+                    bodyEl.innerHTML = rows;
+                    tableEl.hidden = false;
+                    statusEl.textContent = `Showing ${data.length} inspections.`;
+                } catch {
+                    statusEl.textContent = "Unable to load inspections.";
+                }
+            }
+
+            load();
+        })();
+    </script>
+}

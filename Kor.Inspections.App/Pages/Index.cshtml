@@ -1,0 +1,1259 @@
+@page
+@model Kor.Inspections.App.Pages.IndexModel
+
+@{
+    ViewData["Title"] = "Book a Field Review";
+    ViewData["InspectorMode"] = "false";
+
+    var (minDate, maxDate) = Model.AllowedDates;
+
+    var step2Locked = Model.SelectedContactId == null;
+}
+
+<h2>Book a Field Review</h2>
+
+<p>
+    Please complete the form below to request a field review.
+    Bookings for the following day close at 2:00 p.m. Pacific.
+</p>
+
+<form method="post" asp-antiforgery="true">
+    @Html.AntiForgeryToken()
+
+    <input type="hidden" asp-for="SelectedContactId" />
+
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <!-- Honeypot -->
+    <div style="display:none">
+        <input name="CompanyFax" tabindex="-1" autocomplete="off" />
+    </div>
+
+    <!-- ============================= -->
+    <!-- STEP 1 -->
+    <!-- ============================= -->
+
+    <fieldset class="phase-box">
+        <legend>
+            <span class="step-pill">Step 1</span>
+            Find Project Contacts
+        </legend>
+
+        <div class="step-helper">
+            Enter the Kor Job Number and contact email to manage project contacts.
+        </div>
+
+        <div class="form-group">
+            <label asp-for="ProjectNumber"></label>
+            <div class="project-search-row">
+                <input asp-for="ProjectNumber" class="form-control" />
+                <button type="button" id="projectSearchBtn" class="btn btn-outline-primary">
+                    Search
+                </button>
+            </div>
+            <small class="helper-text-muted">
+                Enter a project number or project name, then click Search and select a result.
+            </small>
+            <div id="projectSearchStatus" class="helper-text-muted project-search-status" aria-live="polite"></div>
+            <span asp-validation-for="ProjectNumber" class="text-danger"></span>
+            <div id="projectSuggestions" class="project-suggestions" hidden></div>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="ContactEmail"></label>
+            <input asp-for="ContactEmail" class="form-control" />
+            <span asp-validation-for="ContactEmail" class="text-danger"></span>
+
+            <div id="projectEmailVerificationBox" class="project-email-verify-box" hidden>
+                <div class="helper-text-muted">
+                    Verify this email with a one-time code to access project contacts.
+                </div>
+                <div class="project-email-verify-row">
+                     <button type="button" id="sendProjectEmailCodeBtn" class="btn btn-outline-primary">
+                         Send Code
+                     </button>
+                     <input id="projectEmailCodeInput"
+                            class="form-control project-email-code-input"
+                            inputmode="numeric"
+                            maxlength="6"
+                            placeholder="Enter 6-digit code" />
+                     <button type="button" id="verifyProjectEmailCodeBtn" class="btn btn-primary">
+                         Verify
+                    </button>
+                </div>
+                <div id="projectEmailVerificationStatus"
+                     class="helper-text-muted project-email-verify-status"
+                     aria-live="polite"></div>
+            </div>
+
+            <button type="button"
+                    id="openContactModalBtn"
+                    class="btn btn-outline-primary mt-2">
+                Assign Contact and View Current Inspections
+            </button>
+        </div>
+    </fieldset>
+
+
+    <!-- ============================= -->
+    <!-- STEP 2 -->
+    <!-- ============================= -->
+
+    <div class="step2-wrapper @(step2Locked ? "step2-locked" : "")">
+
+        @if (step2Locked)
+        {
+            <div class="step-lock-overlay">
+                Complete Step 1 to unlock booking
+            </div>
+        }
+
+        <fieldset class="phase-box mt-4"
+                  id="step2Fieldset"
+                  @(step2Locked ? "disabled" : "")>
+
+            <legend>
+                <span class="step-pill">Step 2</span>
+                Request Field Review
+            </legend>
+
+            <div class="step-helper">
+                Confirm contact details and choose your preferred inspection time.
+            </div>
+
+            <div class="form-group">
+                <label asp-for="ProjectAddress"></label>
+                <input asp-for="ProjectAddress" class="form-control" />
+                <span asp-validation-for="ProjectAddress" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="ContactName"></label>
+                <input asp-for="ContactName" class="form-control" />
+                <span asp-validation-for="ContactName" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="ContactPhone"></label>
+                <input asp-for="ContactPhone" type="tel" class="form-control" />
+                <span asp-validation-for="ContactPhone" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="RequestedDate"></label>
+
+                <input asp-for="RequestedDate"
+                       id="requestedDate"
+                       type="text"
+                       value="@Model.RequestedDate?.ToString("yyyy-MM-dd")"
+                       autocomplete="off"
+                       class="form-control"
+                       data-mindate="@minDate.ToString("yyyy-MM-dd")"
+                       data-maxdate="@maxDate.ToString("yyyy-MM-dd")" />
+
+                <span asp-validation-for="RequestedDate" class="text-danger"></span>
+            </div>
+
+            <button type="submit"
+                    asp-page-handler="RefreshTimes"
+                    formnovalidate
+                    id="autoRefreshTimesBtn"
+                    style="display:none;">
+            </button>
+
+            <div class="form-group">
+                <label asp-for="RequestedTime"></label>
+                <select asp-for="RequestedTime" class="form-control">
+                    <option value="">-- Select a time --</option>
+                    <option value="AM">Anytime AM</option>
+                    <option value="PM">Anytime PM</option>
+
+                    @foreach (var t in Model.AvailableTimes)
+                    {
+                        <option value="@t">@t</option>
+                    }
+                </select>
+                <span asp-validation-for="RequestedTime" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Comments"></label>
+                <textarea asp-for="Comments" class="form-control comments-textarea" placeholder="Specify floor and element details"></textarea>
+                <span asp-validation-for="Comments" class="text-danger"></span>
+            </div>
+
+            <button type="submit" asp-page-handler="Book" class="btn btn-primary">
+                Request Field Review
+            </button>
+        </fieldset>
+
+        <p class="mt-2">
+            If you have any issues - please contact Tyler directly at
+            <a href="tel:16048163327">604-816-3327</a>
+        </p>
+
+    </div>
+
+</form>
+
+
+
+<!-- ============================= -->
+<!-- CONTACT MODAL -->
+<!-- ============================= -->
+
+<div id="contactModal" class="kor-modal" style="display:none;">
+    <div class="kor-modal-content">
+
+        <h3 class="contact-modal-title">Project Contacts</h3>
+        <p class="contact-modal-subtitle">Choose an existing contact or create a new one to use for this booking. Selecting a contact will automatically populate the request form.</p>
+
+        <div class="modal-workspace">
+            <section class="modal-contact-panel">
+                <div class="contact-section">
+                    <h4 class="contact-section-title">Project Contacts</h4>
+                    <div id="contactLookupArea" class="contact-list"></div>
+                </div>
+
+                <div class="contact-section contact-form-panel">
+                    <h4 id="contactFormTitle" class="contact-section-title">Add Contact</h4>
+                    <input type="hidden" id="modalEditContactId" />
+
+                    <div class="contact-form-grid">
+                        <div class="form-group contact-form-field contact-form-half">
+                            <label>Name</label>
+                            <input id="modalContactName" class="form-control" />
+                        </div>
+
+                        <div class="form-group contact-form-field contact-form-half">
+                            <label>Phone</label>
+                            <input id="modalContactPhone" class="form-control" />
+                        </div>
+
+                        <div class="form-group contact-form-field contact-form-full">
+                            <label>Site Address</label>
+                            <input id="modalContactAddress" class="form-control" />
+                        </div>
+
+                        <div class="form-group contact-form-field contact-form-full">
+                            <label>Email</label>
+                            <input id="modalContactEmail" class="form-control" />
+                        </div>
+                    </div>
+
+                    <div class="contact-form-actions">
+                        <button id="saveContactBtn" type="button" class="btn btn-primary mt-2">
+                            Save Contact
+                        </button>
+                        <button id="cancelEditBtn" type="button" class="btn btn-secondary mt-2" style="display:none;">
+                            Cancel Edit
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="modal-inspections-panel">
+                <div class="contact-section">
+                    <div class="inspection-header-row">
+                        <h4 class="contact-section-title">Existing Inspections</h4>
+                        <span id="inspectionCountLabel" class="helper-text-muted"></span>
+                        <div class="inspection-filter-toggle">
+                            <button type="button" id="inspectionFilterActiveBtn" class="btn btn-sm btn-secondary active">Active</button>
+                            <button type="button" id="inspectionFilterAllBtn" class="btn btn-sm btn-secondary">All</button>
+                        </div>
+                    </div>
+                    <div id="inspectionLookupArea" class="contact-list inspection-list"></div>
+                </div>
+            </section>
+
+            <aside id="inspectionDetailsPanel" class="inspection-details-panel" aria-hidden="true">
+                <div class="inspection-details-head">
+                    <h4 class="contact-section-title">Inspection Details</h4>
+                    <button type="button" id="closeInspectionDetailsBtn" class="btn btn-sm btn-secondary">Close</button>
+                </div>
+                <div id="inspectionDetailsEmpty" class="helper-text-muted">Select an inspection to view details.</div>
+                <div id="inspectionDetailsBody" class="inspection-details-body" hidden>
+                    <div class="inspection-detail-row"><strong>Status:</strong> <span id="inspectionDetailStatus"></span></div>
+                    <div class="inspection-detail-row"><strong>Start:</strong> <span id="inspectionDetailStart"></span></div>
+                    <div class="inspection-detail-row"><strong>End:</strong> <span id="inspectionDetailEnd"></span></div>
+                    <div class="inspection-detail-row"><strong>Assigned Inspector:</strong> <span id="inspectionDetailAssigned"></span></div>
+                    <div class="inspection-detail-row"><strong>Address:</strong> <span id="inspectionDetailAddress"></span></div>
+                    <div class="inspection-detail-row"><strong>Comments:</strong> <span id="inspectionDetailComments"></span></div>
+                    <div class="inspection-detail-actions">
+                        <button type="button" id="cancelInspectionBtn" class="btn btn-danger">Cancel Booking</button>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <div class="contact-form-actions">
+            <button id="closeModalBtn" class="btn btn-secondary mt-2">
+                Close
+            </button>
+        </div>
+
+    </div>
+</div>
+
+
+
+<!-- ============================= -->
+<!-- SCRIPT -->
+<!-- ============================= -->
+
+<script>
+
+    const modal = document.getElementById("contactModal");
+    const step2Wrapper = document.querySelector(".step2-wrapper");
+    const step2 = document.getElementById("step2Fieldset");
+    const projectInput = document.getElementById("ProjectNumber");
+    const contactEmailField = document.getElementById("ContactEmail");
+    const projectSearchBtn = document.getElementById("projectSearchBtn");
+    const projectSearchStatus = document.getElementById("projectSearchStatus");
+    const projectSuggestions = document.getElementById("projectSuggestions");
+    const projectEmailVerificationBox = document.getElementById("projectEmailVerificationBox");
+    const projectEmailCodeInput = document.getElementById("projectEmailCodeInput");
+    const projectEmailVerificationStatus = document.getElementById("projectEmailVerificationStatus");
+    const sendProjectEmailCodeBtn = document.getElementById("sendProjectEmailCodeBtn");
+    const verifyProjectEmailCodeBtn = document.getElementById("verifyProjectEmailCodeBtn");
+
+    // NEW: inspections area (optional - only renders if element exists)
+    const inspectionLookupArea =
+        document.querySelector("#contactModal .modal-inspections-panel #inspectionLookupArea");
+    const inspectionDetailsPanel = document.getElementById("inspectionDetailsPanel");
+    const inspectionDetailsBody = document.getElementById("inspectionDetailsBody");
+    const inspectionDetailsEmpty = document.getElementById("inspectionDetailsEmpty");
+    const closeInspectionDetailsBtn = document.getElementById("closeInspectionDetailsBtn");
+    const cancelInspectionBtn = document.getElementById("cancelInspectionBtn");
+    const inspectionFilterActiveBtn = document.getElementById("inspectionFilterActiveBtn");
+    const inspectionFilterAllBtn = document.getElementById("inspectionFilterAllBtn");
+    const inspectionCountLabel = document.getElementById("inspectionCountLabel");
+    const inspectionDetailStatus = document.getElementById("inspectionDetailStatus");
+    const inspectionDetailStart = document.getElementById("inspectionDetailStart");
+    const inspectionDetailEnd = document.getElementById("inspectionDetailEnd");
+    const inspectionDetailAssigned = document.getElementById("inspectionDetailAssigned");
+    const inspectionDetailAddress = document.getElementById("inspectionDetailAddress");
+    const inspectionDetailComments = document.getElementById("inspectionDetailComments");
+
+    let currentContacts = [];
+    let currentInspections = [];
+    let selectedInspectionId = null;
+    let inspectionFilterMode = "active";
+    let projectSuggestionItems = [];
+    let activeProjectSuggestionIndex = -1;
+    let projectSuggestRequestCounter = 0;
+
+    const contactFormTitle = document.getElementById("contactFormTitle");
+    const editIdInput = document.getElementById("modalEditContactId");
+    const contactNameInput = document.getElementById("modalContactName");
+    const contactPhoneInput = document.getElementById("modalContactPhone");
+    const contactAddressInput = document.getElementById("modalContactAddress");
+    const contactEmailInput = document.getElementById("modalContactEmail");
+    const cancelEditBtn = document.getElementById("cancelEditBtn");
+    let modalBackdropPointerDown = false;
+
+    document.getElementById("openContactModalBtn")
+        .addEventListener("click", openModal);
+
+    document.getElementById("closeModalBtn")
+        .addEventListener("click", closeModal);
+
+    cancelEditBtn
+        .addEventListener("click", resetContactForm);
+
+    function getRequestVerificationToken() {
+        return document.querySelector('input[name="__RequestVerificationToken"]').value;
+    }
+
+    function describeHttpError(response) {
+        if (!response) return "Request failed.";
+        if (response.status === 429) return "Too many requests. Please wait a moment and try again.";
+        if (response.status === 403) return "Access denied (verification required).";
+        if (response.status === 400) return "Your session or security token may have expired. Please refresh the page and try again.";
+        if (response.status >= 500) return "Server error. Please try again.";
+        return `Request failed (${response.status}).`;
+    }
+
+    async function readJsonSafe(response) {
+        const text = await response.text();
+        if (!text) return null;
+        try {
+            return JSON.parse(text);
+        } catch {
+            return null;
+        }
+    }
+
+    function setProjectEmailVerificationStatus(message) {
+        if (!projectEmailVerificationStatus) return;
+        projectEmailVerificationStatus.textContent = message || "";
+    }
+
+    function hideProjectEmailVerification() {
+        if (projectEmailVerificationBox) {
+            projectEmailVerificationBox.hidden = true;
+        }
+        if (projectEmailCodeInput) {
+            projectEmailCodeInput.value = "";
+        }
+    }
+
+    function showProjectEmailVerification() {
+        if (projectEmailVerificationBox) {
+            projectEmailVerificationBox.hidden = false;
+        }
+    }
+
+    async function getProjectEmailVerificationStatus(project, email) {
+        const response = await fetch("?handler=ProjectEmailVerificationStatus", {
+            method: "POST",
+            headers: {
+                "RequestVerificationToken": getRequestVerificationToken(),
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ projectNumber: project, email: email })
+        });
+
+        if (!response.ok) {
+            const data = await readJsonSafe(response);
+            setProjectEmailVerificationStatus((data && data.error) || describeHttpError(response));
+            return { requiresVerification: true, isVerified: false };
+        }
+
+        const data = await readJsonSafe(response);
+        if (!data) {
+            setProjectEmailVerificationStatus("Unable to check verification status. Please try again.");
+            return { requiresVerification: true, isVerified: false };
+        }
+
+        return data;
+    }
+
+    // Deterministic behavior:
+    // - If already verified => return true
+    // - If not verified => show verification UI and require explicit Send Code click
+    async function ensureProjectEmailVerified(project, email) {
+        const status = await getProjectEmailVerificationStatus(project, email);
+
+        if (!status.requiresVerification || status.isVerified) {
+            hideProjectEmailVerification();
+            setProjectEmailVerificationStatus("");
+            return true;
+        }
+
+        showProjectEmailVerification();
+        setProjectEmailVerificationStatus("Verification required. Click Send Code.");
+
+        return false;
+    }
+
+    async function loadContacts(project, email) {
+        const response = await fetch("?handler=LookupContacts", {
+            method: "POST",
+            headers: {
+                "RequestVerificationToken": getRequestVerificationToken(),
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ projectNumber: project, email: email })
+        });
+
+        const data = await readJsonSafe(response);
+        if (!response.ok || (data && data.error)) {
+            throw new Error((data && data.error) || describeHttpError(response));
+        }
+
+        if (!Array.isArray(data)) {
+            throw new Error("Unexpected server response while loading contacts.");
+        }
+
+        renderContacts(data);
+    }
+
+    // NEW: load inspections (optional UI)
+    async function loadInspections(project, email) {
+        const response = await fetch("?handler=LookupInspections", {
+            method: "POST",
+            headers: {
+                "RequestVerificationToken": getRequestVerificationToken(),
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ projectNumber: project, email: email })
+        });
+
+        const data = await readJsonSafe(response);
+        if (!response.ok || (data && data.error)) {
+            throw new Error((data && data.error) || describeHttpError(response));
+        }
+
+        if (!Array.isArray(data)) {
+            throw new Error("Unexpected server response while loading inspections.");
+        }
+
+        renderInspections(data);
+    }
+
+    function renderInspections(items) {
+        if (!inspectionLookupArea) return;
+
+        currentInspections = Array.isArray(items) ? items : [];
+        inspectionLookupArea.innerHTML = "";
+
+        const filtered = currentInspections.filter(i => {
+            if (inspectionFilterMode === "all") return true;
+            const status = `${i.status ?? ""}`.trim().toLowerCase();
+            return status !== "cancelled" && status !== "completed";
+        });
+        if (inspectionCountLabel) {
+            inspectionCountLabel.textContent = `Showing ${filtered.length}`;
+        }
+
+        if (filtered.length === 0) {
+            inspectionLookupArea.innerHTML = "<p>No inspections found for this filter.</p>";
+            hideInspectionDetails();
+            return;
+        }
+
+        const rows = filtered.map(i => {
+            const start = i.startUtc ? new Date(i.startUtc).toLocaleString() : "";
+            const status = `${i.status ?? ""}`.trim();
+            const contact = `${i.contactName ?? ""}`.trim();
+            const isSelected = selectedInspectionId === i.id;
+
+            return `
+                <button type="button" class="inspection-row${isSelected ? " selected" : ""}" data-inspection-id="${i.id}">
+                    <span class="inspection-row-status">${status || "Unknown"}</span>
+                    <span class="inspection-row-time">${start || "No time"}</span>
+                    <span class="inspection-row-contact">${contact || "No contact"}</span>
+                    <span class="inspection-row-cta" aria-hidden="true">Details</span>
+                </button>
+            `;
+        }).join("");
+
+        inspectionLookupArea.innerHTML = rows;
+
+        inspectionLookupArea.querySelectorAll(".inspection-row").forEach(row => {
+            row.addEventListener("click", () => {
+                const id = row.getAttribute("data-inspection-id");
+                const selected = currentInspections.find(i => String(i.id) === String(id));
+                if (!selected) return;
+                openInspectionDetails(selected);
+                renderInspections(currentInspections);
+            });
+        });
+    }
+
+    function hideInspectionDetails() {
+        selectedInspectionId = null;
+        if (inspectionDetailsPanel) {
+            inspectionDetailsPanel.classList.remove("open");
+            inspectionDetailsPanel.setAttribute("aria-hidden", "true");
+        }
+        if (inspectionDetailsBody) inspectionDetailsBody.hidden = true;
+        if (inspectionDetailsEmpty) inspectionDetailsEmpty.hidden = false;
+        if (cancelInspectionBtn) cancelInspectionBtn.removeAttribute("data-inspection-id");
+    }
+
+    function openInspectionDetails(inspection) {
+        if (!inspection) return;
+        selectedInspectionId = inspection.id;
+
+        if (inspectionDetailStatus) inspectionDetailStatus.textContent = inspection.status ?? "";
+        if (inspectionDetailStart) inspectionDetailStart.textContent = inspection.startUtc ? new Date(inspection.startUtc).toLocaleString() : "";
+        if (inspectionDetailEnd) inspectionDetailEnd.textContent = inspection.endUtc ? new Date(inspection.endUtc).toLocaleString() : "";
+        if (inspectionDetailAssigned) inspectionDetailAssigned.textContent = inspection.assignedTo ?? "Unassigned";
+        if (inspectionDetailAddress) inspectionDetailAddress.textContent = inspection.address ?? "";
+        if (inspectionDetailComments) inspectionDetailComments.textContent = inspection.comments ?? "";
+
+        if (cancelInspectionBtn) cancelInspectionBtn.setAttribute("data-inspection-id", inspection.id ?? "");
+        if (inspectionDetailsEmpty) inspectionDetailsEmpty.hidden = true;
+        if (inspectionDetailsBody) inspectionDetailsBody.hidden = false;
+        if (inspectionDetailsPanel) {
+            inspectionDetailsPanel.classList.add("open");
+            inspectionDetailsPanel.setAttribute("aria-hidden", "false");
+        }
+    }
+
+    if (inspectionFilterActiveBtn) {
+        inspectionFilterActiveBtn.addEventListener("click", () => {
+            inspectionFilterMode = "active";
+            inspectionFilterActiveBtn.classList.add("active");
+            inspectionFilterAllBtn?.classList.remove("active");
+            renderInspections(currentInspections);
+        });
+    }
+
+    if (inspectionFilterAllBtn) {
+        inspectionFilterAllBtn.addEventListener("click", () => {
+            inspectionFilterMode = "all";
+            inspectionFilterAllBtn.classList.add("active");
+            inspectionFilterActiveBtn?.classList.remove("active");
+            renderInspections(currentInspections);
+        });
+    }
+
+    if (closeInspectionDetailsBtn) {
+        closeInspectionDetailsBtn.addEventListener("click", () => {
+            hideInspectionDetails();
+            renderInspections(currentInspections);
+        });
+    }
+
+    if (cancelInspectionBtn) {
+        cancelInspectionBtn.addEventListener("click", async () => {
+            const id = cancelInspectionBtn.getAttribute("data-inspection-id");
+            if (!id) return;
+
+            if (!confirm("Cancel this booking?")) return;
+
+            const response = await fetch("?handler=CancelInspection", {
+                method: "POST",
+                headers: {
+                    "RequestVerificationToken": getRequestVerificationToken(),
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    id: id,
+                    projectNumber: (projectInput?.value || "").trim(),
+                    email: (contactEmailField?.value || "").trim()
+                })
+            });
+
+            const data = await readJsonSafe(response);
+            if (!response.ok || (data && data.error)) {
+                alert((data && data.error) || describeHttpError(response));
+                return;
+            }
+
+            currentInspections = currentInspections.map(i =>
+                String(i.id) === String(id)
+                    ? { ...i, status: "Cancelled" }
+                    : i);
+
+            hideInspectionDetails();
+            renderInspections(currentInspections);
+        });
+    }
+
+    if (sendProjectEmailCodeBtn) {
+        sendProjectEmailCodeBtn.addEventListener("click", async () => {
+            const project = (projectInput?.value || "").trim();
+            const email = (contactEmailField?.value || "").trim();
+
+            if (!project || !email) {
+                setProjectEmailVerificationStatus("Enter project number and email first.");
+                return;
+            }
+
+            sendProjectEmailCodeBtn.disabled = true;
+            const originalText = sendProjectEmailCodeBtn.textContent;
+            sendProjectEmailCodeBtn.textContent = "Sending...";
+
+            try {
+                const response = await fetch("?handler=SendProjectEmailCode", {
+                    method: "POST",
+                    headers: {
+                        "RequestVerificationToken": getRequestVerificationToken(),
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ projectNumber: project, email: email })
+                });
+
+                const data = await readJsonSafe(response);
+                if (!response.ok || (data && data.error)) {
+                    setProjectEmailVerificationStatus((data && data.error) || describeHttpError(response));
+                    return;
+                }
+
+                setProjectEmailVerificationStatus("Code sent. Check your email and enter the 6-digit code.");
+            } catch {
+                setProjectEmailVerificationStatus("Unable to send verification code.");
+            } finally {
+                sendProjectEmailCodeBtn.disabled = false;
+                sendProjectEmailCodeBtn.textContent = originalText;
+            }
+        });
+    }
+
+    if (verifyProjectEmailCodeBtn) {
+        verifyProjectEmailCodeBtn.addEventListener("click", async () => {
+            const project = (projectInput?.value || "").trim();
+            const email = (contactEmailField?.value || "").trim();
+            const code = (projectEmailCodeInput?.value || "").trim();
+
+            if (!project || !email || !code) {
+                setProjectEmailVerificationStatus("Enter project number, email, and code.");
+                return;
+            }
+
+            verifyProjectEmailCodeBtn.disabled = true;
+            const originalText = verifyProjectEmailCodeBtn.textContent;
+            verifyProjectEmailCodeBtn.textContent = "Verifying...";
+
+            try {
+                const response = await fetch("?handler=VerifyProjectEmailCode", {
+                    method: "POST",
+                    headers: {
+                        "RequestVerificationToken": getRequestVerificationToken(),
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ projectNumber: project, email: email, code: code })
+                });
+
+                const data = await readJsonSafe(response);
+                if (!response.ok || (data && data.error)) {
+                    setProjectEmailVerificationStatus((data && data.error) || describeHttpError(response));
+                    return;
+                }
+
+                hideProjectEmailVerification();
+                setProjectEmailVerificationStatus("Email verified. You can now manage contacts.");
+
+                // After verification, attempt both:
+                // - open modal (existing behavior)
+                // - load inspections (new feature, if UI exists)
+                await openModal();
+
+                if (inspectionLookupArea) {
+                    try {
+                        await loadInspections(project, email);
+                    } catch (err) {
+                        console.warn("Failed to load inspections after verification:", err);
+                    }
+                }
+            } catch {
+                setProjectEmailVerificationStatus("Unable to verify code.");
+            } finally {
+                verifyProjectEmailCodeBtn.disabled = false;
+                verifyProjectEmailCodeBtn.textContent = originalText;
+            }
+        });
+    }
+
+    if (projectInput) {
+        projectInput.addEventListener("input", () => {
+            hideProjectEmailVerification();
+            setProjectEmailVerificationStatus("");
+        });
+    }
+
+    if (contactEmailField) {
+        contactEmailField.addEventListener("input", () => {
+            hideProjectEmailVerification();
+            setProjectEmailVerificationStatus("");
+        });
+    }
+
+    function closeProjectSuggestions() {
+        if (!projectSuggestions) return;
+        projectSuggestions.hidden = true;
+        projectSuggestions.innerHTML = "";
+        projectSuggestionItems = [];
+        activeProjectSuggestionIndex = -1;
+    }
+
+    function setProjectSearchStatus(message) {
+        if (!projectSearchStatus) return;
+        projectSearchStatus.textContent = message || "";
+    }
+
+    function applyProjectSuggestion(item) {
+        if (!item || !item.projectNumber) return;
+
+        projectInput.value = item.projectNumber;
+
+        const projectAddressInput = document.getElementById("ProjectAddress");
+        if (projectAddressInput && !projectAddressInput.value && item.address) {
+            projectAddressInput.value = item.address;
+        }
+
+        closeProjectSuggestions();
+        setProjectSearchStatus(`Selected ${item.projectNumber}.`);
+    }
+
+    function renderProjectSuggestions(items) {
+        if (!projectSuggestions) return;
+
+        projectSuggestionItems = Array.isArray(items) ? items : [];
+        activeProjectSuggestionIndex = -1;
+
+        if (projectSuggestionItems.length === 0) {
+            closeProjectSuggestions();
+            setProjectSearchStatus("No matching projects found.");
+            return;
+        }
+
+        projectSuggestions.innerHTML = "";
+
+        projectSuggestionItems.forEach((item, index) => {
+            const row = document.createElement("button");
+            row.type = "button";
+            row.className = "project-suggestion-item";
+            row.textContent = item.display || item.projectNumber || "";
+            row.addEventListener("click", () => applyProjectSuggestion(item));
+            row.addEventListener("mouseenter", () => {
+                activeProjectSuggestionIndex = index;
+                syncActiveProjectSuggestion();
+            });
+            projectSuggestions.appendChild(row);
+        });
+
+        projectSuggestions.hidden = false;
+        setProjectSearchStatus(`${projectSuggestionItems.length} matching project(s) found.`);
+    }
+
+    function syncActiveProjectSuggestion() {
+        if (!projectSuggestions) return;
+        const rows = projectSuggestions.querySelectorAll(".project-suggestion-item");
+        rows.forEach((row, index) => {
+            row.classList.toggle("active", index === activeProjectSuggestionIndex);
+        });
+    }
+
+    async function fetchProjectSuggestions() {
+        if (!projectInput || !projectSuggestions) return;
+
+        const term = (projectInput.value || "").trim();
+        if (term.length < 2) {
+            closeProjectSuggestions();
+            setProjectSearchStatus("Enter at least 2 characters to search.");
+            return;
+        }
+
+        const requestId = ++projectSuggestRequestCounter;
+        const url = `?handler=ProjectSuggestions&term=${encodeURIComponent(term)}&limit=15`;
+        const originalButtonText = projectSearchBtn ? projectSearchBtn.textContent : "";
+
+        if (projectSearchBtn) {
+            projectSearchBtn.disabled = true;
+            projectSearchBtn.textContent = "Searching...";
+        }
+
+        setProjectSearchStatus(`Searching for "${term}"...`);
+
+        try {
+            const response = await fetch(url, { method: "GET" });
+            if (!response.ok) {
+                console.error("Project suggestion request failed:", response.status);
+                closeProjectSuggestions();
+                setProjectSearchStatus("Project search failed. Please try again.");
+                return;
+            }
+
+            const data = await readJsonSafe(response);
+            if (!Array.isArray(data)) {
+                closeProjectSuggestions();
+                setProjectSearchStatus("Project search failed. Please try again.");
+                return;
+            }
+
+            if (requestId !== projectSuggestRequestCounter) {
+                return;
+            }
+
+            renderProjectSuggestions(data);
+        } catch {
+            console.error("Project suggestion request threw.");
+            closeProjectSuggestions();
+            setProjectSearchStatus("Project search failed. Please try again.");
+        } finally {
+            if (projectSearchBtn) {
+                projectSearchBtn.disabled = false;
+                projectSearchBtn.textContent = originalButtonText;
+            }
+        }
+    }
+
+    if (projectSearchBtn) {
+        projectSearchBtn.addEventListener("click", () => {
+            fetchProjectSuggestions();
+        });
+    }
+
+    if (projectInput) {
+        projectInput.addEventListener("input", () => {
+            closeProjectSuggestions();
+            setProjectSearchStatus("");
+        });
+
+        projectInput.addEventListener("keydown", e => {
+            const hasOpenSuggestions = projectSuggestionItems.length > 0 && !projectSuggestions.hidden;
+
+            if (e.key === "Enter" && !hasOpenSuggestions) {
+                e.preventDefault();
+                fetchProjectSuggestions();
+                return;
+            }
+
+            if (!hasOpenSuggestions) {
+                if (e.key === "Escape") {
+                    closeProjectSuggestions();
+                }
+                return;
+            }
+
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                activeProjectSuggestionIndex =
+                    (activeProjectSuggestionIndex + 1) % projectSuggestionItems.length;
+                syncActiveProjectSuggestion();
+                return;
+            }
+
+            if (e.key === "ArrowUp") {
+                e.preventDefault();
+                activeProjectSuggestionIndex =
+                    activeProjectSuggestionIndex <= 0
+                        ? projectSuggestionItems.length - 1
+                        : activeProjectSuggestionIndex - 1;
+                syncActiveProjectSuggestion();
+                return;
+            }
+
+            if (e.key === "Enter") {
+                if (activeProjectSuggestionIndex >= 0 &&
+                    activeProjectSuggestionIndex < projectSuggestionItems.length) {
+                    e.preventDefault();
+                    applyProjectSuggestion(projectSuggestionItems[activeProjectSuggestionIndex]);
+                }
+                return;
+            }
+
+            if (e.key === "Escape") {
+                closeProjectSuggestions();
+            }
+        });
+    }
+
+    document.addEventListener("keydown", e => {
+        if (e.key === "Escape") closeModal();
+    });
+
+    document.addEventListener("click", e => {
+        if (!projectSuggestions || !projectInput) return;
+        if (e.target === projectInput || projectSuggestions.contains(e.target)) return;
+        closeProjectSuggestions();
+    });
+
+    modal.addEventListener("pointerdown", e => {
+        modalBackdropPointerDown = (e.target === modal);
+    });
+
+    modal.addEventListener("pointerup", e => {
+        if (modalBackdropPointerDown && e.target === modal) closeModal();
+        modalBackdropPointerDown = false;
+    });
+    document.querySelector(".kor-modal-content")
+        .addEventListener("click", e => e.stopPropagation());
+
+    function resetContactForm() {
+        editIdInput.value = "";
+        contactFormTitle.textContent = "Add Contact";
+        document.getElementById("saveContactBtn").textContent = "Save Contact";
+        cancelEditBtn.style.display = "none";
+
+        contactNameInput.value = "";
+        contactPhoneInput.value = "";
+        contactAddressInput.value = "";
+        contactEmailInput.readOnly = false;
+        contactEmailInput.value = (contactEmailField?.value || "").trim();
+    }
+
+    function beginEditContact(id) {
+        const contact = currentContacts.find(c => c.id === id);
+        if (!contact) {
+            alert("Contact not found.");
+            return;
+        }
+
+        editIdInput.value = String(contact.id);
+        contactFormTitle.textContent = `Editing: ${contact.name ?? "Contact"}`;
+        document.getElementById("saveContactBtn").textContent = "Save Changes";
+        cancelEditBtn.style.display = "";
+        contactNameInput.value = contact.name ?? "";
+        contactPhoneInput.value = contact.phone ?? "";
+        contactAddressInput.value = contact.address ?? "";
+        contactEmailInput.readOnly = true;
+        contactEmailInput.value = contact.email ?? (document.getElementById("ContactEmail").value || "");
+    }
+
+    async function openModal() {
+
+        const projectInputEl = document.getElementById("ProjectNumber");
+        const emailInputEl = document.getElementById("ContactEmail");
+
+        // force browser to finalize typed values
+        projectInputEl.blur();
+        emailInputEl.blur();
+
+        const project = (projectInputEl?.value || "").trim();
+        const email = (emailInputEl?.value || "").trim();
+
+        if (!project || !email) {
+            alert("Enter a valid project number and email first.");
+            return;
+        }
+
+        inspectionFilterMode = "active";
+        inspectionFilterActiveBtn?.classList.add("active");
+        inspectionFilterAllBtn?.classList.remove("active");
+
+        try {
+            await loadContacts(project, email);
+        } catch (err) {
+            const message = (err && err.message) || "";
+            if (!/verify|verification|access denied|403/i.test(message)) {
+                alert(message || "Unable to load contacts.");
+                return;
+            }
+
+            const verified = await ensureProjectEmailVerified(project, email);
+            if (!verified) {
+                return;
+            }
+
+            try {
+                await loadContacts(project, email);
+            } catch (retryErr) {
+                alert((retryErr && retryErr.message) || "Unable to load contacts.");
+                return;
+            }
+        }
+
+        currentInspections = [];
+        // New feature: load inspections if the UI exists
+        if (inspectionLookupArea) {
+            try {
+                await loadInspections(project, email);
+            } catch (err) {
+                console.warn("Unable to load inspections:", err);
+                currentInspections = [];
+            }
+        }
+        hideInspectionDetails();
+        renderInspections(currentInspections);
+
+        resetContactForm();
+        modal.style.display = "flex";
+        document.body.style.overflow = "hidden";
+    }
+
+    function closeModal() {
+        hideInspectionDetails();
+        modal.style.display = "none";
+        document.body.style.overflow = "";
+    }
+
+    function renderContacts(data) {
+
+        const area = document.getElementById("contactLookupArea");
+        currentContacts = Array.isArray(data) ? data : [];
+        area.innerHTML = "";
+
+        if (!data || data.length === 0) {
+            area.innerHTML = "<p>No saved contacts yet for this project and email domain. Create your first contact below to continue.</p>";
+            return;
+        }
+
+        data.forEach(c => {
+
+            const row = document.createElement("div");
+            row.className = "contact-row";
+
+            row.innerHTML = `
+                <div class="contact-row-main">
+                    <div class="contact-row-name">${c.name ?? ""}</div>
+                    <div class="contact-row-meta">${c.email ?? ""} · ${c.phone ?? ""}</div>
+                </div>
+                <div class="contact-row-actions">
+                    <button onclick="selectContact(${c.id})" class="btn btn-sm btn-secondary">Use</button>
+                    <button onclick="beginEditContact(${c.id})" class="btn btn-sm btn-outline-primary">Edit</button>
+                    <button onclick="deleteContact(${c.id})" class="btn btn-sm btn-danger">Delete</button>
+                </div>
+            `;
+
+            area.appendChild(row);
+        });
+    }
+
+    function selectContact(id) {
+
+        const project = document.getElementById("ProjectNumber").value;
+        const email = document.getElementById("ContactEmail").value;
+
+        const qs = new URLSearchParams({
+            handler: "SelectContact",
+            id: String(id),
+            ProjectNumber: project ?? "",
+            ContactEmail: email ?? ""
+        });
+
+        fetch("?" + qs.toString(), {
+            method: "POST",
+            headers: {
+                "RequestVerificationToken":
+                    document.querySelector('input[name="__RequestVerificationToken"]').value
+            }
+        })
+        .then(async r => {
+            const data = await readJsonSafe(r);
+            if (!r.ok) {
+                throw new Error((data && data.error) || describeHttpError(r));
+            }
+            if (!data) {
+                throw new Error("Unexpected server response.");
+            }
+            return data;
+        })
+        .then(c => {
+            if (c && c.error) {
+                alert(c.error);
+                return;
+            }
+
+            document.getElementById("SelectedContactId").value = c.id;
+            document.getElementById("ContactName").value = c.name;
+            document.getElementById("ContactPhone").value = c.phone;
+            document.getElementById("ProjectAddress").value = c.address ?? "";
+
+            step2.disabled = false;
+
+            if (step2Wrapper) {
+                step2Wrapper.classList.remove("step2-locked");
+
+                const lockMsg = step2Wrapper.querySelector(".step-lock-overlay");
+                if (lockMsg) {
+                    lockMsg.remove();
+                }
+            }
+
+            closeModal();
+
+            step2.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+    }
+
+    function deleteContact(id) {
+
+        if (!confirm("Delete this contact?"))
+            return;
+
+        const project = document.getElementById("ProjectNumber").value;
+        const email = document.getElementById("ContactEmail").value;
+
+        const deleteQs = new URLSearchParams({
+            handler: "DeleteContact",
+            id: String(id),
+            ProjectNumber: project ?? "",
+            ContactEmail: email ?? ""
+        });
+
+        fetch("?" + deleteQs.toString(), {
+            method: "POST",
+            headers: {
+                "RequestVerificationToken":
+                    document.querySelector('input[name="__RequestVerificationToken"]').value
+            }
+        })
+        .then(async r => {
+            const data = await readJsonSafe(r);
+            if (!r.ok || (data && data.error)) {
+                throw new Error((data && data.error) || describeHttpError(r));
+            }
+        })
+        .then(() => loadContacts(project, email))
+        .catch(err => alert(err.message || "Failed to delete contact."));
+    }
+
+    document.getElementById("saveContactBtn")
+        .addEventListener("click", () => {
+
+            const saveBtn = document.getElementById("saveContactBtn");
+            const originalSaveText = saveBtn.textContent;
+            saveBtn.disabled = true;
+            saveBtn.textContent = "Saving...";
+            const editIdRaw = editIdInput.value;
+            const editId = editIdRaw ? Number(editIdRaw) : null;
+            const isEdit = Number.isFinite(editId);
+            const existingContact = isEdit
+                ? currentContacts.find(c => c.id === editId)
+                : null;
+            const emailForSave = isEdit
+                ? (existingContact?.email ?? "")
+                : (contactEmailInput.value || "");
+
+            if (!isEdit && !emailForSave.trim()) {
+                alert("Email is required.");
+                saveBtn.disabled = false;
+                saveBtn.textContent = originalSaveText;
+                return;
+            }
+
+            const payload = {
+                id: Number.isFinite(editId) ? editId : null,
+                name: contactNameInput.value,
+                phone: contactPhoneInput.value,
+                address: contactAddressInput.value,
+                projectNumber: document.getElementById("ProjectNumber").value,
+                email: emailForSave
+            };
+
+            fetch("?handler=SaveContactAjax", {
+                method: "POST",
+                headers: {
+                    "RequestVerificationToken":
+                        document.querySelector('input[name="__RequestVerificationToken"]').value,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(async r => {
+                const data = await readJsonSafe(r);
+                if (!r.ok) {
+                    throw new Error((data && data.error) || describeHttpError(r));
+                }
+                return data;
+            })
+            .then(data => {
+                if (data && data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                if (!data || typeof data.id !== "number") {
+                    alert("Unable to save contact. Please try again.");
+                    return;
+                }
+
+                if (!isEdit) {
+                    const project = document.getElementById("ProjectNumber").value;
+                    const email = document.getElementById("ContactEmail").value;
+
+                    loadContacts(project, email)
+                        .catch(err => alert((err && err.message) || "Unable to load contacts."));
+                    resetContactForm();
+                    return;
+                }
+
+                selectContact(data.id);
+            })
+            .finally(() => {
+                saveBtn.disabled = false;
+                saveBtn.textContent = originalSaveText;
+            });
+        });
+
+    contactPhoneInput.addEventListener("input", () => {
+        let digits = (contactPhoneInput.value || "").replace(/\D/g, "").slice(0, 10);
+
+        if (digits.length >= 7) {
+            contactPhoneInput.value = `(${digits.slice(0, 3)})-${digits.slice(3, 6)}-${digits.slice(6)}`;
+        } else if (digits.length >= 4) {
+            contactPhoneInput.value = `(${digits.slice(0, 3)})-${digits.slice(3)}`;
+        } else if (digits.length > 0) {
+            contactPhoneInput.value = `(${digits}`;
+        } else {
+            contactPhoneInput.value = "";
+        }
+    });
+
+</script>

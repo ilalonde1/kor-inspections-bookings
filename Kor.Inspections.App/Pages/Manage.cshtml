@@ -1,0 +1,65 @@
+﻿@page
+@model Kor.Inspections.App.Pages.ManageModel
+
+@{
+    ViewData["Title"] = "View Booking";
+}
+
+<h2>View Field Review Booking</h2>
+
+@if (Model.BookingNotFound)
+{
+    <p>Sorry — we couldn’t find a booking for this link.</p>
+}
+else
+{
+    <p>
+        <strong>Project:</strong> @Model.ProjectNumber<br />
+        <strong>Date:</strong> @Model.LocalDateText<br />
+        <strong>Time:</strong> @Model.LocalTimeText
+    </p>
+
+    @if (!string.IsNullOrWhiteSpace(Model.AssignedTo))
+    {
+        <p>
+            <strong>Assigned Inspector:</strong> @Model.AssignedTo
+        </p>
+    }
+    @if (Model.CancelledSuccessfully)
+    {
+        <p style="color: green; font-weight: bold;">
+            This booking has been cancelled successfully.
+        </p>
+    }
+    else if (Model.AlreadyCancelled)
+    {
+        <p style="font-style: italic;">
+            This booking has already been cancelled.
+        </p>
+    }
+    else if (!Model.CanCancel)
+    {
+        <p style="color: darkred;">
+            This booking can no longer be cancelled online.
+            Cancellations must be submitted by <strong>2:00 PM Pacific</strong> on the previous business day.
+        </p>
+        <p>
+            Please contact KOR directly if you have questions.
+        </p>
+    }
+    else
+    {
+        <hr />
+        <p>
+            If you need to cancel this booking, you may do so below.
+        </p>
+
+        <form method="post">
+            <input type="hidden" asp-for="Token" />
+            <button type="submit"
+                    onclick="return confirm('Are you sure you want to cancel this booking?');">
+                Cancel Booking
+            </button>
+        </form>
+    }
+}

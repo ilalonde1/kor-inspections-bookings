@@ -1,0 +1,13 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.cache
+*.pdb
+*.log
+node_modules/
+TestResults/
+.artifacts/
+appsettings.Development.json
+appsettings.Local.json

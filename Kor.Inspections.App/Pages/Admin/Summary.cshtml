@@ -1,0 +1,364 @@
+﻿@page "/admin/summary"
+@using Kor.Inspections.App.Services 
+@model Kor.Inspections.App.Pages.Admin.SummaryModel
+@{
+    ViewData["Title"] = "Tomorrow's Field Reviews";
+}
+
+<h2>Field Reviews for @Model.SummaryDateLocal.ToString("yyyy-MM-dd")</h2>
+
+    <p>
+        This summary shows all non-cancelled bookings scheduled for tomorrow,
+        based on Kor's local time.
+    </p>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="admin-status-message">
+            @Model.StatusMessage
+        </div>
+    }
+
+    <div class="assign-inline" style="flex-wrap:wrap; align-items:center; margin-bottom:14px;">
+        <form method="post" asp-page-handler="EmailAllInspectors" style="margin:0;">
+            <button type="submit" class="btn-primary">
+                Email All Assigned Inspectors
+            </button>
+        </form>
+
+        <form method="post" asp-page-handler="Email" style="margin:0;">
+            <button type="submit" class="btn-primary">
+                Email Full Summary
+            </button>
+        </form>
+
+        <form method="post" asp-page-handler="EmailInspector" class="assign-inline" style="margin:0;">
+
+            <select name="inspectorEmail" required class="inspector-dropdown">
+                <option value="">Select inspector...</option>
+
+                @foreach (var inspector in Model.Inspectors)
+                {
+                    <option value="@inspector.Email">
+                        @inspector.DisplayName
+                    </option>
+                }
+            </select>
+
+            <button type="submit" class="btn-primary">
+                Email Inspector Summary
+            </button>
+
+        </form>
+    </div>
+
+    @if (!Model.Bookings.Any())
+    {
+        <p>No bookings are scheduled for that day.</p>
+    }
+    else
+    {
+        var hasUnassignedRows = Model.Bookings.Any(b =>
+            string.Equals(b.AssignedTo, "Unassigned", StringComparison.OrdinalIgnoreCase));
+
+        @if (hasUnassignedRows)
+        {
+            <div class="summary-unassigned-note">
+                Highlighted rows are unassigned.
+            </div>
+        }
+
+        <div class="admin-table-container">
+            <div class="table-responsive-mobile">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th class="col-time">
+                            <a asp-page="./Summary"
+                               asp-route-sort="time"
+                               asp-route-dir="@Model.ToggleDir("time")"
+                               class="sort-link">
+                                Time ⇅
+                            </a>
+                        </th>
+                        <th class="col-job">
+                            <a asp-page="./Summary"
+                               asp-route-sort="job"
+                               asp-route-dir="@Model.ToggleDir("job")"
+                               class="sort-link">
+                                Job # ⇅
+                            </a>
+                        </th>
+                        <th class="col-address">
+                            <a asp-page="./Summary"
+                               asp-route-sort="address"
+                               asp-route-dir="@Model.ToggleDir("address")"
+                               class="sort-link">
+                                Site Address ⇅
+                            </a>
+                        </th>
+                        <th class="col-contact">Contact</th>
+                        <th class="col-assigned">
+                            <a asp-page="./Summary"
+                               asp-route-sort="assigned"
+                               asp-route-dir="@Model.ToggleDir("assigned")"
+                               class="sort-link">
+                                Assigned To ⇅
+                            </a>
+                        </th>
+                        <th class="col-status">
+                            <a asp-page="./Summary"
+                               asp-route-sort="status"
+                               asp-route-dir="@Model.ToggleDir("status")"
+                               class="sort-link">
+                                Status ⇅
+                            </a>
+                        </th>
+                        <th class="col-comments">
+                            Comments
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var b in Model.Bookings)
+                    {
+                        var isUnassigned = string.Equals(b.AssignedTo, "Unassigned", StringComparison.OrdinalIgnoreCase);
+                        <tr class="summary-booking-row @(isUnassigned ? "summary-unassigned-row" : "")" data-booking-id="@b.BookingId">
+                            <td>
+                                @BookingDisplayHelper.GetTimeDisplay(
+                                b.TimePreference,
+                                        b.StartLocal,
+                                        b.EndLocal)
+                    </td>
+                            <td>@b.ProjectNumber</td>
+                            <td>@b.ProjectAddress</td>
+                            <td>@b.ContactName (@b.ContactPhone)</td>
+                            <td>@b.AssignedTo</td>
+                            <td>@b.Status</td>
+                            <td>@b.Comments</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            </div>
+        </div>
+
+        var inspectorGroups = Model.Bookings
+            .Where(b => !string.Equals(b.AssignedTo, "Unassigned", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(b => b.AssignedTo)
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        @if (inspectorGroups.Any())
+        {
+            <div class="summary-route-planner">
+                <h3>Inspector Route Planner</h3>
+                <p class="helper-text-muted">Drag stops to reorder, click Set Route Order, then Navigate Route.</p>
+
+                @foreach (var group in inspectorGroups)
+                {
+                    <section class="summary-route-card" data-inspector="@group.Key">
+                        <div class="summary-route-head">
+                            <h4>@group.Key</h4>
+                            <div class="summary-route-actions">
+                                <button type="button" class="btn-smooth summary-set-route-btn">Set Route Order</button>
+                                <button type="button" class="btn-smooth summary-nav-route-btn">Navigate Route</button>
+                            </div>
+                        </div>
+
+                        <div class="summary-route-status helper-text-muted"></div>
+
+                        <ul class="summary-route-list">
+                            @foreach (var b in group.OrderBy(x => x.StartLocal))
+                            {
+                                <li class="summary-route-item"
+                                    draggable="true"
+                                    data-booking-id="@b.BookingId"
+                                    data-address="@b.ProjectAddress">
+                                    <span class="summary-route-time">
+                                        @BookingDisplayHelper.GetTimeDisplay(
+                                            b.TimePreference,
+                                            b.StartLocal,
+                                            b.EndLocal)
+                                    </span>
+                                    <span class="summary-route-job">@b.ProjectNumber</span>
+                                    <span class="summary-route-address">@b.ProjectAddress</span>
+                                    <span class="summary-route-item-controls">
+                                        <button type="button" class="btn-smooth summary-route-move-up" aria-label="Move stop up">Up</button>
+                                        <button type="button" class="btn-smooth summary-route-move-down" aria-label="Move stop down">Down</button>
+                                    </span>
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
+            </div>
+        }
+    }
+
+    <p class="summary-back-link">
+        <a asp-page="/Admin/Index" class="btn-smooth">
+            Back to Admin Dashboard
+        </a>
+
+    </p>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const cards = Array.from(document.querySelectorAll(".summary-route-card"));
+    if (!cards.length) return;
+
+    cards.forEach((card) => {
+        const list = card.querySelector(".summary-route-list");
+        const setBtn = card.querySelector(".summary-set-route-btn");
+        const navBtn = card.querySelector(".summary-nav-route-btn");
+        const status = card.querySelector(".summary-route-status");
+        const tableRows = Array.from(document.querySelectorAll(".summary-booking-row"));
+        let savedOrder = null;
+        let draggedItem = null;
+
+        if (!list) return;
+
+        function setStatus(message) {
+            if (status) status.textContent = message || "";
+        }
+
+        function getItems() {
+            return Array.from(list.querySelectorAll(".summary-route-item"));
+        }
+
+        function getOrderedItems() {
+            const current = getItems();
+            if (!savedOrder || !savedOrder.length) return current;
+
+            const byId = new Map(current.map(i => [i.dataset.bookingId, i]));
+            const ordered = savedOrder.map(id => byId.get(id)).filter(Boolean);
+            const leftovers = current.filter(i => !savedOrder.includes(i.dataset.bookingId));
+            return ordered.concat(leftovers);
+        }
+
+        function getDropTarget(mouseY) {
+            const siblings = getItems().filter(i => i !== draggedItem);
+            let best = null;
+            let bestOffset = Number.NEGATIVE_INFINITY;
+
+            siblings.forEach((item) => {
+                const rect = item.getBoundingClientRect();
+                const offset = mouseY - rect.top - rect.height / 2;
+                if (offset < 0 && offset > bestOffset) {
+                    bestOffset = offset;
+                    best = item;
+                }
+            });
+
+            return best;
+        }
+
+        getItems().forEach((item) => {
+            const moveUpBtn = item.querySelector(".summary-route-move-up");
+            const moveDownBtn = item.querySelector(".summary-route-move-down");
+
+            item.addEventListener("dragstart", function (e) {
+                draggedItem = item;
+                item.classList.add("summary-route-dragging");
+                setStatus("Drag stops, then click Set Route Order.");
+                if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", item.dataset.bookingId || "");
+                }
+            });
+
+            item.addEventListener("dragend", function () {
+                item.classList.remove("summary-route-dragging");
+                draggedItem = null;
+            });
+
+            item.addEventListener("click", function () {
+                const bookingId = item.dataset.bookingId;
+                if (!bookingId) return;
+
+                getItems().forEach(i => i.classList.remove("active"));
+                item.classList.add("active");
+
+                tableRows.forEach(r => r.classList.remove("desktop-active-row"));
+                const targetRow = document.querySelector(`.summary-booking-row[data-booking-id="${bookingId}"]`);
+                if (targetRow) {
+                    targetRow.classList.add("desktop-active-row");
+                    targetRow.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
+            });
+
+            if (moveUpBtn) {
+                moveUpBtn.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const prev = item.previousElementSibling;
+                    if (!prev) return;
+                    list.insertBefore(item, prev);
+                    setStatus("Order changed. Click Set Route Order.");
+                });
+            }
+
+            if (moveDownBtn) {
+                moveDownBtn.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const next = item.nextElementSibling;
+                    if (!next) return;
+                    if (next.nextElementSibling) {
+                        list.insertBefore(item, next.nextElementSibling);
+                    } else {
+                        list.appendChild(item);
+                    }
+                    setStatus("Order changed. Click Set Route Order.");
+                });
+            }
+        });
+
+        list.addEventListener("dragover", function (e) {
+            if (!draggedItem) return;
+            e.preventDefault();
+            const target = getDropTarget(e.clientY);
+            if (!target) {
+                list.appendChild(draggedItem);
+            } else {
+                list.insertBefore(draggedItem, target);
+            }
+        });
+
+        if (setBtn) {
+            setBtn.addEventListener("click", function () {
+                savedOrder = getItems()
+                    .map(i => i.dataset.bookingId)
+                    .filter(Boolean);
+                setStatus("Route order set.");
+            });
+        }
+
+        if (navBtn) {
+            navBtn.addEventListener("click", function () {
+                const addresses = getOrderedItems()
+                    .map(i => (i.dataset.address || "").trim())
+                    .filter(Boolean);
+
+                if (!addresses.length) {
+                    setStatus("No valid addresses in this route.");
+                    return;
+                }
+
+                const origin = encodeURIComponent(addresses[0]);
+                const destination = encodeURIComponent(addresses[addresses.length - 1]);
+                const waypoints = addresses.slice(1, -1).map(encodeURIComponent).join("|");
+
+                const url =
+                    "https://www.google.com/maps/dir/?api=1"
+                    + "&origin=" + origin
+                    + "&destination=" + destination
+                    + (waypoints ? "&waypoints=" + waypoints : "");
+
+                window.open(url, "_blank");
+            });
+        }
+    });
+});
+</script>
