@@ -62,6 +62,8 @@ builder.Services.AddRazorPages(options =>
 
 builder.Services.AddDbContext<InspectionsContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("Sql")));
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<InspectionsContext>();
 
 // --------------------
 // Configuration options
@@ -85,6 +87,8 @@ builder.Services.Configure<DeltekProjectOptions>(
 
 builder.Services.AddHttpClient();
 
+builder.Services.AddSingleton<IGraphAccessTokenSource, MsalGraphAccessTokenSource>();
+builder.Services.AddSingleton<IGraphTokenProvider, GraphTokenProvider>();
 builder.Services.AddScoped<GraphMailService>();
 builder.Services.AddScoped<TimeRuleService>();
 builder.Services.AddScoped<BookingService>();
@@ -185,6 +189,7 @@ app.UseRateLimiter();
 // --------------------
 
 app.MapRazorPages();
+app.MapHealthChecks("/healthz");
 
 app.Run();
 
@@ -266,3 +271,5 @@ static void ValidateInspectionRulesConfiguration(IConfiguration config, Microsof
 
     logger.LogWarning("{Message} Development mode will continue to run.", message);
 }
+
+public partial class Program { }

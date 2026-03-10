@@ -4,6 +4,7 @@ using Kor.Inspections.App.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Kor.Inspections.App.Migrations
 {
     [DbContext(typeof(InspectionsContext))]
-    partial class InspectionsContextModelSnapshot : ModelSnapshot
+    [Migration("20260310234643_AddUniqueInspectorEmailIndex")]
+    partial class AddUniqueInspectorEmailIndex
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -87,6 +90,9 @@ namespace Kor.Inspections.App.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<string>("ElementsJson")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("EndUtc")
                         .HasColumnType("datetime2");

@@ -10,9 +10,6 @@ namespace Kor.Inspections.App.Data.Models
         public string ProjectNumber { get; set; } = string.Empty;
         public string? ProjectAddress { get; set; }
 
-        // Work details
-        public string? ElementsJson { get; set; }
-
         // Site contact
         public string ContactName { get; set; } = string.Empty;
         public string ContactPhone { get; set; } = string.Empty;

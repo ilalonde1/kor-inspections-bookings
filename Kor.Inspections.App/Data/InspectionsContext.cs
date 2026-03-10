@@ -88,6 +88,10 @@ namespace Kor.Inspections.App.Data
                       .HasMaxLength(200)
                       .IsRequired();
 
+                entity.HasIndex(i => i.Email)
+                      .IsUnique()
+                      .HasDatabaseName("IX_Inspectors_UniqueEmail");
+
                 entity.Property(i => i.DailyMax)
                       .HasDefaultValue(8);
 
