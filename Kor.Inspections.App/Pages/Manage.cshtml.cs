@@ -32,6 +32,7 @@ namespace Kor.Inspections.App.Pages
         public bool AlreadyCancelled { get; private set; }
         public bool CancelledSuccessfully { get; private set; }
         public bool CanCancel { get; private set; }
+        public bool IsTerminalState { get; private set; }
 
         // Display fields
         public string ProjectNumber { get; private set; } = "";
@@ -98,6 +99,15 @@ namespace Kor.Inspections.App.Pages
 
             AlreadyCancelled = string.Equals(
                 booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase);
+
+            var isTerminal = (string.Equals(booking.Status, "Completed", StringComparison.OrdinalIgnoreCase) ||
+                              string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase)) &&
+                             !_timeRules.IsCancellationAllowed(booking.StartUtc);
+            if (isTerminal)
+            {
+                IsTerminalState = true;
+                return;
+            }
 
             var tz = _timeRules.TimeZone;
 

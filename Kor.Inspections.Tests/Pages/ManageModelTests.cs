@@ -7,7 +7,6 @@ using Kor.Inspections.Tests.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -95,6 +94,64 @@ public class ManageModelTests
         Assert.Equal("client-token", action.PerformedBy);
     }
 
+    [Fact]
+    public async Task OnGetAsync_CancelledBookingWithClosedWindow_SetsTerminalStateAndHidesProject()
+    {
+        await using var db = CreateContext();
+        var booking = await AddBookingAsync(db, "Cancelled", DateTime.UtcNow.AddDays(-1), DateTime.UtcNow);
+        var logger = new ListLogger<BookingService>();
+        var model = CreateModel(db, logger, out _);
+        model.Token = booking.CancelToken;
+
+        await model.OnGetAsync();
+
+        Assert.True(model.IsTerminalState);
+        Assert.Equal(string.Empty, model.ProjectNumber);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_CompletedBookingWithClosedWindow_SetsTerminalState()
+    {
+        await using var db = CreateContext();
+        var booking = await AddBookingAsync(db, "Completed", DateTime.UtcNow.AddDays(-1), DateTime.UtcNow);
+        var logger = new ListLogger<BookingService>();
+        var model = CreateModel(db, logger, out _);
+        model.Token = booking.CancelToken;
+
+        await model.OnGetAsync();
+
+        Assert.True(model.IsTerminalState);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_CancelledBookingWithOpenWindow_RemainsVisible()
+    {
+        await using var db = CreateContext();
+        var booking = await AddBookingAsync(db, "Cancelled");
+        var logger = new ListLogger<BookingService>();
+        var model = CreateModel(db, logger, out _);
+        model.Token = booking.CancelToken;
+
+        await model.OnGetAsync();
+
+        Assert.False(model.IsTerminalState);
+        Assert.Equal("30844", model.ProjectNumber);
+    }
+
+    [Fact]
+    public async Task OnGetAsync_UnassignedFutureBooking_IsNotTerminal()
+    {
+        await using var db = CreateContext();
+        var booking = await AddBookingAsync(db, "Unassigned");
+        var logger = new ListLogger<BookingService>();
+        var model = CreateModel(db, logger, out _);
+        model.Token = booking.CancelToken;
+
+        await model.OnGetAsync();
+
+        Assert.False(model.IsTerminalState);
+    }
+
     private static ManageModel CreateModel(
         InspectionsContext db,
         ListLogger<BookingService> bookingLogger,
@@ -106,11 +163,7 @@ public class ManageModelTests
         var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
         var timeRules = TimeRuleServiceTestFactory.Create(timeZone, nowLocal.Hour + 1);
 
-        var graphConfig = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>())
-            .Build();
-
-        var graphMail = new GraphMailService(graphConfig, new NoOpHttpClientFactory());
+        var graphMail = new GraphMailService(new ThrowingTokenProvider(), new NoOpHttpClientFactory());
         var bookingService = new BookingService(
             db,
             Options.Create(new NotificationOptions
@@ -140,8 +193,15 @@ public class ManageModelTests
         return new ManageModel(db, timeRules, bookingService);
     }
 
-    private static async Task<Booking> AddBookingAsync(InspectionsContext db, string status)
+    private static async Task<Booking> AddBookingAsync(
+        InspectionsContext db,
+        string status,
+        DateTime? startUtc = null,
+        DateTime? endUtc = null)
     {
+        var resolvedStartUtc = startUtc ?? DateTime.UtcNow.AddDays(2);
+        var resolvedEndUtc = endUtc ?? resolvedStartUtc.AddHours(1);
+
         var booking = new Booking
         {
             BookingId = Guid.NewGuid(),
@@ -151,8 +211,8 @@ public class ManageModelTests
             ContactName = "Jane Doe",
             ContactPhone = "6045551212",
             ContactEmail = "jane@example.com",
-            StartUtc = DateTime.UtcNow.AddDays(2),
-            EndUtc = DateTime.UtcNow.AddDays(2).AddHours(1),
+            StartUtc = resolvedStartUtc,
+            EndUtc = resolvedEndUtc,
             Status = status,
             CreatedUtc = DateTime.UtcNow
         };
@@ -174,6 +234,14 @@ public class ManageModelTests
     private sealed class NoOpHttpClientFactory : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new();
+    }
+
+    private sealed class ThrowingTokenProvider : IGraphTokenProvider
+    {
+        public Task<string> GetTokenAsync()
+        {
+            throw new InvalidOperationException("Missing Graph configuration.");
+        }
     }
 
     private sealed class ListLogger<T> : ILogger<T>
