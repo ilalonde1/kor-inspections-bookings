@@ -1,4 +1,9 @@
+import "dotenv/config";
+import path from "path";
 import { defineConfig, devices } from "@playwright/test";
+
+// Absolute path keeps config and auth.ts in agreement regardless of CWD.
+const STORAGE_STATE = path.join(__dirname, "storageState.json");
 
 export default defineConfig({
   testDir: "./specs",
@@ -8,8 +13,8 @@ export default defineConfig({
     timeout: 10000
   },
   use: {
-    baseURL: process.env.BASE_URL || "http://localhost:5000",
-    storageState: "storageState.json",
+    baseURL: process.env.BASE_URL || "https://localhost:7074",
+    storageState: STORAGE_STATE,
     ignoreHTTPSErrors: true,
     trace: "on-first-retry"
   },
@@ -17,7 +22,8 @@ export default defineConfig({
     {
       name: "mobile-safari",
       use: {
-        ...devices["iPhone 13"]
+        ...devices["iPhone 13"],
+        storageState: STORAGE_STATE
       }
     }
   ]

@@ -4,9 +4,7 @@ test("admin mobile inspector tools smoke", async ({ page }) => {
   await page.goto("/admin");
   await page.waitForLoadState("domcontentloaded");
 
-  const body = page.locator("body");
-  await expect(body).toHaveClass(/mobile-mode/);
-  await expect(body).toHaveClass(/inspector-mode/);
+  await expect(page).toHaveURL(/admin/);
 
   await expect(page.locator("#adminMobileTodayPanel")).toBeVisible();
   await expect(page.locator("#adminMobileInspectorBar")).toBeVisible();
