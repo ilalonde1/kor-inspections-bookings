@@ -47,7 +47,7 @@ namespace Kor.Inspections.App.Pages
 
         public async Task<IActionResult> OnPostAsync()
         {
-            var booking = await _db.Bookings.SingleOrDefaultAsync(b => b.CancelToken == Token);
+            var booking = await _bookingService.GetBookingByCancelTokenAsync(Token);
 
             if (booking == null)
             {
@@ -62,19 +62,20 @@ namespace Kor.Inspections.App.Pages
                 return Page();
             }
 
+            if (string.Equals(booking.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            {
+                await LoadAsync();
+                return Page();
+            }
+
             if (!_timeRules.IsCancellationAllowed(booking.StartUtc))
             {
                 await LoadAsync();
                 return Page();
             }
 
-            booking.Status = "Cancelled";
-            await _db.SaveChangesAsync();
-
-            // SEND CANCELLATION EMAILS
-            await _bookingService.SendCancellationEmailsAsync(booking);
-
-            CancelledSuccessfully = true;
+            var cancelled = await _bookingService.CancelBookingByTokenAsync(Token);
+            CancelledSuccessfully = cancelled;
             await LoadAsync();
             return Page();
         }

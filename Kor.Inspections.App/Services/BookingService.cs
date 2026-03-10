@@ -174,6 +174,9 @@ namespace Kor.Inspections.App.Services
             if (string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
                 return true;
 
+            if (string.Equals(booking.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+                return false;
+
             booking.Status = "Cancelled";
             RecordAction(
                 booking.BookingId,
