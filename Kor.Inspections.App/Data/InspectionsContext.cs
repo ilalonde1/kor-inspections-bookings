@@ -52,6 +52,10 @@ namespace Kor.Inspections.App.Data
                       .IsRequired();
 
                 entity.HasIndex(b => b.ContactEmail);
+                entity.HasIndex(b => new { b.ProjectNumber, b.ContactEmail, b.StartUtc })
+                      .IsUnique()
+                      .HasFilter("[Status] != 'Cancelled'")
+                      .HasDatabaseName("IX_Bookings_NoDuplicateActiveSlot");
 
                 entity.Property(b => b.Status)
                       .HasMaxLength(30)

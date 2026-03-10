@@ -150,8 +150,17 @@ namespace Kor.Inspections.App.Services
                 booking.BookingId,
                 "Created",
                 booking.ContactEmail);
-            await _db.SaveChangesAsync();
-            await tx.CommitAsync();
+            try
+            {
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+            }
+            catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_Bookings_NoDuplicateActiveSlot", StringComparison.Ordinal) == true)
+            {
+                _db.ChangeTracker.Clear();
+                throw new BookingSlotUnavailableException(
+                    "This booking was already submitted. Please check your confirmation email.");
+            }
 
             _logger.LogInformation(
                 "New booking created for {ProjectNumber} at {StartUtc} by {ContactName} ({ContactEmail}).",
