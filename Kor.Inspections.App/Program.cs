@@ -40,7 +40,6 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
     options.Cookie.SameSite = SameSiteMode.Lax;
 });
-builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<ProjectProfileService>();
 builder.Services.AddScoped<ProjectBootstrapVerificationService>();
@@ -128,6 +127,16 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(10),
                 QueueLimit = 0
             }));
+
+    options.AddPolicy("contactMutation", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(10),
+                QueueLimit = 0
+            }));
 });
 
 var app = builder.Build();
@@ -143,6 +152,8 @@ if (app.Environment.IsProduction())
     ValidateRequiredSecret(builder.Configuration, "Graph:ClientSecret");
     ValidateRequiredSecret(builder.Configuration, "AzureAd:ClientSecret");
     ValidateRequiredSecret(builder.Configuration, "Deltek:OdbcDsn");
+    ValidateRequiredConfiguration(builder.Configuration, "Notification:FromMailbox");
+    ValidateRequiredConfiguration(builder.Configuration, "App:PublicBaseUrl");
 }
 
 // --------------------
@@ -184,6 +195,15 @@ static void ValidateRequiredSecret(IConfiguration config, string key)
     {
         throw new InvalidOperationException(
             $"Missing required production secret configuration: '{key}'. Configure it via environment variables or secure secret store.");
+    }
+}
+
+static void ValidateRequiredConfiguration(IConfiguration config, string key)
+{
+    var value = config[key];
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        throw new InvalidOperationException($"Missing required configuration: '{key}'.");
     }
 }
 

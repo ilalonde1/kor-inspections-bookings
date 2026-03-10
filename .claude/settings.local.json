@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:/VIsual Studio Projects/KOR Inspections Bookings/Kor.Inspections.App\" && dotnet build 2>&1)"
+    ]
+  }
+}

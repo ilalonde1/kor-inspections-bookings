@@ -120,6 +120,31 @@ namespace Kor.Inspections.App.Services
             return TimeZoneInfo.ConvertTimeToUtc(local, _tz);
         }
 
+        public bool IsCancellationAllowed(DateTime bookingStartUtc)
+        {
+            var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _tz);
+            var bookingLocal = TimeZoneInfo.ConvertTimeFromUtc(bookingStartUtc, _tz);
+
+            if (bookingLocal <= nowLocal)
+                return false;
+
+            var bookingDate = bookingLocal.Date;
+
+            var cutoffDay = bookingDate.AddDays(-1);
+            while (cutoffDay.DayOfWeek == DayOfWeek.Saturday ||
+                   cutoffDay.DayOfWeek == DayOfWeek.Sunday)
+            {
+                cutoffDay = cutoffDay.AddDays(-1);
+            }
+
+            var cutoffLocal = new DateTime(
+                cutoffDay.Year, cutoffDay.Month, cutoffDay.Day,
+                _options.CutoffHourLocal, 0, 0,
+                DateTimeKind.Unspecified);
+
+            return nowLocal <= cutoffLocal;
+        }
+
         // --------------------------------------------------
         // FULLY BOOKED DAYS (for Flatpickr)
         // --------------------------------------------------

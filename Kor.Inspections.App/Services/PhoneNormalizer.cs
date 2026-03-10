@@ -5,7 +5,7 @@ public static class PhoneNormalizer
     public static string Normalize(string phone)
     {
         if (string.IsNullOrWhiteSpace(phone))
-            return phone;
+            return string.Empty;
 
         var digits = Regex.Replace(phone, @"\D", "");
 
@@ -18,6 +18,9 @@ public static class PhoneNormalizer
 
     public static string Format(string phone)
     {
+        if (string.IsNullOrWhiteSpace(phone))
+            return string.Empty;
+
         var digits = Normalize(phone);
 
         if (digits.Length != 10)

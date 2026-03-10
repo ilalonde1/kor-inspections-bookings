@@ -201,8 +201,8 @@
 
                                         @foreach (var inspector in Model.Inspectors)
                                         {
-                                            <option value="@inspector.DisplayName"
-                                                    selected="@(inspector.DisplayName == b.AssignedTo)">
+                                            <option value="@inspector.Email"
+                                                    selected="@(inspector.Email == b.AssignedToValue || inspector.DisplayName == b.AssignedToValue)">
                                                 @inspector.DisplayName
                                             </option>
                                         }

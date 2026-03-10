@@ -6,10 +6,12 @@ using System.Text;
 using System.Threading.Tasks;
 using Kor.Inspections.App.Data;
 using Kor.Inspections.App.Data.Models;
+using Kor.Inspections.App.Options;
 using Kor.Inspections.App.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Kor.Inspections.App.Pages.Admin
 {
@@ -18,15 +20,18 @@ namespace Kor.Inspections.App.Pages.Admin
         private readonly InspectionsContext _db;
         private readonly TimeRuleService _timeRules;
         private readonly GraphMailService _mail;
+        private readonly NotificationOptions _notificationOptions;
 
         public SummaryModel(
             InspectionsContext db,
             TimeRuleService timeRules,
-            GraphMailService mail)
+            GraphMailService mail,
+            IOptions<NotificationOptions> notificationOptions)
         {
             _db = db;
             _timeRules = timeRules;
             _mail = mail;
+            _notificationOptions = notificationOptions.Value;
         }
 
         public DateTime SummaryDateLocal { get; private set; }
@@ -98,6 +103,16 @@ namespace Kor.Inspections.App.Pages.Admin
 
             var bookings = await query.ToListAsync();
 
+            Inspectors = await _db.Inspectors
+                .Where(i => i.Enabled)
+                .OrderBy(i => i.DisplayName)
+                .ToListAsync();
+
+            var inspectorsByEmail = Inspectors
+                .Where(i => !string.IsNullOrWhiteSpace(i.Email))
+                .GroupBy(i => i.Email, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().DisplayName, StringComparer.OrdinalIgnoreCase);
+
             Bookings = bookings
                 .Select(b =>
                 {
@@ -115,19 +130,11 @@ namespace Kor.Inspections.App.Pages.Admin
                         ContactName = b.ContactName,
                         ContactPhone = b.ContactPhone,
                         Status = b.Status,
-                        AssignedTo = string.IsNullOrWhiteSpace(b.AssignedTo)
-                            ? "Unassigned"
-                            : b.AssignedTo,
+                        AssignedTo = ResolveAssignedToDisplay(b.AssignedTo, inspectorsByEmail),
                         Comments = b.Comments ?? string.Empty
                     };
                 })
                 .ToList();
-
-            // Load inspectors for dropdown
-            Inspectors = await _db.Inspectors
-                .Where(i => i.Enabled)
-                .OrderBy(i => i.DisplayName)
-                .ToListAsync();
         }
 
         // ---------------------------------------------------
@@ -137,8 +144,8 @@ namespace Kor.Inspections.App.Pages.Admin
         {
             await OnGetAsync();
 
-            var fromMailbox = "reviews@korstructural.com";
-            var toEmail = "reviews@korstructural.com";
+            var fromMailbox = _notificationOptions.FromMailbox;
+            var toEmail = _notificationOptions.FromMailbox;
             var subject = $"Kor Field Reviews - {SummaryDateLocal:yyyy-MM-dd} (Tomorrow)";
             var html = BuildEmailHtml(SummaryDateLocal, Bookings);
 
@@ -175,7 +182,7 @@ var inspectorBookings = (inspector is null
                 return RedirectToPage();
             }
 
-            var fromMailbox = "reviews@korstructural.com";
+            var fromMailbox = _notificationOptions.FromMailbox;
             var subject = $"Your Field Reviews - {SummaryDateLocal:yyyy-MM-dd}";
             var html = BuildEmailHtml(SummaryDateLocal, inspectorBookings);
 
@@ -189,7 +196,7 @@ var inspectorBookings = (inspector is null
         {
             await OnGetAsync();
 
-            var fromMailbox = "reviews@korstructural.com";
+            var fromMailbox = _notificationOptions.FromMailbox;
 
             var inspectorsByName = Inspectors
                 .Where(i => !string.IsNullOrWhiteSpace(i.DisplayName) && !string.IsNullOrWhiteSpace(i.Email))
@@ -288,6 +295,18 @@ var inspectorBookings = (inspector is null
                 return "desc";
 
             return "asc";
+        }
+
+        private static string ResolveAssignedToDisplay(
+            string? assignedTo,
+            IReadOnlyDictionary<string, string> inspectorsByEmail)
+        {
+            if (string.IsNullOrWhiteSpace(assignedTo))
+                return "Unassigned";
+
+            return inspectorsByEmail.TryGetValue(assignedTo, out var displayName)
+                ? displayName
+                : assignedTo;
         }
     }
 }

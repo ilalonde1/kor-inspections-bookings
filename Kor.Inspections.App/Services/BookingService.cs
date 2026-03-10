@@ -57,6 +57,37 @@ namespace Kor.Inspections.App.Services
             return _db.Bookings.FirstOrDefaultAsync(b => b.CancelToken == token);
         }
 
+        private Task<Inspector?> GetAssignedInspectorAsync(string? assignedTo, bool requireEnabled)
+        {
+            if (string.IsNullOrWhiteSpace(assignedTo))
+                return Task.FromResult<Inspector?>(null);
+
+            var query = _db.Inspectors.AsQueryable();
+
+            if (requireEnabled)
+                query = query.Where(i => i.Enabled);
+
+            return query.FirstOrDefaultAsync(i =>
+                i.Email == assignedTo ||
+                i.DisplayName == assignedTo);
+        }
+
+        private void RecordAction(
+            Guid bookingId,
+            string actionType,
+            string? performedBy,
+            string? notes = null)
+        {
+            _db.BookingActions.Add(new BookingAction
+            {
+                BookingId = bookingId,
+                ActionType = actionType,
+                PerformedBy = performedBy,
+                Notes = notes,
+                ActionUtc = DateTime.UtcNow
+            });
+        }
+
         // --------------------------------------------------
         // Booking creation
         // --------------------------------------------------
@@ -115,6 +146,10 @@ namespace Kor.Inspections.App.Services
             };
 
             _db.Bookings.Add(booking);
+            RecordAction(
+                booking.BookingId,
+                "Created",
+                booking.ContactEmail);
             await _db.SaveChangesAsync();
             await tx.CommitAsync();
 
@@ -140,6 +175,10 @@ namespace Kor.Inspections.App.Services
                 return true;
 
             booking.Status = "Cancelled";
+            RecordAction(
+                booking.BookingId,
+                "Cancelled",
+                "client-token");
             await _db.SaveChangesAsync();
 
             _logger.LogInformation("Booking {BookingId} cancelled via token.", booking.BookingId);
@@ -160,7 +199,7 @@ namespace Kor.Inspections.App.Services
                 var startLocal = TimeZoneInfo.ConvertTimeFromUtc(booking.StartUtc, tz);
                 var endLocal = TimeZoneInfo.ConvertTimeFromUtc(booking.EndUtc, tz);
 
-                var fromMailbox = "reviews@korstructural.com";
+                var fromMailbox = _notificationOptions.FromMailbox;
                 var manageUrl = BuildManageUrl(booking);
 
                 // -------------------------
@@ -187,9 +226,7 @@ namespace Kor.Inspections.App.Services
                 // -------------------------
                 if (!string.IsNullOrWhiteSpace(booking.AssignedTo))
                 {
-                    var inspector = await _db.Inspectors
-                        .Where(i => i.Enabled)
-                        .FirstOrDefaultAsync(i => i.DisplayName == booking.AssignedTo);
+                    var inspector = await GetAssignedInspectorAsync(booking.AssignedTo, requireEnabled: true);
 
                     if (inspector != null && !string.IsNullOrWhiteSpace(inspector.Email))
                     {
@@ -233,7 +270,7 @@ namespace Kor.Inspections.App.Services
                 var startLocal = TimeZoneInfo.ConvertTimeFromUtc(booking.StartUtc, tz);
                 var endLocal = TimeZoneInfo.ConvertTimeFromUtc(booking.EndUtc, tz);
 
-                var fromMailbox = "reviews@korstructural.com";
+                var fromMailbox = _notificationOptions.FromMailbox;
                 var displayName = _notificationOptions.DisplayName ?? "Kor Structural";
 
                 var manageUrl = BuildManageUrl(booking);
@@ -293,7 +330,7 @@ namespace Kor.Inspections.App.Services
                 var startLocal = TimeZoneInfo.ConvertTimeFromUtc(booking.StartUtc, tz);
                 var endLocal = TimeZoneInfo.ConvertTimeFromUtc(booking.EndUtc, tz);
 
-                var fromMailbox = "reviews@korstructural.com";
+                var fromMailbox = _notificationOptions.FromMailbox;
                 var displayName = _notificationOptions.DisplayName ?? "Kor Structural";
 
                 // -------------------------
@@ -317,8 +354,7 @@ namespace Kor.Inspections.App.Services
                 if (!string.IsNullOrWhiteSpace(booking.AssignedTo))
                 {
                     // Note: do NOT require Enabled here; if they were assigned, they should be notified.
-                    var inspector = await _db.Inspectors
-                        .FirstOrDefaultAsync(i => i.DisplayName == booking.AssignedTo);
+                    var inspector = await GetAssignedInspectorAsync(booking.AssignedTo, requireEnabled: false);
 
                     if (inspector != null && !string.IsNullOrWhiteSpace(inspector.Email))
                     {

@@ -12,3 +12,5 @@ Properties/PublishProfiles/*.pubxml.user
 
 # IDE/local cache
 .vs/
+tests/e2e/.env
+tests/e2e/storageState.json

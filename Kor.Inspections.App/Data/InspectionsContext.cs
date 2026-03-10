@@ -51,6 +51,8 @@ namespace Kor.Inspections.App.Data
                       .HasMaxLength(120)
                       .IsRequired();
 
+                entity.HasIndex(b => b.ContactEmail);
+
                 entity.Property(b => b.Status)
                       .HasMaxLength(30)
                       .HasDefaultValue("Unassigned");

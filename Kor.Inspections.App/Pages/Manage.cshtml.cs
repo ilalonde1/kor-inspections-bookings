@@ -62,7 +62,7 @@ namespace Kor.Inspections.App.Pages
                 return Page();
             }
 
-            if (!IsCancellationAllowed(booking.StartUtc))
+            if (!_timeRules.IsCancellationAllowed(booking.StartUtc))
             {
                 await LoadAsync();
                 return Page();
@@ -112,41 +112,23 @@ namespace Kor.Inspections.App.Pages
                 localEnd);
 
             StatusText = booking.Status;
-            AssignedTo = booking.AssignedTo;
+            AssignedTo = await ResolveAssignedToDisplayAsync(booking.AssignedTo);
 
 
-            CanCancel = !AlreadyCancelled && IsCancellationAllowed(booking.StartUtc);
+            CanCancel = !AlreadyCancelled && _timeRules.IsCancellationAllowed(booking.StartUtc);
         }
 
-        /// <summary>
-        /// Cancellation allowed until 2:00 PM Pacific on the previous business day.
-        /// Business days are Mon–Fri (holidays not included yet).
-        /// </summary>
-        private bool IsCancellationAllowed(DateTime bookingStartUtc)
+        private async Task<string?> ResolveAssignedToDisplayAsync(string? assignedTo)
         {
-            var tz = _timeRules.TimeZone;
+            if (string.IsNullOrWhiteSpace(assignedTo))
+                return assignedTo;
 
-            var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
-            var bookingLocal = TimeZoneInfo.ConvertTimeFromUtc(bookingStartUtc, tz);
+            var displayName = await _db.Inspectors
+                .Where(i => i.Email == assignedTo)
+                .Select(i => i.DisplayName)
+                .FirstOrDefaultAsync();
 
-            if (bookingLocal <= nowLocal)
-                return false;
-
-            var bookingDate = bookingLocal.Date;
-
-            var cutoffDay = bookingDate.AddDays(-1);
-            while (cutoffDay.DayOfWeek == DayOfWeek.Saturday ||
-                   cutoffDay.DayOfWeek == DayOfWeek.Sunday)
-            {
-                cutoffDay = cutoffDay.AddDays(-1);
-            }
-
-            var cutoffLocal = new DateTime(
-                cutoffDay.Year, cutoffDay.Month, cutoffDay.Day,
-                14, 0, 0,
-                DateTimeKind.Unspecified);
-
-            return nowLocal <= cutoffLocal;
+            return string.IsNullOrWhiteSpace(displayName) ? assignedTo : displayName;
         }
     }
 }

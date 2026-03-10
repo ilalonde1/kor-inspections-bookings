@@ -2,12 +2,13 @@ using System;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using Kor.Inspections.App.Data;
 using Kor.Inspections.App.Data.Models;
+using Kor.Inspections.App.Options;
+using Microsoft.Extensions.Options;
 
 namespace Kor.Inspections.App.Services
 {
@@ -15,11 +16,10 @@ namespace Kor.Inspections.App.Services
     {
         private static readonly TimeSpan PendingTtl = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan VerifiedTtl = TimeSpan.FromHours(8);
-        private const string SessionScopeKey = "project_bootstrap_scope";
 
         private readonly IMemoryCache _cache;
         private readonly GraphMailService _mailService;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly NotificationOptions _notificationOptions;
         private readonly ILogger<ProjectBootstrapVerificationService> _logger;
         private readonly InspectionsContext _db;
 
@@ -33,13 +33,13 @@ namespace Kor.Inspections.App.Services
         public ProjectBootstrapVerificationService(
             IMemoryCache cache,
             GraphMailService mailService,
-            IHttpContextAccessor httpContextAccessor,
+            IOptions<NotificationOptions> notificationOptions,
             InspectionsContext db,
             ILogger<ProjectBootstrapVerificationService> logger)
         {
             _cache = cache;
             _mailService = mailService;
-            _httpContextAccessor = httpContextAccessor;
+            _notificationOptions = notificationOptions.Value;
             _db = db;
             _logger = logger;
         }
@@ -64,7 +64,7 @@ namespace Kor.Inspections.App.Services
             // Persistent trust (ProjectDefaults)
             var trusted = await _db.ProjectDefaults.AnyAsync(x =>
                     x.ProjectNumber == normalizedProject &&
-                    x.EmailDomain.Trim().ToLower() == domain,
+                    x.EmailDomain == domain,
                 ct);
 
             if (trusted)
@@ -106,18 +106,31 @@ namespace Kor.Inspections.App.Services
             if (!status.RequiresVerification || status.IsVerified)
                 return true;
 
-            var code = RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
             var key = BuildKey(normalizedProject, normalizedEmail);
 
-            _cache.Set(
-                key,
-                new VerificationState
-                {
-                    Code = code,
-                    Verified = false,
-                    FailedAttempts = 0
-                },
-                PendingTtl);
+            // Domain-scoped verification: if another user from the same domain has
+            // already requested a code, reuse it to prevent invalidating concurrent requests.
+            string code;
+            if (_cache.TryGetValue<VerificationState>(key, out var existing)
+                && existing is { Verified: false }
+                && existing.FailedAttempts == 0)
+            {
+                code = existing.Code;
+            }
+            else
+            {
+                code = RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
+
+                _cache.Set(
+                    key,
+                    new VerificationState
+                    {
+                        Code = code,
+                        Verified = false,
+                        FailedAttempts = 0
+                    },
+                    PendingTtl);
+            }
 
             try
             {
@@ -129,7 +142,7 @@ namespace Kor.Inspections.App.Services
                     "<p>This code expires in 15 minutes.</p>";
 
                 await _mailService.SendHtmlAsync(
-                    "reviews@korstructural.com",
+                    _notificationOptions.FromMailbox,
                     normalizedEmail,
                     subject,
                     body);
@@ -201,7 +214,7 @@ namespace Kor.Inspections.App.Services
 
             var existing = await _db.ProjectDefaults.SingleOrDefaultAsync(x =>
                     x.ProjectNumber == normalizedProject &&
-                    x.EmailDomain.Trim().ToLower() == domain,
+                    x.EmailDomain == domain,
                 ct);
 
             if (existing == null)
@@ -257,22 +270,6 @@ namespace Kor.Inspections.App.Services
             var v = (email ?? string.Empty).Trim().ToLowerInvariant();
             var at = v.LastIndexOf('@');
             return (at > 0 && at < v.Length - 1) ? v : string.Empty;
-        }
-
-        private string GetBrowserScope()
-        {
-            var session = _httpContextAccessor.HttpContext?.Session;
-            if (session == null)
-                return "no-session";
-
-            var scope = session.GetString(SessionScopeKey);
-            if (string.IsNullOrWhiteSpace(scope))
-            {
-                scope = Guid.NewGuid().ToString("N");
-                session.SetString(SessionScopeKey, scope);
-            }
-
-            return scope;
         }
 
         private static string BuildKey(string projectNumber, string email)

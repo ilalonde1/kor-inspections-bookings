@@ -359,24 +359,34 @@ namespace Kor.Inspections.App.Pages
 
             var domainSuffix = "@" + domain;
 
-            var list = await _db.Bookings
+            var bookings = await _db.Bookings
                 .AsNoTracking()
                 .Where(b => b.ProjectNumber != null && b.ProjectNumber.StartsWith(base5))
-                .Where(b => b.ContactEmail != null && b.ContactEmail.ToLower().EndsWith(domainSuffix))
+                .Where(b => b.ContactEmail != null && EF.Functions.Like(b.ContactEmail, "%" + domainSuffix))
                 .OrderByDescending(b => b.StartUtc)
+                .ToListAsync();
+
+            var inspectorsByEmail = await _db.Inspectors
+                .AsNoTracking()
+                .Where(i => !string.IsNullOrWhiteSpace(i.Email))
+                .GroupBy(i => i.Email)
+                .Select(g => new { Email = g.Key, DisplayName = g.First().DisplayName })
+                .ToDictionaryAsync(x => x.Email, x => x.DisplayName, StringComparer.OrdinalIgnoreCase);
+
+            var list = bookings
                 .Select(b => new InspectionDto
                 {
                     Id = b.BookingId.ToString(),
                     StartUtc = b.StartUtc,
                     EndUtc = b.EndUtc,
                     Status = b.Status,
-                    AssignedTo = b.AssignedTo,
+                    AssignedTo = ResolveAssignedToDisplay(b.AssignedTo, inspectorsByEmail),
                     ContactName = b.ContactName,
                     ContactEmail = b.ContactEmail,
                     Address = b.ProjectAddress,
                     Comments = b.Comments
                 })
-                .ToListAsync();
+                .ToList();
 
             return new JsonResult(list);
         }
@@ -430,7 +440,7 @@ namespace Kor.Inspections.App.Pages
                     b.ProjectNumber != null &&
                     b.ProjectNumber.StartsWith(base5) &&
                     b.ContactEmail != null &&
-                    b.ContactEmail.ToLower().EndsWith(domainSuffix));
+                    EF.Functions.Like(b.ContactEmail, "%" + domainSuffix));
 
             if (booking == null)
             {
@@ -447,17 +457,36 @@ namespace Kor.Inspections.App.Pages
                 return new JsonResult(new { error = "Completed inspections cannot be cancelled." });
             }
 
-            if (!IsCancellationAllowed(booking.StartUtc))
+            if (!_timeRules.IsCancellationAllowed(booking.StartUtc))
             {
                 Response.StatusCode = 400;
                 return new JsonResult(new { error = "Cancellation window has closed for this inspection." });
             }
 
             booking.Status = "Cancelled";
+            _db.BookingActions.Add(new BookingAction
+            {
+                BookingId = booking.BookingId,
+                ActionType = "Cancelled",
+                PerformedBy = emailRaw,
+                ActionUtc = DateTime.UtcNow
+            });
             await _db.SaveChangesAsync();
             await _bookingService.SendCancellationEmailsAsync(booking);
 
             return new JsonResult(new { ok = true });
+        }
+
+        private static string? ResolveAssignedToDisplay(
+            string? assignedTo,
+            IReadOnlyDictionary<string, string> inspectorsByEmail)
+        {
+            if (string.IsNullOrWhiteSpace(assignedTo))
+                return assignedTo;
+
+            return inspectorsByEmail.TryGetValue(assignedTo, out var displayName)
+                ? displayName
+                : assignedTo;
         }
 
         [EnableRateLimiting("verification")]
@@ -540,6 +569,7 @@ namespace Kor.Inspections.App.Pages
             return new JsonResult(new { ok = true });
         }
 
+        [EnableRateLimiting("contactMutation")]
         public async Task<JsonResult> OnPostSaveContactAjaxAsync([FromBody] SaveContactRequest req)
         {
             var project = (req.ProjectNumber ?? "").Trim();
@@ -599,6 +629,7 @@ namespace Kor.Inspections.App.Pages
             return new JsonResult(dto);
         }
 
+        [EnableRateLimiting("contactMutation")]
         public async Task<JsonResult> OnPostSelectContactAsync(int id)
         {
             if (string.IsNullOrWhiteSpace(ProjectNumber) || string.IsNullOrWhiteSpace(ContactEmail))
@@ -642,6 +673,7 @@ namespace Kor.Inspections.App.Pages
             return new JsonResult(dto);
         }
 
+        [EnableRateLimiting("contactMutation")]
         public async Task<IActionResult> OnPostDeleteContactAsync(int id)
         {
             if (string.IsNullOrWhiteSpace(ProjectNumber) || string.IsNullOrWhiteSpace(ContactEmail))
@@ -867,31 +899,5 @@ namespace Kor.Inspections.App.Pages
             return true;
         }
 
-        private bool IsCancellationAllowed(DateTime bookingStartUtc)
-        {
-            var tz = _timeRules.TimeZone;
-
-            var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
-            var bookingLocal = TimeZoneInfo.ConvertTimeFromUtc(bookingStartUtc, tz);
-
-            if (bookingLocal <= nowLocal)
-                return false;
-
-            var bookingDate = bookingLocal.Date;
-
-            var cutoffDay = bookingDate.AddDays(-1);
-            while (cutoffDay.DayOfWeek == DayOfWeek.Saturday ||
-                   cutoffDay.DayOfWeek == DayOfWeek.Sunday)
-            {
-                cutoffDay = cutoffDay.AddDays(-1);
-            }
-
-            var cutoffLocal = new DateTime(
-                cutoffDay.Year, cutoffDay.Month, cutoffDay.Day,
-                14, 0, 0,
-                DateTimeKind.Unspecified);
-
-            return nowLocal <= cutoffLocal;
-        }
     }
 }

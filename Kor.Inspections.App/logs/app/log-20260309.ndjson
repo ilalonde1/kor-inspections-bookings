@@ -1,0 +1,1 @@
+{"@t":"2026-03-10T05:49:06.5419484Z","@m":"HTTP \"GET\" \"/\" responded 200 in 3534.4764 ms","@i":"62d0885c","@tr":"663e86f80a2fa8b4a9cd66d5d788bad2","@sp":"2cac4f54345e4503","RequestMethod":"GET","RequestPath":"/","StatusCode":200,"Elapsed":3534.4764,"SourceContext":"Serilog.AspNetCore.RequestLoggingMiddleware","RequestId":"0HNJUD2T0JVB9:00000001","ConnectionId":"0HNJUD2T0JVB9"}
