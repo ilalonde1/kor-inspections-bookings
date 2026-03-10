@@ -191,7 +191,24 @@ namespace Kor.Inspections.App.Services
                 booking.BookingId,
                 "Cancelled",
                 "client-token");
-            await _db.SaveChangesAsync();
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _db.ChangeTracker.Clear();
+
+                var current = await _db.Bookings
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(b => b.BookingId == booking.BookingId);
+
+                _logger.LogInformation(
+                    "Concurrent cancellation detected for booking {BookingId}.",
+                    booking.BookingId);
+
+                return string.Equals(current?.Status, "Cancelled", StringComparison.OrdinalIgnoreCase);
+            }
 
             _logger.LogInformation("Booking {BookingId} cancelled via token.", booking.BookingId);
 

@@ -64,6 +64,10 @@ namespace Kor.Inspections.App.Data
                 entity.Property(b => b.CreatedUtc)
                       .HasDefaultValueSql("SYSUTCDATETIME()");
 
+                entity.Property(b => b.RowVersion)
+                      .IsRowVersion()
+                      .IsConcurrencyToken();
+
                 entity.Property(b => b.CancelToken)
                       .HasDefaultValueSql("NEWID()");
             });

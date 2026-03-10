@@ -37,6 +37,7 @@ namespace Kor.Inspections.App.Data.Models
 
         // Audit
         public DateTime CreatedUtc { get; set; }
+        public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
         // Cancellation
         public Guid CancelToken { get; set; }
