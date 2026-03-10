@@ -1,0 +1,66 @@
+@page "/admin/trusted-domains"
+@model Kor.Inspections.App.Pages.Admin.TrustedDomainsModel
+@{
+    ViewData["Title"] = "Trusted Domains";
+}
+
+<h2>Trusted Domains</h2>
+
+<p>
+    These entries grant project access to all users at the trusted email domain for the listed project.
+</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="admin-status-message">
+        @Model.StatusMessage
+    </div>
+}
+
+@if (!Model.TrustedDomains.Any())
+{
+    <p>No trusted domains have been configured.</p>
+}
+else
+{
+    <div class="admin-table-container">
+        <div class="table-responsive-mobile">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Project Number</th>
+                        <th>Trusted Domain</th>
+                        <th>Date Added</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.TrustedDomains)
+                    {
+                        <tr>
+                            <td>@row.ProjectNumber</td>
+                            <td>@row.EmailDomain</td>
+                            <td>@row.UpdatedUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>
+                                <form method="post" asp-page-handler="Revoke" style="margin:0;">
+                                    <input type="hidden" name="id" value="@row.Id" />
+                                    <button type="submit"
+                                            class="admin-btn admin-btn-cancel"
+                                            onclick="return confirm('Revoke trust for this domain?');">
+                                        Revoke
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<p class="summary-back-link">
+    <a asp-page="/Admin/Index" class="btn-smooth">
+        Back to Admin Dashboard
+    </a>
+</p>
