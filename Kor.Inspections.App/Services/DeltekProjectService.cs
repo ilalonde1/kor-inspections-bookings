@@ -27,6 +27,7 @@ namespace Kor.Inspections.App.Services
 
     public class DeltekProjectService
     {
+        private const int OdbcCommandTimeoutSeconds = 10;
         private readonly DeltekProjectOptions _options;
         private readonly ILogger<DeltekProjectService> _logger;
 
@@ -61,6 +62,7 @@ namespace Kor.Inspections.App.Services
                     conn.Open();
 
                     using var cmd = conn.CreateCommand();
+                    cmd.CommandTimeout = OdbcCommandTimeoutSeconds;
                     cmd.CommandText = _options.Sql_ProjectByNumber;
                     AddParametersForPlaceholders(cmd, projectNumber.Trim());
 
@@ -169,6 +171,7 @@ namespace Kor.Inspections.App.Services
             conn.Open();
 
             using var cmd = conn.CreateCommand();
+            cmd.CommandTimeout = OdbcCommandTimeoutSeconds;
             cmd.CommandText = _options.Sql_ProjectSearchByPrefix;
             AddParametersForPlaceholders(cmd, like);
 

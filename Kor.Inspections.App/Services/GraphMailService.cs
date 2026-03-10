@@ -3,28 +3,35 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Identity.Client;
 
 namespace Kor.Inspections.App.Services
 {
-    public class GraphMailService
+    public interface IGraphTokenProvider
     {
-        private readonly IConfiguration _config;
-        private readonly IHttpClientFactory _httpClientFactory;
+        Task<string> GetTokenAsync();
+    }
 
-        public GraphMailService(IConfiguration config, IHttpClientFactory httpClientFactory)
-        {
-            _config = config;
-            _httpClientFactory = httpClientFactory;
-        }
+    public interface IGraphAccessTokenSource
+    {
+        Task<GraphAccessToken> AcquireTokenAsync();
+    }
 
-        private async Task<string> GetTokenAsync()
+    public sealed record GraphAccessToken(string AccessToken, DateTimeOffset ExpiresOn);
+
+    public sealed class MsalGraphAccessTokenSource : IGraphAccessTokenSource
+    {
+        private static readonly string[] GraphScopes = ["https://graph.microsoft.com/.default"];
+        private readonly IConfidentialClientApplication _app;
+
+        public MsalGraphAccessTokenSource(IConfiguration config)
         {
-            var tenantId = _config["Graph:TenantId"];
-            var clientId = _config["Graph:ClientId"];
-            var clientSecret = _config["Graph:ClientSecret"];
+            var tenantId = config["Graph:TenantId"];
+            var clientId = config["Graph:ClientId"];
+            var clientSecret = config["Graph:ClientSecret"];
 
             if (string.IsNullOrWhiteSpace(tenantId) ||
                 string.IsNullOrWhiteSpace(clientId) ||
@@ -34,22 +41,83 @@ namespace Kor.Inspections.App.Services
                     "Missing Graph configuration. Expected Graph:TenantId, Graph:ClientId, Graph:ClientSecret in appsettings.json.");
             }
 
-            var app = ConfidentialClientApplicationBuilder
+            _app = ConfidentialClientApplicationBuilder
                 .Create(clientId)
                 .WithClientSecret(clientSecret)
                 .WithAuthority($"https://login.microsoftonline.com/{tenantId}")
                 .Build();
+        }
 
-            var result = await app
-                .AcquireTokenForClient(new[] { "https://graph.microsoft.com/.default" })
+        public async Task<GraphAccessToken> AcquireTokenAsync()
+        {
+            var result = await _app
+                .AcquireTokenForClient(GraphScopes)
                 .ExecuteAsync();
 
-            return result.AccessToken;
+            return new GraphAccessToken(result.AccessToken, result.ExpiresOn);
+        }
+    }
+
+    public sealed class GraphTokenProvider : IGraphTokenProvider
+    {
+        private static readonly TimeSpan RefreshSkew = TimeSpan.FromMinutes(5);
+        private readonly IGraphAccessTokenSource _source;
+        private readonly SemaphoreSlim _refreshLock = new(1, 1);
+        private GraphAccessToken? _cachedToken;
+
+        public GraphTokenProvider(IGraphAccessTokenSource source)
+        {
+            _source = source;
+        }
+
+        public async Task<string> GetTokenAsync()
+        {
+            if (TryGetCachedToken(out var token))
+                return token;
+
+            await _refreshLock.WaitAsync();
+            try
+            {
+                if (TryGetCachedToken(out token))
+                    return token;
+
+                _cachedToken = await _source.AcquireTokenAsync();
+                return _cachedToken.AccessToken;
+            }
+            finally
+            {
+                _refreshLock.Release();
+            }
+        }
+
+        private bool TryGetCachedToken(out string token)
+        {
+            if (_cachedToken is not null &&
+                _cachedToken.ExpiresOn > DateTimeOffset.UtcNow.Add(RefreshSkew))
+            {
+                token = _cachedToken.AccessToken;
+                return true;
+            }
+
+            token = string.Empty;
+            return false;
+        }
+    }
+
+    public class GraphMailService
+    {
+        private readonly IGraphTokenProvider _tokenProvider;
+        private readonly IHttpClientFactory _httpClientFactory;
+
+        public GraphMailService(IGraphTokenProvider tokenProvider, IHttpClientFactory httpClientFactory)
+        {
+            _tokenProvider = tokenProvider;
+            _httpClientFactory = httpClientFactory;
         }
 
         public async Task SendHtmlAsync(string fromUserPrincipalName, string toEmail, string subject, string htmlBody)
         {
-            var token = await GetTokenAsync();
+            var token = await _tokenProvider.GetTokenAsync();
 
             var payload = new
             {
