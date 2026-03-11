@@ -8,8 +8,6 @@
             Configuration["Features:InspectorMobileToolsEnabled"],
             "false",
             StringComparison.OrdinalIgnoreCase);
-
-    ViewData["Title"] = "Upcoming Field Reviews";
     ViewData["InspectorMode"] = inspectorMobileToolsEnabled ? "true" : "false";
 }
 
@@ -150,7 +148,7 @@
                 <tbody>
                     @foreach (var b in Model.Bookings)
                     {
-                        <tr class="booking-row" data-status="@b.Status" data-booking-id="@b.BookingId">
+                        <tr class="booking-row status-@((b.Status ?? string.Empty).ToLowerInvariant())" data-status="@b.Status" data-booking-id="@b.BookingId">
 
                             <td>@b.StartLocal.ToString("yyyy-MM-dd")</td>
 
@@ -182,7 +180,7 @@
 
                             <td>
                                 <strong>@b.ContactName</strong><br />
-                                <span class="phone contact-phone">@FormatPhone(b.ContactPhone)</span><br />
+                                <span class="phone contact-phone">@Model.FormatPhone(b.ContactPhone)</span><br />
                                 <span class="phone">@b.ContactEmail</span>
                             </td>
 
@@ -198,7 +196,7 @@
 
                             <td>
 
-                                <form method="post" asp-page-handler="Assign" class="assign-inline">
+                                <form method="post" asp-page-handler="Assign" class="assign-inline" data-inline-confirm-form>
                                     <input type="hidden" name="id" value="@b.BookingId" />
 
                                     <select name="assignedTo">
@@ -213,14 +211,20 @@
                                         }
                                     </select>
 
-                                    <button class="admin-btn admin-btn-set">Assign</button>
+                                    <button type="button" class="admin-btn admin-btn-set" data-confirm-trigger>
+                                        <span data-confirm-label>Assign</span>
+                                    </button>
+                                    <span data-confirm-controls hidden style="display:inline-flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                                        <span>Are you sure?</span>
+                                        <button type="submit" class="admin-btn admin-btn-set">Confirm</button>
+                                        <button type="button" class="admin-btn btn-secondary" data-confirm-cancel>Cancel</button>
+                                    </span>
                                 </form>
 
                                 <div class="action-stack">
 
                                     <form method="post"
-                                          asp-page-handler="Cancel"
-                                          onsubmit="return confirm('Cancel this booking?');">
+                                          asp-page-handler="Cancel">
                                         <input type="hidden" name="id" value="@b.BookingId" />
                                         <button class="admin-btn admin-btn-cancel">Cancel</button>
                                     </form>
@@ -251,21 +255,6 @@
             <a class="btn btn-dark mobile-view" href="#">Details</a>
         </div>
     }
-
-@functions {
-    private string FormatPhone(string phone)
-    {
-        if (string.IsNullOrWhiteSpace(phone))
-            return "";
-
-        var digits = new string(phone.Where(char.IsDigit).ToArray());
-
-        if (digits.Length != 10)
-            return phone;
-
-        return $"({digits[..3]})-{digits.Substring(3, 3)}-{digits.Substring(6)}";
-    }
-}
 
 @section Scripts {
 @if (inspectorMobileToolsEnabled)
@@ -444,4 +433,32 @@ document.addEventListener("DOMContentLoaded", function () {
 }
 
 }
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-inline-confirm-form]").forEach(function (form) {
+        const trigger = form.querySelector("[data-confirm-trigger]");
+        const label = form.querySelector("[data-confirm-label]");
+        const controls = form.querySelector("[data-confirm-controls]");
+        const cancel = form.querySelector("[data-confirm-cancel]");
+
+        if (!trigger || !label || !controls || !cancel) return;
+
+        trigger.addEventListener("click", function () {
+            trigger.disabled = true;
+            label.hidden = true;
+            controls.hidden = false;
+            controls.style.display = "inline-flex";
+            controls.querySelector('button[type="submit"]')?.focus();
+        });
+
+        cancel.addEventListener("click", function () {
+            controls.hidden = true;
+            label.hidden = false;
+            trigger.disabled = false;
+            trigger.focus();
+        });
+    });
+});
+</script>
 

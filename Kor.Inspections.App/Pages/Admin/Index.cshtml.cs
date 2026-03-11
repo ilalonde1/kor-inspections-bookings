@@ -99,8 +99,11 @@ namespace Kor.Inspections.App.Pages.Admin
 
         public async Task OnGetAsync()
         {
+            ViewData["Title"] = "Admin";
             await LoadDataAsync();
         }
+
+        public string FormatPhone(string phone) => PhoneNormalizer.Format(phone);
 
         public IActionResult OnGetMobileActionLog(string evt)
         {

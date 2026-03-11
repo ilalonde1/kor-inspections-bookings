@@ -1,15 +1,25 @@
 ﻿@page "/admin/summary"
 @using Kor.Inspections.App.Services 
 @model Kor.Inspections.App.Pages.Admin.SummaryModel
-@{
-    ViewData["Title"] = "Tomorrow's Field Reviews";
-}
-
-<h2>Field Reviews for @Model.SummaryDateLocal.ToString("yyyy-MM-dd")</h2>
+<h2>Field Reviews for @Model.SelectedDate.ToString("yyyy-MM-dd")</h2>
 
     <p>
-        This summary shows all non-cancelled bookings scheduled for tomorrow,
+        This summary shows all non-cancelled bookings scheduled for the selected day,
         based on Kor's local time.
+    </p>
+
+    <p class="assign-inline" style="align-items:center; margin-bottom:14px;">
+        <a asp-page="./Summary"
+           asp-route-date="@Model.SelectedDate.AddDays(-1).ToString("yyyy-MM-dd")"
+           asp-route-sort="@Model.Sort"
+           asp-route-dir="@Model.Dir"
+           class="btn-smooth">Prev Day</a>
+        <span><strong>@Model.SelectedDate.ToString("yyyy-MM-dd")</strong></span>
+        <a asp-page="./Summary"
+           asp-route-date="@Model.SelectedDate.AddDays(1).ToString("yyyy-MM-dd")"
+           asp-route-sort="@Model.Sort"
+           asp-route-dir="@Model.Dir"
+           class="btn-smooth">Next Day</a>
     </p>
 
     @if (!string.IsNullOrEmpty(Model.StatusMessage))
@@ -20,19 +30,27 @@
     }
 
     <div class="assign-inline" style="flex-wrap:wrap; align-items:center; margin-bottom:14px;">
-        <form method="post" asp-page-handler="EmailAllInspectors" style="margin:0;">
-            <button type="submit" class="btn-primary">
-                Email All Assigned Inspectors
+        <form method="post" asp-page-handler="EmailAllInspectors" style="margin:0;" data-inline-confirm-form>
+            <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
+            <button type="button" class="btn-primary" data-confirm-trigger>
+                <span data-confirm-label>Email All Assigned Inspectors</span>
             </button>
+            <span data-confirm-controls hidden style="display:inline-flex; gap:8px; align-items:center; margin-left:8px;">
+                <span>Are you sure?</span>
+                <button type="submit" class="btn-primary">Confirm</button>
+                <button type="button" class="btn-secondary" data-confirm-cancel>Cancel</button>
+            </span>
         </form>
 
         <form method="post" asp-page-handler="Email" style="margin:0;">
+            <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
             <button type="submit" class="btn-primary">
                 Email Full Summary
             </button>
         </form>
 
         <form method="post" asp-page-handler="EmailInspector" class="assign-inline" style="margin:0;">
+            <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
 
             <select name="inspectorEmail" required class="inspector-dropdown">
                 <option value="">Select inspector...</option>
@@ -153,7 +171,7 @@
         {
             <div class="summary-route-planner">
                 <h3>Inspector Route Planner</h3>
-                <p class="helper-text-muted">Drag stops to reorder, click Set Route Order, then Navigate Route.</p>
+                <p class="helper-text-muted">Stops are listed in time order. Navigate Route opens Google Maps in that order.</p>
 
                 @foreach (var group in inspectorGroups)
                 {
@@ -161,18 +179,14 @@
                         <div class="summary-route-head">
                             <h4>@group.Key</h4>
                             <div class="summary-route-actions">
-                                <button type="button" class="btn-smooth summary-set-route-btn">Set Route Order</button>
                                 <button type="button" class="btn-smooth summary-nav-route-btn">Navigate Route</button>
                             </div>
                         </div>
-
-                        <div class="summary-route-status helper-text-muted"></div>
 
                         <ul class="summary-route-list">
                             @foreach (var b in group.OrderBy(x => x.StartLocal))
                             {
                                 <li class="summary-route-item"
-                                    draggable="true"
                                     data-booking-id="@b.BookingId"
                                     data-address="@b.ProjectAddress">
                                     <span class="summary-route-time">
@@ -183,10 +197,6 @@
                                     </span>
                                     <span class="summary-route-job">@b.ProjectNumber</span>
                                     <span class="summary-route-address">@b.ProjectAddress</span>
-                                    <span class="summary-route-item-controls">
-                                        <button type="button" class="btn-smooth summary-route-move-up" aria-label="Move stop up">Up</button>
-                                        <button type="button" class="btn-smooth summary-route-move-down" aria-label="Move stop down">Down</button>
-                                    </span>
                                 </li>
                             }
                         </ul>
@@ -213,69 +223,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
     cards.forEach((card) => {
         const list = card.querySelector(".summary-route-list");
-        const setBtn = card.querySelector(".summary-set-route-btn");
         const navBtn = card.querySelector(".summary-nav-route-btn");
-        const status = card.querySelector(".summary-route-status");
         const tableRows = Array.from(document.querySelectorAll(".summary-booking-row"));
-        let savedOrder = null;
-        let draggedItem = null;
 
         if (!list) return;
-
-        function setStatus(message) {
-            if (status) status.textContent = message || "";
-        }
 
         function getItems() {
             return Array.from(list.querySelectorAll(".summary-route-item"));
         }
 
-        function getOrderedItems() {
-            const current = getItems();
-            if (!savedOrder || !savedOrder.length) return current;
-
-            const byId = new Map(current.map(i => [i.dataset.bookingId, i]));
-            const ordered = savedOrder.map(id => byId.get(id)).filter(Boolean);
-            const leftovers = current.filter(i => !savedOrder.includes(i.dataset.bookingId));
-            return ordered.concat(leftovers);
-        }
-
-        function getDropTarget(mouseY) {
-            const siblings = getItems().filter(i => i !== draggedItem);
-            let best = null;
-            let bestOffset = Number.NEGATIVE_INFINITY;
-
-            siblings.forEach((item) => {
-                const rect = item.getBoundingClientRect();
-                const offset = mouseY - rect.top - rect.height / 2;
-                if (offset < 0 && offset > bestOffset) {
-                    bestOffset = offset;
-                    best = item;
-                }
-            });
-
-            return best;
-        }
-
         getItems().forEach((item) => {
-            const moveUpBtn = item.querySelector(".summary-route-move-up");
-            const moveDownBtn = item.querySelector(".summary-route-move-down");
-
-            item.addEventListener("dragstart", function (e) {
-                draggedItem = item;
-                item.classList.add("summary-route-dragging");
-                setStatus("Drag stops, then click Set Route Order.");
-                if (e.dataTransfer) {
-                    e.dataTransfer.effectAllowed = "move";
-                    e.dataTransfer.setData("text/plain", item.dataset.bookingId || "");
-                }
-            });
-
-            item.addEventListener("dragend", function () {
-                item.classList.remove("summary-route-dragging");
-                draggedItem = null;
-            });
-
             item.addEventListener("click", function () {
                 const bookingId = item.dataset.bookingId;
                 if (!bookingId) return;
@@ -290,57 +247,11 @@ document.addEventListener("DOMContentLoaded", function () {
                     targetRow.scrollIntoView({ behavior: "smooth", block: "center" });
                 }
             });
-
-            if (moveUpBtn) {
-                moveUpBtn.addEventListener("click", function (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const prev = item.previousElementSibling;
-                    if (!prev) return;
-                    list.insertBefore(item, prev);
-                    setStatus("Order changed. Click Set Route Order.");
-                });
-            }
-
-            if (moveDownBtn) {
-                moveDownBtn.addEventListener("click", function (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const next = item.nextElementSibling;
-                    if (!next) return;
-                    if (next.nextElementSibling) {
-                        list.insertBefore(item, next.nextElementSibling);
-                    } else {
-                        list.appendChild(item);
-                    }
-                    setStatus("Order changed. Click Set Route Order.");
-                });
-            }
         });
-
-        list.addEventListener("dragover", function (e) {
-            if (!draggedItem) return;
-            e.preventDefault();
-            const target = getDropTarget(e.clientY);
-            if (!target) {
-                list.appendChild(draggedItem);
-            } else {
-                list.insertBefore(draggedItem, target);
-            }
-        });
-
-        if (setBtn) {
-            setBtn.addEventListener("click", function () {
-                savedOrder = getItems()
-                    .map(i => i.dataset.bookingId)
-                    .filter(Boolean);
-                setStatus("Route order set.");
-            });
-        }
 
         if (navBtn) {
             navBtn.addEventListener("click", function () {
-                const addresses = getOrderedItems()
+                const addresses = getItems()
                     .map(i => (i.dataset.address || "").trim())
                     .filter(Boolean);
 
@@ -362,6 +273,34 @@ document.addEventListener("DOMContentLoaded", function () {
                 window.open(url, "_blank");
             });
         }
+    });
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-inline-confirm-form]").forEach(function (form) {
+        const trigger = form.querySelector("[data-confirm-trigger]");
+        const label = form.querySelector("[data-confirm-label]");
+        const controls = form.querySelector("[data-confirm-controls]");
+        const cancel = form.querySelector("[data-confirm-cancel]");
+
+        if (!trigger || !label || !controls || !cancel) return;
+
+        trigger.addEventListener("click", function () {
+            trigger.disabled = true;
+            label.hidden = true;
+            controls.hidden = false;
+            controls.style.display = "inline-flex";
+            controls.querySelector('button[type="submit"]')?.focus();
+        });
+
+        cancel.addEventListener("click", function () {
+            controls.hidden = true;
+            label.hidden = false;
+            trigger.disabled = false;
+            trigger.focus();
+        });
     });
 });
 </script>

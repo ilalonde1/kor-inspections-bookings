@@ -43,6 +43,7 @@ namespace Kor.Inspections.App.Pages
 
         public async Task OnGetAsync()
         {
+            ViewData["Title"] = "Manage Booking";
             await LoadAsync();
         }
 

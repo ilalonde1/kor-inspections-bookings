@@ -25,31 +25,24 @@ else
     <div id="inspectionsStatus" class="text-muted">Loading inspections...</div>
 
     <div class="table-responsive">
-    <table id="inspectionsTable" class="table table-sm table-striped" hidden>
-        <thead>
-            <tr>
-                <th>Status</th>
-                <th>Scheduled</th>
-                <th>Assigned Inspector</th>
-                <th>Contact</th>
-                <th>Address</th>
-                <th>Comments</th>
-            </tr>
-        </thead>
-        <tbody id="inspectionsBody"></tbody>
-    </table>
+        <table id="inspectionsTable" class="table table-sm table-striped" hidden>
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Scheduled</th>
+                    <th>Assigned Inspector</th>
+                    <th>Contact</th>
+                    <th>Address</th>
+                    <th>Comments</th>
+                </tr>
+            </thead>
+            <tbody id="inspectionsBody"></tbody>
+        </table>
     </div>
 }
 
 @if (Model.HasRequiredQuery)
 {
-    <style>
-        #inspectionsTable th,
-        #inspectionsTable td {
-            white-space: nowrap;
-        }
-    </style>
-
     <script>
         (function () {
             const projectNumber = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ProjectNumber));

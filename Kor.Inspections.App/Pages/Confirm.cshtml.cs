@@ -37,6 +37,7 @@ namespace Kor.Inspections.App.Pages
         public SupportOptions Support { get; private set; } = new();
         public async Task<IActionResult> OnGetAsync(Guid id)
         {
+            ViewData["Title"] = "Booking Confirmed";
             Booking = await _bookingService.GetBookingAsync(id);
             if (Booking == null)
             {

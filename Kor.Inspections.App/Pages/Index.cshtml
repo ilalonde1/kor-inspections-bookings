@@ -1,6 +1,10 @@
 @page
 @model Kor.Inspections.App.Pages.IndexModel
 
+@section Styles {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+}
+
 @{
     ViewData["Title"] = "Book a Field Review";
     ViewData["InspectorMode"] = "false";
@@ -72,6 +76,7 @@
                      <button type="button" id="sendProjectEmailCodeBtn" class="btn btn-outline-primary">
                          Send Code
                      </button>
+                     <label for="projectEmailCodeInput">Verification code</label>
                      <input id="projectEmailCodeInput"
                             class="form-control project-email-code-input"
                             inputmode="numeric"
@@ -202,10 +207,10 @@
 <!-- CONTACT MODAL -->
 <!-- ============================= -->
 
-<div id="contactModal" class="kor-modal" style="display:none;">
+<div id="contactModal" class="kor-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
     <div class="kor-modal-content">
 
-        <h3 class="contact-modal-title">Project Contacts</h3>
+        <h3 id="contactModalTitle" class="contact-modal-title">Project Contacts</h3>
         <p class="contact-modal-subtitle">Choose an existing contact or create a new one to use for this booking. Selecting a contact will automatically populate the request form.</p>
 
         <div class="modal-workspace">
@@ -350,10 +355,14 @@
     const contactAddressInput = document.getElementById("modalContactAddress");
     const contactEmailInput = document.getElementById("modalContactEmail");
     const cancelEditBtn = document.getElementById("cancelEditBtn");
+    let lastModalTrigger = null;
     let modalBackdropPointerDown = false;
 
     document.getElementById("openContactModalBtn")
-        .addEventListener("click", openModal);
+        .addEventListener("click", e => {
+            lastModalTrigger = e.currentTarget;
+            openModal();
+        });
 
     document.getElementById("closeModalBtn")
         .addEventListener("click", closeModal);
@@ -401,6 +410,33 @@
     function showProjectEmailVerification() {
         if (projectEmailVerificationBox) {
             projectEmailVerificationBox.hidden = false;
+        }
+    }
+
+    function getModalFocusableElements() {
+        return Array.from(modal.querySelectorAll(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+            .filter(el => !el.hidden && el.offsetParent !== null);
+    }
+
+    function handleModalKeydown(e) {
+        if (modal.style.display !== "flex" || e.key !== "Tab") return;
+
+        const focusable = getModalFocusableElements();
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+            return;
+        }
+
+        if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
         }
     }
 
@@ -710,6 +746,7 @@
                 hideProjectEmailVerification();
                 setProjectEmailVerificationStatus("Email verified. You can now manage contacts.");
 
+                lastModalTrigger = verifyProjectEmailCodeBtn;
                 await openModal();
             } catch {
                 setProjectEmailVerificationStatus("Unable to verify code.");
@@ -933,6 +970,7 @@
         if (modalBackdropPointerDown && e.target === modal) closeModal();
         modalBackdropPointerDown = false;
     });
+    modal.addEventListener("keydown", handleModalKeydown);
     document.querySelector(".kor-modal-content")
         .addEventListener("click", e => e.stopPropagation());
 
@@ -1026,12 +1064,14 @@
         resetContactForm();
         modal.style.display = "flex";
         document.body.style.overflow = "hidden";
+        getModalFocusableElements()[0]?.focus();
     }
 
     function closeModal() {
         hideInspectionDetails();
         modal.style.display = "none";
         document.body.style.overflow = "";
+        lastModalTrigger?.focus();
     }
 
     function renderContacts(data) {
@@ -1253,3 +1293,7 @@
     });
 
 </script>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+}
