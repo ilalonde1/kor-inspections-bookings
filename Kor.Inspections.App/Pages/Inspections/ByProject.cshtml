@@ -61,15 +61,6 @@ else
             const tableEl = document.getElementById("inspectionsTable");
             const bodyEl = document.getElementById("inspectionsBody");
 
-            function escapeHtml(value) {
-                return String(value ?? "")
-                    .replaceAll("&", "&amp;")
-                    .replaceAll("<", "&lt;")
-                    .replaceAll(">", "&gt;")
-                    .replaceAll('"', "&quot;")
-                    .replaceAll("'", "&#39;");
-            }
-
             function asLocal(value) {
                 if (!value) return "";
                 const d = new Date(value);

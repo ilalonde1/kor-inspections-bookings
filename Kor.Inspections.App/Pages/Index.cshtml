@@ -515,14 +515,16 @@
 
         const rows = filtered.map(i => {
             const start = i.startUtc ? new Date(i.startUtc).toLocaleString() : "";
-            const status = `${i.status ?? ""}`.trim();
-            const contact = `${i.contactName ?? ""}`.trim();
+            const status = escapeHtml(`${i.status ?? ""}`.trim());
+            const contact = escapeHtml(`${i.contactName ?? ""}`.trim());
+            const startText = escapeHtml(start);
+            const inspectionId = escapeHtml(i.id);
             const isSelected = selectedInspectionId === i.id;
 
             return `
-                <button type="button" class="inspection-row${isSelected ? " selected" : ""}" data-inspection-id="${i.id}">
+                <button type="button" class="inspection-row${isSelected ? " selected" : ""}" data-inspection-id="${inspectionId}">
                     <span class="inspection-row-status">${status || "Unknown"}</span>
-                    <span class="inspection-row-time">${start || "No time"}</span>
+                    <span class="inspection-row-time">${startText || "No time"}</span>
                     <span class="inspection-row-contact">${contact || "No contact"}</span>
                     <span class="inspection-row-cta" aria-hidden="true">Details</span>
                 </button>
@@ -1055,19 +1057,24 @@
         }
 
         data.forEach(c => {
+            const name = escapeHtml(c.name);
+            const email = escapeHtml(c.email);
+            const phone = escapeHtml(c.phone);
+            const contactId = Number(c.id);
+            const safeContactId = Number.isFinite(contactId) ? contactId : "null";
 
             const row = document.createElement("div");
             row.className = "contact-row";
 
             row.innerHTML = `
                 <div class="contact-row-main">
-                    <div class="contact-row-name">${c.name ?? ""}</div>
-                    <div class="contact-row-meta">${c.email ?? ""} · ${c.phone ?? ""}</div>
+                    <div class="contact-row-name">${name}</div>
+                    <div class="contact-row-meta">${email} · ${phone}</div>
                 </div>
                 <div class="contact-row-actions">
-                    <button onclick="selectContact(${c.id})" class="btn btn-sm btn-secondary">Use</button>
-                    <button onclick="beginEditContact(${c.id})" class="btn btn-sm btn-outline-primary">Edit</button>
-                    <button onclick="deleteContact(${c.id})" class="btn btn-sm btn-danger">Delete</button>
+                    <button onclick="selectContact(${safeContactId})" class="btn btn-sm btn-secondary">Use</button>
+                    <button onclick="beginEditContact(${safeContactId})" class="btn btn-sm btn-outline-primary">Edit</button>
+                    <button onclick="deleteContact(${safeContactId})" class="btn btn-sm btn-danger">Delete</button>
                 </div>
             `;
 
