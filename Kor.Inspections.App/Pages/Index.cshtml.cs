@@ -471,7 +471,24 @@ namespace Kor.Inspections.App.Pages
                 PerformedBy = emailRaw,
                 ActionUtc = DateTime.UtcNow
             });
-            await _db.SaveChangesAsync();
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _db.ChangeTracker.Clear();
+
+                var current = await _db.Bookings
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(b => b.BookingId == bookingId);
+
+                if (string.Equals(current?.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                    return new JsonResult(new { ok = true });
+
+                Response.StatusCode = 409;
+                return new JsonResult(new { error = "Booking was modified concurrently. Please refresh and try again." });
+            }
             await _bookingService.SendCancellationEmailsAsync(booking);
 
             return new JsonResult(new { ok = true });
