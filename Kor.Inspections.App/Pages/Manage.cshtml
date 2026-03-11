@@ -42,12 +42,6 @@ else
             <strong>Time:</strong> @Model.LocalTimeText
         </p>
 
-        @if (!string.IsNullOrWhiteSpace(Model.AssignedTo))
-        {
-            <p>
-                <strong>Assigned Inspector:</strong> @Model.AssignedTo
-            </p>
-        }
         @if (Model.CancelledSuccessfully)
         {
             <p style="color: green; font-weight: bold;">

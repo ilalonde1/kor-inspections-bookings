@@ -281,7 +281,6 @@
                     <div class="inspection-detail-row"><strong>Status:</strong> <span id="inspectionDetailStatus"></span></div>
                     <div class="inspection-detail-row"><strong>Start:</strong> <span id="inspectionDetailStart"></span></div>
                     <div class="inspection-detail-row"><strong>End:</strong> <span id="inspectionDetailEnd"></span></div>
-                    <div class="inspection-detail-row"><strong>Assigned Inspector:</strong> <span id="inspectionDetailAssigned"></span></div>
                     <div class="inspection-detail-row"><strong>Address:</strong> <span id="inspectionDetailAddress"></span></div>
                     <div class="inspection-detail-row"><strong>Comments:</strong> <span id="inspectionDetailComments"></span></div>
                     <div class="inspection-detail-actions">
@@ -337,7 +336,6 @@
     const inspectionDetailStatus = document.getElementById("inspectionDetailStatus");
     const inspectionDetailStart = document.getElementById("inspectionDetailStart");
     const inspectionDetailEnd = document.getElementById("inspectionDetailEnd");
-    const inspectionDetailAssigned = document.getElementById("inspectionDetailAssigned");
     const inspectionDetailAddress = document.getElementById("inspectionDetailAddress");
     const inspectionDetailComments = document.getElementById("inspectionDetailComments");
 
@@ -651,7 +649,6 @@
         if (inspectionDetailStatus) inspectionDetailStatus.textContent = inspection.status ?? "";
         if (inspectionDetailStart) inspectionDetailStart.textContent = inspection.startUtc ? new Date(inspection.startUtc).toLocaleString() : "";
         if (inspectionDetailEnd) inspectionDetailEnd.textContent = inspection.endUtc ? new Date(inspection.endUtc).toLocaleString() : "";
-        if (inspectionDetailAssigned) inspectionDetailAssigned.textContent = inspection.assignedTo ?? "Unassigned";
         if (inspectionDetailAddress) inspectionDetailAddress.textContent = inspection.address ?? "";
         if (inspectionDetailComments) inspectionDetailComments.textContent = inspection.comments ?? "";
 

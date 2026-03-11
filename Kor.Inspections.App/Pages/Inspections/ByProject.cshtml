@@ -25,12 +25,10 @@ else
     <div id="inspectionsStatus" class="text-muted">Loading inspections...</div>
 
     <div class="table-responsive">
-        <table id="inspectionsTable" class="table table-sm table-striped" hidden>
+        <table id="inspectionsTable" class="table table-sm table-striped text-start" hidden>
             <thead>
                 <tr>
-                    <th>Status</th>
                     <th>Scheduled</th>
-                    <th>Assigned Inspector</th>
                     <th>Contact</th>
                     <th>Address</th>
                     <th>Comments</th>
@@ -109,17 +107,13 @@ else
                     }
 
                     const rows = data.map(i => {
-                        const status = escapeHtml(getDisplayStatus(i));
                         const start = escapeHtml(asLocal(i.startUtc));
-                        const assigned = escapeHtml(i.assignedTo || "Unassigned");
                         const contact = escapeHtml(`${i.contactName || ""}${i.contactEmail ? ` (${i.contactEmail})` : ""}`);
                         const address = escapeHtml(i.address || "");
                         const comments = escapeHtml(i.comments || "");
 
                         return `<tr>
-                            <td>${status}</td>
                             <td>${start}</td>
-                            <td>${assigned}</td>
                             <td>${contact}</td>
                             <td>${address}</td>
                             <td>${comments}</td>
