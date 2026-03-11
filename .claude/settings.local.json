@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cd \"C:/VIsual Studio Projects/KOR Inspections Bookings/Kor.Inspections.App\" && dotnet build 2>&1)"
+      "Bash(cd \"C:/VIsual Studio Projects/KOR Inspections Bookings/Kor.Inspections.App\" && dotnet build 2>&1)",
+      "Bash(cd \"C:/VIsual Studio Projects/KOR Inspections Bookings\" && dotnet build Kor.Inspections.App/Kor.Inspections.App.csproj -c Release -nologo 2>&1)",
+      "Bash(cd \"C:/VIsual Studio Projects/KOR Inspections Bookings\" && dotnet build Kor.Inspections.Tests/Kor.Inspections.Tests.csproj -c Release -nologo 2>&1)"
     ]
   }
 }

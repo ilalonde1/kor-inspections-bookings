@@ -69,6 +69,11 @@ FORM CONTROLS
     resize: vertical;
 }
 
+#ContactEmail,
+#openContactModalBtn {
+    margin-bottom: 1rem;
+}
+
 /* =========================================================
 BUTTONS
 ========================================================= */
