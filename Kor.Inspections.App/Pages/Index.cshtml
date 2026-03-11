@@ -465,9 +465,54 @@
         return data;
     }
 
+    async function sendVerificationCode(project, email) {
+        if (!project || !email) {
+            setProjectEmailVerificationStatus("Enter project number and email first.");
+            return false;
+        }
+
+        if (sendProjectEmailCodeBtn) {
+            sendProjectEmailCodeBtn.disabled = true;
+        }
+        const originalText = sendProjectEmailCodeBtn?.textContent || "";
+        if (sendProjectEmailCodeBtn) {
+            sendProjectEmailCodeBtn.textContent = "Sending...";
+        }
+
+        setProjectEmailVerificationStatus("Sending verification code...");
+
+        try {
+            const response = await fetch("?handler=SendProjectEmailCode", {
+                method: "POST",
+                headers: {
+                    "RequestVerificationToken": getRequestVerificationToken(),
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ projectNumber: project, email: email })
+            });
+
+            const data = await readJsonSafe(response);
+            if (!response.ok || (data && data.error)) {
+                setProjectEmailVerificationStatus((data && data.error) || describeHttpError(response));
+                return false;
+            }
+
+            setProjectEmailVerificationStatus("Code sent. Check your email and enter the 6-digit code.");
+            return true;
+        } catch {
+            setProjectEmailVerificationStatus("Unable to send verification code.");
+            return false;
+        } finally {
+            if (sendProjectEmailCodeBtn) {
+                sendProjectEmailCodeBtn.disabled = false;
+                sendProjectEmailCodeBtn.textContent = originalText;
+            }
+        }
+    }
+
     // Deterministic behavior:
     // - If already verified => return true
-    // - If not verified => show verification UI and require explicit Send Code click
+    // - If not verified => show verification UI and automatically send a code
     async function ensureProjectEmailVerified(project, email) {
         const status = await getProjectEmailVerificationStatus(project, email);
 
@@ -478,7 +523,7 @@
         }
 
         showProjectEmailVerification();
-        setProjectEmailVerificationStatus("Verification required. Click Send Code.");
+        await sendVerificationCode(project, email);
 
         return false;
     }
@@ -676,39 +721,7 @@
         sendProjectEmailCodeBtn.addEventListener("click", async () => {
             const project = (projectInput?.value || "").trim();
             const email = (contactEmailField?.value || "").trim();
-
-            if (!project || !email) {
-                setProjectEmailVerificationStatus("Enter project number and email first.");
-                return;
-            }
-
-            sendProjectEmailCodeBtn.disabled = true;
-            const originalText = sendProjectEmailCodeBtn.textContent;
-            sendProjectEmailCodeBtn.textContent = "Sending...";
-
-            try {
-                const response = await fetch("?handler=SendProjectEmailCode", {
-                    method: "POST",
-                    headers: {
-                        "RequestVerificationToken": getRequestVerificationToken(),
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ projectNumber: project, email: email })
-                });
-
-                const data = await readJsonSafe(response);
-                if (!response.ok || (data && data.error)) {
-                    setProjectEmailVerificationStatus((data && data.error) || describeHttpError(response));
-                    return;
-                }
-
-                setProjectEmailVerificationStatus("Code sent. Check your email and enter the 6-digit code.");
-            } catch {
-                setProjectEmailVerificationStatus("Unable to send verification code.");
-            } finally {
-                sendProjectEmailCodeBtn.disabled = false;
-                sendProjectEmailCodeBtn.textContent = originalText;
-            }
+            await sendVerificationCode(project, email);
         });
     }
 
