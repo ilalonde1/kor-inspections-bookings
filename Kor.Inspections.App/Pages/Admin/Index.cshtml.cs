@@ -194,7 +194,16 @@ namespace Kor.Inspections.App.Pages.Admin
                 ActionUtc = DateTime.UtcNow
             });
 
-            await _db.SaveChangesAsync();
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _db.ChangeTracker.Clear();
+                StatusMessage = "This booking was just modified by another user. Please refresh and try again.";
+                return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
+            }
 
             if (wasUnassigned &&
                 booking.Status.Equals("Assigned", StringComparison.OrdinalIgnoreCase))
@@ -232,7 +241,16 @@ namespace Kor.Inspections.App.Pages.Admin
                 PerformedBy = User.Identity?.Name,
                 ActionUtc = DateTime.UtcNow
             });
-            await _db.SaveChangesAsync();
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _db.ChangeTracker.Clear();
+                StatusMessage = "This booking was just modified by another user. Please refresh and try again.";
+                return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
+            }
 
             await _bookingService.SendCancellationEmailsAsync(booking);
 
