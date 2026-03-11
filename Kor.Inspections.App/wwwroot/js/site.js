@@ -34,7 +34,6 @@ window.escapeHtml = function escapeHtml(str) {
 
                 minDate: dateInput.dataset.mindate,
                 maxDate: dateInput.dataset.maxdate,
-                disableMobile: true,
 
                 //---------------------------------------
                 // Fix Razor postback timing bug

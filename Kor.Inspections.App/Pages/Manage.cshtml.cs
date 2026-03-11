@@ -100,6 +100,19 @@ namespace Kor.Inspections.App.Pages
             AlreadyCancelled = string.Equals(
                 booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase);
 
+            var tz = _timeRules.TimeZone;
+            var localStart = TimeZoneInfo.ConvertTimeFromUtc(booking.StartUtc, tz);
+            var localEnd = TimeZoneInfo.ConvertTimeFromUtc(booking.EndUtc, tz);
+
+            ProjectNumber = booking.ProjectNumber;
+            LocalDateText = localStart.ToString("yyyy-MM-dd (ddd)");
+            LocalTimeText = BookingDisplayHelper.GetTimeDisplay(
+                booking.TimePreference,
+                localStart,
+                localEnd);
+            StatusText = booking.Status;
+            AssignedTo = await ResolveAssignedToDisplayAsync(booking.AssignedTo);
+
             var isTerminal = (string.Equals(booking.Status, "Completed", StringComparison.OrdinalIgnoreCase) ||
                               string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase)) &&
                              !_timeRules.IsCancellationAllowed(booking.StartUtc);
@@ -108,23 +121,6 @@ namespace Kor.Inspections.App.Pages
                 IsTerminalState = true;
                 return;
             }
-
-            var tz = _timeRules.TimeZone;
-
-            var localStart = TimeZoneInfo.ConvertTimeFromUtc(booking.StartUtc, tz);
-            var localEnd = TimeZoneInfo.ConvertTimeFromUtc(booking.EndUtc, tz); // ADD THIS
-
-            ProjectNumber = booking.ProjectNumber;
-            LocalDateText = localStart.ToString("yyyy-MM-dd (ddd)");
-
-            LocalTimeText = BookingDisplayHelper.GetTimeDisplay(
-                booking.TimePreference,
-                localStart,
-                localEnd);
-
-            StatusText = booking.Status;
-            AssignedTo = await ResolveAssignedToDisplayAsync(booking.AssignedTo);
-
 
             CanCancel = !AlreadyCancelled && _timeRules.IsCancellationAllowed(booking.StartUtc);
         }

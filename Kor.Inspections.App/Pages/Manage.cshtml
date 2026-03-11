@@ -16,6 +16,23 @@ else
     @if (Model.IsTerminalState)
     {
         <p>This booking is no longer active.</p>
+        <p>
+            <strong>Project:</strong> @Model.ProjectNumber<br />
+            <strong>Date:</strong> @Model.LocalDateText<br />
+            <strong>Time:</strong> @Model.LocalTimeText<br />
+            <strong>Status:</strong> @Model.StatusText
+        </p>
+
+        @if (!string.IsNullOrWhiteSpace(Model.AssignedTo))
+        {
+            <p>
+                <strong>Assigned Inspector:</strong> @Model.AssignedTo
+            </p>
+        }
+
+        <p>
+            <a asp-page="/Index">Book a new inspection</a>
+        </p>
     }
     else
     {
