@@ -239,15 +239,6 @@ namespace Kor.Inspections.App.Services
             return true;
         }
 
-        public async Task<bool> EnsureVerifiedForInitialSetupAsync(
-            string projectNumber,
-            string email,
-            CancellationToken ct = default)
-        {
-            var status = await GetStatusAsync(projectNumber, email, ct);
-            return !status.RequiresVerification || status.IsVerified;
-        }
-
         public async Task<bool> EnsureVerifiedForProjectAccessAsync(
             string projectNumber,
             string email,

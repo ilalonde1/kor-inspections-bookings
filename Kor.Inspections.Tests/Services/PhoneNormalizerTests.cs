@@ -1,3 +1,5 @@
+using Kor.Inspections.App.Services;
+
 namespace Kor.Inspections.Tests.Services;
 
 public class PhoneNormalizerTests
