@@ -69,7 +69,7 @@ namespace Kor.Inspections.App.Services
 
             if (trusted)
             {
-                var trustedKey = BuildKey(normalizedProject, normalizedEmail);
+                var trustedKey = ProjectCacheKeys.BuildVerificationKey(normalizedProject, domain);
                 _cache.Set(
                     trustedKey,
                     new VerificationState
@@ -83,7 +83,7 @@ namespace Kor.Inspections.App.Services
             }
 
             // Temporary trust (cache)
-            var key = BuildKey(normalizedProject, normalizedEmail);
+            var key = ProjectCacheKeys.BuildVerificationKey(normalizedProject, domain);
 
             if (_cache.TryGetValue<VerificationState>(key, out var state) && state is { Verified: true })
                 return (true, true);
@@ -106,7 +106,7 @@ namespace Kor.Inspections.App.Services
             if (!status.RequiresVerification || status.IsVerified)
                 return true;
 
-            var key = BuildKey(normalizedProject, normalizedEmail);
+            var key = ProjectCacheKeys.BuildVerificationKey(normalizedProject, normalizedEmail[(normalizedEmail.IndexOf('@') + 1)..]);
 
             // Domain-scoped verification: if another user from the same domain has
             // already requested a code, reuse it to prevent invalidating concurrent requests.
@@ -181,7 +181,7 @@ namespace Kor.Inspections.App.Services
             // IMPORTANT: do NOT early-return here based on status.IsVerified,
             // because we still need to persist the trusted domain to ProjectDefaults.
 
-            var key = BuildKey(normalizedProject, normalizedEmail);
+            var key = ProjectCacheKeys.BuildVerificationKey(normalizedProject, normalizedEmail[(normalizedEmail.IndexOf('@') + 1)..]);
 
             if (!_cache.TryGetValue<VerificationState>(key, out var state) || state == null)
                 return false;
@@ -263,14 +263,5 @@ namespace Kor.Inspections.App.Services
             return (at > 0 && at < v.Length - 1) ? v : string.Empty;
         }
 
-        private static string BuildKey(string projectNumber, string email)
-        {
-            var at = email.IndexOf('@');
-            var domain = at >= 0 && at < email.Length - 1
-                ? email[(at + 1)..].Trim().ToLowerInvariant()
-                : string.Empty;
-
-            return $"proj-bootstrap:{projectNumber}|{domain}";
-        }
     }
 }

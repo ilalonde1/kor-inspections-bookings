@@ -86,49 +86,6 @@ window.escapeHtml = function escapeHtml(str) {
             highlightInput.focus();
         }
 
-
-        //---------------------------------------
-        // Auto-load saved contacts
-        //---------------------------------------
-
-        const projectInput = document.querySelector("input[name='ProjectNumber']");
-        const emailInput = document.querySelector("input[name='ContactEmail']");
-        const loadBtn = document.getElementById("loadSavedBtn");
-
-        // DO NOT return the whole script if missing.
-        // This was a hidden bug in your previous version.
-        if (projectInput && emailInput && loadBtn) {
-
-            let timeout = null;
-            let hasAutoLoaded = false;
-
-            function tryAutoLoad() {
-
-                if (hasAutoLoaded) return;
-
-                const project = projectInput.value.trim();
-                const email = emailInput.value.trim();
-
-                if (project.length >= 5 && email.includes("@")) {
-
-                    clearTimeout(timeout);
-
-                    timeout = setTimeout(() => {
-
-                        if (!document.querySelector(".saved-box")) {
-                            hasAutoLoaded = true;
-                            loadBtn.click();
-                        }
-
-                    }, 600);
-                }
-            }
-
-            projectInput.addEventListener("input", tryAutoLoad);
-            emailInput.addEventListener("input", tryAutoLoad);
-        }
-
-
     });
 
 })();
