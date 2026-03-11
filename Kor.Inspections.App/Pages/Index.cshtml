@@ -710,18 +710,7 @@
                 hideProjectEmailVerification();
                 setProjectEmailVerificationStatus("Email verified. You can now manage contacts.");
 
-                // After verification, attempt both:
-                // - open modal (existing behavior)
-                // - load inspections (new feature, if UI exists)
                 await openModal();
-
-                if (inspectionLookupArea) {
-                    try {
-                        await loadInspections(project, email);
-                    } catch (err) {
-                        console.warn("Failed to load inspections after verification:", err);
-                    }
-                }
             } catch {
                 setProjectEmailVerificationStatus("Unable to verify code.");
             } finally {

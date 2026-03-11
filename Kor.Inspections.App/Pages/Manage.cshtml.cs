@@ -59,29 +59,29 @@ namespace Kor.Inspections.App.Pages
             if (string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
             {
                 AlreadyCancelled = true;
-                await LoadAsync();
+                await LoadAsync(booking);
                 return Page();
             }
 
             if (string.Equals(booking.Status, "Completed", StringComparison.OrdinalIgnoreCase))
             {
-                await LoadAsync();
+                await LoadAsync(booking);
                 return Page();
             }
 
             if (!_timeRules.IsCancellationAllowed(booking.StartUtc))
             {
-                await LoadAsync();
+                await LoadAsync(booking);
                 return Page();
             }
 
             var cancelled = await _bookingService.CancelBookingByTokenAsync(Token);
             CancelledSuccessfully = cancelled;
-            await LoadAsync();
+            await LoadAsync(booking);
             return Page();
         }
 
-        private async Task LoadAsync()
+        private async Task LoadAsync(Kor.Inspections.App.Data.Models.Booking? booking = null)
         {
             if (Token == Guid.Empty)
             {
@@ -89,7 +89,7 @@ namespace Kor.Inspections.App.Pages
                 return;
             }
 
-            var booking = await _db.Bookings.SingleOrDefaultAsync(b => b.CancelToken == Token);
+            booking ??= await _db.Bookings.SingleOrDefaultAsync(b => b.CancelToken == Token);
 
             if (booking == null)
             {
