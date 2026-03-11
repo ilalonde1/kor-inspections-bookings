@@ -328,7 +328,7 @@ namespace Kor.Inspections.App.Pages
         }
 
         // ---------------------------------------------------------
-        // Lookup inspections by project + email-domain scope
+        // Lookup inspections by project
         // ---------------------------------------------------------
 
         public async Task<JsonResult> OnPostLookupInspectionsAsync([FromBody] LookupContactsRequest req)
@@ -336,34 +336,24 @@ namespace Kor.Inspections.App.Pages
             var projectRaw = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
             var emailRaw = (req.Email ?? "").Trim();
 
-            if (string.IsNullOrWhiteSpace(projectRaw) || string.IsNullOrWhiteSpace(emailRaw))
+            if (string.IsNullOrWhiteSpace(projectRaw))
                 return new JsonResult(Array.Empty<InspectionDto>());
 
-            var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
-
-            if (!canAccess)
+            if (!string.IsNullOrWhiteSpace(emailRaw))
             {
-                Response.StatusCode = 403;
-                return new JsonResult(new { error = "Please verify your email before viewing inspections." });
+                var canAccess = await _projectBootstrapVerificationService
+                    .EnsureVerifiedForProjectAccessAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
+
+                if (!canAccess)
+                {
+                    Response.StatusCode = 403;
+                    return new JsonResult(new { error = "Please verify your email before viewing inspections." });
+                }
             }
-
-            var at = emailRaw.IndexOf('@');
-            if (at <= 0 || at >= emailRaw.Length - 1)
-                return new JsonResult(Array.Empty<InspectionDto>());
-
-            var domain = emailRaw[(at + 1)..].Trim().ToLowerInvariant();
-            var base5 = projectRaw;
-
-            if (string.IsNullOrWhiteSpace(base5) || string.IsNullOrWhiteSpace(domain))
-                return new JsonResult(Array.Empty<InspectionDto>());
-
-            var domainSuffix = "@" + domain;
 
             var bookings = await _db.Bookings
                 .AsNoTracking()
-                .Where(b => b.ProjectNumber != null && b.ProjectNumber.StartsWith(base5))
-                .Where(b => b.ContactEmail != null && EF.Functions.Like(b.ContactEmail, "%" + domainSuffix))
+                .Where(b => b.ProjectNumber != null && b.ProjectNumber.StartsWith(projectRaw))
                 .OrderByDescending(b => b.StartUtc)
                 .ToListAsync();
 

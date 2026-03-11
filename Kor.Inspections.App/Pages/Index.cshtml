@@ -260,7 +260,7 @@
             <section class="modal-inspections-panel">
                 <div class="contact-section">
                     <div class="inspection-header-row">
-                        <h4 class="contact-section-title">Existing Inspections</h4>
+                        <h4 id="inspectionListTitle" class="contact-section-title">Active Inspections</h4>
                         <span id="inspectionCountLabel" class="helper-text-muted"></span>
                         <div class="inspection-filter-toggle">
                             <button type="button" id="inspectionFilterActiveBtn" class="btn btn-sm btn-secondary active">Active</button>
@@ -332,6 +332,7 @@
     const cancelInspectionBtn = document.getElementById("cancelInspectionBtn");
     const inspectionFilterActiveBtn = document.getElementById("inspectionFilterActiveBtn");
     const inspectionFilterAllBtn = document.getElementById("inspectionFilterAllBtn");
+    const inspectionListTitle = document.getElementById("inspectionListTitle");
     const inspectionCountLabel = document.getElementById("inspectionCountLabel");
     const inspectionDetailStatus = document.getElementById("inspectionDetailStatus");
     const inspectionDetailStart = document.getElementById("inspectionDetailStart");
@@ -625,6 +626,13 @@
         });
     }
 
+    function updateInspectionListTitle() {
+        if (!inspectionListTitle) return;
+        inspectionListTitle.textContent = inspectionFilterMode === "all"
+            ? "All Inspections"
+            : "Active Inspections";
+    }
+
     function hideInspectionDetails() {
         selectedInspectionId = null;
         if (inspectionDetailsPanel) {
@@ -661,6 +669,7 @@
             inspectionFilterMode = "active";
             inspectionFilterActiveBtn.classList.add("active");
             inspectionFilterAllBtn?.classList.remove("active");
+            updateInspectionListTitle();
             renderInspections(currentInspections);
         });
     }
@@ -670,6 +679,7 @@
             inspectionFilterMode = "all";
             inspectionFilterAllBtn.classList.add("active");
             inspectionFilterActiveBtn?.classList.remove("active");
+            updateInspectionListTitle();
             renderInspections(currentInspections);
         });
     }
@@ -1038,6 +1048,7 @@
         inspectionFilterMode = "active";
         inspectionFilterActiveBtn?.classList.add("active");
         inspectionFilterAllBtn?.classList.remove("active");
+        updateInspectionListTitle();
 
         try {
             await loadContacts(project, email);
