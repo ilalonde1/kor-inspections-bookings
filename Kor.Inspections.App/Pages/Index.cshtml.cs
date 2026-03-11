@@ -129,6 +129,7 @@ namespace Kor.Inspections.App.Pages
 
         public async Task OnGetAsync(string? projectNumber, string? contactEmail, int? selectedContactId)
         {
+            ViewData["Title"] = "Book a Field Review";
             AllowedDates = _timeRules.GetAllowedDateRangeUtcNow();
 
             if (!RequestedDate.HasValue)
