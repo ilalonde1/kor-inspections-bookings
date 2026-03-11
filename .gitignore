@@ -20,3 +20,4 @@ tests/e2e/.env
 tests/e2e/storageState.json
 appsettings.Development.json
 appsettings.Local.json
+migration_script.sql
