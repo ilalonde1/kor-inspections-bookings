@@ -149,6 +149,10 @@ ValidateInspectionRulesConfiguration(
     app.Configuration,
     app.Logger,
     strict: app.Environment.IsProduction());
+DeltekConfigurationValidator.Validate(
+    app.Configuration,
+    app.Logger,
+    strict: app.Environment.IsProduction());
 
 if (app.Environment.IsProduction())
 {
@@ -273,3 +277,34 @@ static void ValidateInspectionRulesConfiguration(IConfiguration config, Microsof
 }
 
 public partial class Program { }
+
+public static class DeltekConfigurationValidator
+{
+    public static void Validate(IConfiguration config, Microsoft.Extensions.Logging.ILogger logger, bool strict)
+    {
+        var section = config.GetSection("Deltek");
+        var options = section.Get<DeltekProjectOptions>() ?? new DeltekProjectOptions();
+
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(options.Sql_ProjectByNumber))
+        {
+            errors.Add("Deltek:Sql_ProjectByNumber is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.Sql_ProjectSearchByPrefix))
+        {
+            errors.Add("Deltek:Sql_ProjectSearchByPrefix is required.");
+        }
+
+        if (errors.Count == 0)
+            return;
+
+        var message = "Deltek configuration is invalid: " + string.Join(" ", errors);
+
+        if (strict)
+            throw new InvalidOperationException(message);
+
+        logger.LogWarning("{Message} Development mode will continue to run.", message);
+    }
+}
