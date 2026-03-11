@@ -106,6 +106,11 @@ namespace Kor.Inspections.App.Data
             {
                 entity.ToTable("BookingActions");
                 entity.HasKey(a => a.ActionId);
+
+                entity.HasOne<Booking>()
+                      .WithMany()
+                      .HasForeignKey(a => a.BookingId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             // ----------------------------
