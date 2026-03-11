@@ -4,18 +4,12 @@ using System.Data.Odbc;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Kor.Inspections.App.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Kor.Inspections.App.Services
 {
-    public class DeltekProjectOptions
-    {
-        public string OdbcDsn { get; set; } = string.Empty;
-        public string Sql_ProjectByNumber { get; set; } = string.Empty;
-        public string Sql_ProjectSearchByPrefix { get; set; } = string.Empty;
-    }
-
     public sealed class DeltekProjectInfo
     {
         public string ProjectNumber { get; init; } = string.Empty;

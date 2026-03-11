@@ -1,6 +1,10 @@
 @page
 @model Kor.Inspections.App.Pages.IndexModel
 
+@section Styles {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+}
+
 @{
     ViewData["Title"] = "Book a Field Review";
     ViewData["InspectorMode"] = "false";
@@ -72,6 +76,7 @@
                      <button type="button" id="sendProjectEmailCodeBtn" class="btn btn-outline-primary">
                          Send Code
                      </button>
+                     <label for="projectEmailCodeInput">Verification code</label>
                      <input id="projectEmailCodeInput"
                             class="form-control project-email-code-input"
                             inputmode="numeric"
@@ -202,10 +207,10 @@
 <!-- CONTACT MODAL -->
 <!-- ============================= -->
 
-<div id="contactModal" class="kor-modal" style="display:none;">
+<div id="contactModal" class="kor-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
     <div class="kor-modal-content">
 
-        <h3 class="contact-modal-title">Project Contacts</h3>
+        <h3 id="contactModalTitle" class="contact-modal-title">Project Contacts</h3>
         <p class="contact-modal-subtitle">Choose an existing contact or create a new one to use for this booking. Selecting a contact will automatically populate the request form.</p>
 
         <div class="modal-workspace">
@@ -255,7 +260,7 @@
             <section class="modal-inspections-panel">
                 <div class="contact-section">
                     <div class="inspection-header-row">
-                        <h4 class="contact-section-title">Existing Inspections</h4>
+                        <h4 id="inspectionListTitle" class="contact-section-title">Active Inspections</h4>
                         <span id="inspectionCountLabel" class="helper-text-muted"></span>
                         <div class="inspection-filter-toggle">
                             <button type="button" id="inspectionFilterActiveBtn" class="btn btn-sm btn-secondary active">Active</button>
@@ -276,7 +281,6 @@
                     <div class="inspection-detail-row"><strong>Status:</strong> <span id="inspectionDetailStatus"></span></div>
                     <div class="inspection-detail-row"><strong>Start:</strong> <span id="inspectionDetailStart"></span></div>
                     <div class="inspection-detail-row"><strong>End:</strong> <span id="inspectionDetailEnd"></span></div>
-                    <div class="inspection-detail-row"><strong>Assigned Inspector:</strong> <span id="inspectionDetailAssigned"></span></div>
                     <div class="inspection-detail-row"><strong>Address:</strong> <span id="inspectionDetailAddress"></span></div>
                     <div class="inspection-detail-row"><strong>Comments:</strong> <span id="inspectionDetailComments"></span></div>
                     <div class="inspection-detail-actions">
@@ -327,11 +331,11 @@
     const cancelInspectionBtn = document.getElementById("cancelInspectionBtn");
     const inspectionFilterActiveBtn = document.getElementById("inspectionFilterActiveBtn");
     const inspectionFilterAllBtn = document.getElementById("inspectionFilterAllBtn");
+    const inspectionListTitle = document.getElementById("inspectionListTitle");
     const inspectionCountLabel = document.getElementById("inspectionCountLabel");
     const inspectionDetailStatus = document.getElementById("inspectionDetailStatus");
     const inspectionDetailStart = document.getElementById("inspectionDetailStart");
     const inspectionDetailEnd = document.getElementById("inspectionDetailEnd");
-    const inspectionDetailAssigned = document.getElementById("inspectionDetailAssigned");
     const inspectionDetailAddress = document.getElementById("inspectionDetailAddress");
     const inspectionDetailComments = document.getElementById("inspectionDetailComments");
 
@@ -350,10 +354,14 @@
     const contactAddressInput = document.getElementById("modalContactAddress");
     const contactEmailInput = document.getElementById("modalContactEmail");
     const cancelEditBtn = document.getElementById("cancelEditBtn");
+    let lastModalTrigger = null;
     let modalBackdropPointerDown = false;
 
     document.getElementById("openContactModalBtn")
-        .addEventListener("click", openModal);
+        .addEventListener("click", e => {
+            lastModalTrigger = e.currentTarget;
+            openModal();
+        });
 
     document.getElementById("closeModalBtn")
         .addEventListener("click", closeModal);
@@ -404,6 +412,33 @@
         }
     }
 
+    function getModalFocusableElements() {
+        return Array.from(modal.querySelectorAll(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+            .filter(el => !el.hidden && el.offsetParent !== null);
+    }
+
+    function handleModalKeydown(e) {
+        if (modal.style.display !== "flex" || e.key !== "Tab") return;
+
+        const focusable = getModalFocusableElements();
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+            return;
+        }
+
+        if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
+    }
+
     async function getProjectEmailVerificationStatus(project, email) {
         const response = await fetch("?handler=ProjectEmailVerificationStatus", {
             method: "POST",
@@ -429,9 +464,54 @@
         return data;
     }
 
+    async function sendVerificationCode(project, email) {
+        if (!project || !email) {
+            setProjectEmailVerificationStatus("Enter project number and email first.");
+            return false;
+        }
+
+        if (sendProjectEmailCodeBtn) {
+            sendProjectEmailCodeBtn.disabled = true;
+        }
+        const originalText = sendProjectEmailCodeBtn?.textContent || "";
+        if (sendProjectEmailCodeBtn) {
+            sendProjectEmailCodeBtn.textContent = "Sending...";
+        }
+
+        setProjectEmailVerificationStatus("Sending verification code...");
+
+        try {
+            const response = await fetch("?handler=SendProjectEmailCode", {
+                method: "POST",
+                headers: {
+                    "RequestVerificationToken": getRequestVerificationToken(),
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ projectNumber: project, email: email })
+            });
+
+            const data = await readJsonSafe(response);
+            if (!response.ok || (data && data.error)) {
+                setProjectEmailVerificationStatus((data && data.error) || describeHttpError(response));
+                return false;
+            }
+
+            setProjectEmailVerificationStatus("Code sent. Check your email and enter the 6-digit code.");
+            return true;
+        } catch {
+            setProjectEmailVerificationStatus("Unable to send verification code.");
+            return false;
+        } finally {
+            if (sendProjectEmailCodeBtn) {
+                sendProjectEmailCodeBtn.disabled = false;
+                sendProjectEmailCodeBtn.textContent = originalText;
+            }
+        }
+    }
+
     // Deterministic behavior:
     // - If already verified => return true
-    // - If not verified => show verification UI and require explicit Send Code click
+    // - If not verified => show verification UI and automatically send a code
     async function ensureProjectEmailVerified(project, email) {
         const status = await getProjectEmailVerificationStatus(project, email);
 
@@ -442,7 +522,7 @@
         }
 
         showProjectEmailVerification();
-        setProjectEmailVerificationStatus("Verification required. Click Send Code.");
+        await sendVerificationCode(project, email);
 
         return false;
     }
@@ -515,14 +595,16 @@
 
         const rows = filtered.map(i => {
             const start = i.startUtc ? new Date(i.startUtc).toLocaleString() : "";
-            const status = `${i.status ?? ""}`.trim();
-            const contact = `${i.contactName ?? ""}`.trim();
+            const status = escapeHtml(`${i.status ?? ""}`.trim());
+            const contact = escapeHtml(`${i.contactName ?? ""}`.trim());
+            const startText = escapeHtml(start);
+            const inspectionId = escapeHtml(i.id);
             const isSelected = selectedInspectionId === i.id;
 
             return `
-                <button type="button" class="inspection-row${isSelected ? " selected" : ""}" data-inspection-id="${i.id}">
+                <button type="button" class="inspection-row${isSelected ? " selected" : ""}" data-inspection-id="${inspectionId}">
                     <span class="inspection-row-status">${status || "Unknown"}</span>
-                    <span class="inspection-row-time">${start || "No time"}</span>
+                    <span class="inspection-row-time">${startText || "No time"}</span>
                     <span class="inspection-row-contact">${contact || "No contact"}</span>
                     <span class="inspection-row-cta" aria-hidden="true">Details</span>
                 </button>
@@ -540,6 +622,13 @@
                 renderInspections(currentInspections);
             });
         });
+    }
+
+    function updateInspectionListTitle() {
+        if (!inspectionListTitle) return;
+        inspectionListTitle.textContent = inspectionFilterMode === "all"
+            ? "All Inspections"
+            : "Active Inspections";
     }
 
     function hideInspectionDetails() {
@@ -560,7 +649,6 @@
         if (inspectionDetailStatus) inspectionDetailStatus.textContent = inspection.status ?? "";
         if (inspectionDetailStart) inspectionDetailStart.textContent = inspection.startUtc ? new Date(inspection.startUtc).toLocaleString() : "";
         if (inspectionDetailEnd) inspectionDetailEnd.textContent = inspection.endUtc ? new Date(inspection.endUtc).toLocaleString() : "";
-        if (inspectionDetailAssigned) inspectionDetailAssigned.textContent = inspection.assignedTo ?? "Unassigned";
         if (inspectionDetailAddress) inspectionDetailAddress.textContent = inspection.address ?? "";
         if (inspectionDetailComments) inspectionDetailComments.textContent = inspection.comments ?? "";
 
@@ -578,6 +666,7 @@
             inspectionFilterMode = "active";
             inspectionFilterActiveBtn.classList.add("active");
             inspectionFilterAllBtn?.classList.remove("active");
+            updateInspectionListTitle();
             renderInspections(currentInspections);
         });
     }
@@ -587,6 +676,7 @@
             inspectionFilterMode = "all";
             inspectionFilterAllBtn.classList.add("active");
             inspectionFilterActiveBtn?.classList.remove("active");
+            updateInspectionListTitle();
             renderInspections(currentInspections);
         });
     }
@@ -638,39 +728,7 @@
         sendProjectEmailCodeBtn.addEventListener("click", async () => {
             const project = (projectInput?.value || "").trim();
             const email = (contactEmailField?.value || "").trim();
-
-            if (!project || !email) {
-                setProjectEmailVerificationStatus("Enter project number and email first.");
-                return;
-            }
-
-            sendProjectEmailCodeBtn.disabled = true;
-            const originalText = sendProjectEmailCodeBtn.textContent;
-            sendProjectEmailCodeBtn.textContent = "Sending...";
-
-            try {
-                const response = await fetch("?handler=SendProjectEmailCode", {
-                    method: "POST",
-                    headers: {
-                        "RequestVerificationToken": getRequestVerificationToken(),
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ projectNumber: project, email: email })
-                });
-
-                const data = await readJsonSafe(response);
-                if (!response.ok || (data && data.error)) {
-                    setProjectEmailVerificationStatus((data && data.error) || describeHttpError(response));
-                    return;
-                }
-
-                setProjectEmailVerificationStatus("Code sent. Check your email and enter the 6-digit code.");
-            } catch {
-                setProjectEmailVerificationStatus("Unable to send verification code.");
-            } finally {
-                sendProjectEmailCodeBtn.disabled = false;
-                sendProjectEmailCodeBtn.textContent = originalText;
-            }
+            await sendVerificationCode(project, email);
         });
     }
 
@@ -708,18 +766,8 @@
                 hideProjectEmailVerification();
                 setProjectEmailVerificationStatus("Email verified. You can now manage contacts.");
 
-                // After verification, attempt both:
-                // - open modal (existing behavior)
-                // - load inspections (new feature, if UI exists)
+                lastModalTrigger = verifyProjectEmailCodeBtn;
                 await openModal();
-
-                if (inspectionLookupArea) {
-                    try {
-                        await loadInspections(project, email);
-                    } catch (err) {
-                        console.warn("Failed to load inspections after verification:", err);
-                    }
-                }
             } catch {
                 setProjectEmailVerificationStatus("Unable to verify code.");
             } finally {
@@ -942,6 +990,7 @@
         if (modalBackdropPointerDown && e.target === modal) closeModal();
         modalBackdropPointerDown = false;
     });
+    modal.addEventListener("keydown", handleModalKeydown);
     document.querySelector(".kor-modal-content")
         .addEventListener("click", e => e.stopPropagation());
 
@@ -996,6 +1045,7 @@
         inspectionFilterMode = "active";
         inspectionFilterActiveBtn?.classList.add("active");
         inspectionFilterAllBtn?.classList.remove("active");
+        updateInspectionListTitle();
 
         try {
             await loadContacts(project, email);
@@ -1035,12 +1085,14 @@
         resetContactForm();
         modal.style.display = "flex";
         document.body.style.overflow = "hidden";
+        getModalFocusableElements()[0]?.focus();
     }
 
     function closeModal() {
         hideInspectionDetails();
         modal.style.display = "none";
         document.body.style.overflow = "";
+        lastModalTrigger?.focus();
     }
 
     function renderContacts(data) {
@@ -1055,19 +1107,24 @@
         }
 
         data.forEach(c => {
+            const name = escapeHtml(c.name);
+            const email = escapeHtml(c.email);
+            const phone = escapeHtml(c.phone);
+            const contactId = Number(c.id);
+            const safeContactId = Number.isFinite(contactId) ? contactId : "null";
 
             const row = document.createElement("div");
             row.className = "contact-row";
 
             row.innerHTML = `
                 <div class="contact-row-main">
-                    <div class="contact-row-name">${c.name ?? ""}</div>
-                    <div class="contact-row-meta">${c.email ?? ""} · ${c.phone ?? ""}</div>
+                    <div class="contact-row-name">${name}</div>
+                    <div class="contact-row-meta">${email} · ${phone}</div>
                 </div>
                 <div class="contact-row-actions">
-                    <button onclick="selectContact(${c.id})" class="btn btn-sm btn-secondary">Use</button>
-                    <button onclick="beginEditContact(${c.id})" class="btn btn-sm btn-outline-primary">Edit</button>
-                    <button onclick="deleteContact(${c.id})" class="btn btn-sm btn-danger">Delete</button>
+                    <button onclick="selectContact(${safeContactId})" class="btn btn-sm btn-secondary">Use</button>
+                    <button onclick="beginEditContact(${safeContactId})" class="btn btn-sm btn-outline-primary">Edit</button>
+                    <button onclick="deleteContact(${safeContactId})" class="btn btn-sm btn-danger">Delete</button>
                 </div>
             `;
 
@@ -1257,3 +1314,7 @@
     });
 
 </script>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+}

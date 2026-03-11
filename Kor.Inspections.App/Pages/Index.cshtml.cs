@@ -129,6 +129,7 @@ namespace Kor.Inspections.App.Pages
 
         public async Task OnGetAsync(string? projectNumber, string? contactEmail, int? selectedContactId)
         {
+            ViewData["Title"] = "Book a Field Review";
             AllowedDates = _timeRules.GetAllowedDateRangeUtcNow();
 
             if (!RequestedDate.HasValue)
@@ -295,7 +296,7 @@ namespace Kor.Inspections.App.Pages
 
         public async Task<JsonResult> OnPostLookupContactsAsync([FromBody] LookupContactsRequest req)
         {
-            var project = (req.ProjectNumber ?? "").Trim();
+            var project = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
             var email = (req.Email ?? "").Trim();
 
             if (string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(email))
@@ -327,42 +328,32 @@ namespace Kor.Inspections.App.Pages
         }
 
         // ---------------------------------------------------------
-        // Lookup inspections by project + email-domain scope
+        // Lookup inspections by project
         // ---------------------------------------------------------
 
         public async Task<JsonResult> OnPostLookupInspectionsAsync([FromBody] LookupContactsRequest req)
         {
-            var projectRaw = (req.ProjectNumber ?? "").Trim();
+            var projectRaw = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
             var emailRaw = (req.Email ?? "").Trim();
 
-            if (string.IsNullOrWhiteSpace(projectRaw) || string.IsNullOrWhiteSpace(emailRaw))
+            if (string.IsNullOrWhiteSpace(projectRaw))
                 return new JsonResult(Array.Empty<InspectionDto>());
 
-            var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
-
-            if (!canAccess)
+            if (!string.IsNullOrWhiteSpace(emailRaw))
             {
-                Response.StatusCode = 403;
-                return new JsonResult(new { error = "Please verify your email before viewing inspections." });
+                var canAccess = await _projectBootstrapVerificationService
+                    .EnsureVerifiedForProjectAccessAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
+
+                if (!canAccess)
+                {
+                    Response.StatusCode = 403;
+                    return new JsonResult(new { error = "Please verify your email before viewing inspections." });
+                }
             }
-
-            var at = emailRaw.IndexOf('@');
-            if (at <= 0 || at >= emailRaw.Length - 1)
-                return new JsonResult(Array.Empty<InspectionDto>());
-
-            var domain = emailRaw[(at + 1)..].Trim().ToLowerInvariant();
-            var base5 = ProjectNumberHelper.Base5(projectRaw);
-
-            if (string.IsNullOrWhiteSpace(base5) || string.IsNullOrWhiteSpace(domain))
-                return new JsonResult(Array.Empty<InspectionDto>());
-
-            var domainSuffix = "@" + domain;
 
             var bookings = await _db.Bookings
                 .AsNoTracking()
-                .Where(b => b.ProjectNumber != null && b.ProjectNumber.StartsWith(base5))
-                .Where(b => b.ContactEmail != null && EF.Functions.Like(b.ContactEmail, "%" + domainSuffix))
+                .Where(b => b.ProjectNumber != null && b.ProjectNumber.StartsWith(projectRaw))
                 .OrderByDescending(b => b.StartUtc)
                 .ToListAsync();
 
@@ -393,7 +384,7 @@ namespace Kor.Inspections.App.Pages
 
         public async Task<JsonResult> OnPostCancelInspectionAsync([FromBody] CancelInspectionRequest req)
         {
-            var projectRaw = (req.ProjectNumber ?? "").Trim();
+            var projectRaw = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
             var emailRaw = (req.Email ?? "").Trim();
             var idRaw = (req.Id ?? "").Trim();
 
@@ -425,7 +416,7 @@ namespace Kor.Inspections.App.Pages
             }
 
             var domain = emailRaw[(at + 1)..].Trim().ToLowerInvariant();
-            var base5 = ProjectNumberHelper.Base5(projectRaw);
+            var base5 = projectRaw;
             var domainSuffix = "@" + domain;
 
             if (string.IsNullOrWhiteSpace(base5) || string.IsNullOrWhiteSpace(domain))
@@ -510,7 +501,7 @@ namespace Kor.Inspections.App.Pages
         public async Task<JsonResult> OnPostProjectEmailVerificationStatusAsync(
             [FromBody] ProjectEmailVerificationRequest req)
         {
-            var project = (req.ProjectNumber ?? "").Trim();
+            var project = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
             var email = (req.Email ?? "").Trim();
 
             if (string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(email))
@@ -532,7 +523,7 @@ namespace Kor.Inspections.App.Pages
         public async Task<JsonResult> OnPostSendProjectEmailCodeAsync(
             [FromBody] ProjectEmailVerificationRequest req)
         {
-            var project = (req.ProjectNumber ?? "").Trim();
+            var project = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
             var email = (req.Email ?? "").Trim();
 
             if (string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(email))
@@ -559,7 +550,7 @@ namespace Kor.Inspections.App.Pages
         public async Task<JsonResult> OnPostVerifyProjectEmailCodeAsync(
             [FromBody] VerifyProjectEmailCodeRequest req)
         {
-            var project = (req.ProjectNumber ?? "").Trim();
+            var project = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
             var email = (req.Email ?? "").Trim();
             var code = (req.Code ?? "").Trim();
 
@@ -589,7 +580,7 @@ namespace Kor.Inspections.App.Pages
         [EnableRateLimiting("contactMutation")]
         public async Task<JsonResult> OnPostSaveContactAjaxAsync([FromBody] SaveContactRequest req)
         {
-            var project = (req.ProjectNumber ?? "").Trim();
+            var project = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
             var requesterEmail = string.IsNullOrWhiteSpace(ContactEmail)
                 ? (req.Email ?? "").Trim()
                 : ContactEmail.Trim();
@@ -649,21 +640,24 @@ namespace Kor.Inspections.App.Pages
         [EnableRateLimiting("contactMutation")]
         public async Task<JsonResult> OnPostSelectContactAsync(int id)
         {
-            if (string.IsNullOrWhiteSpace(ProjectNumber) || string.IsNullOrWhiteSpace(ContactEmail))
+            var projectNumber = ProjectNumberHelper.Base5(ProjectNumber?.Trim() ?? string.Empty);
+            var contactEmail = ContactEmail?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(projectNumber) || string.IsNullOrWhiteSpace(contactEmail))
             {
                 Response.StatusCode = 400;
                 return new JsonResult(new { error = "Project number and email are required." });
             }
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(ProjectNumber, ContactEmail, HttpContext.RequestAborted);
+                .EnsureVerifiedForProjectAccessAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
             if (!canAccess)
             {
                 Response.StatusCode = 403;
                 return new JsonResult(new { error = "Please verify your email before selecting a contact." });
             }
 
-            var profile = await _projectProfileService.GetProfileAsync(ProjectNumber, ContactEmail);
+            var profile = await _projectProfileService.GetProfileAsync(projectNumber, contactEmail);
             var contact = profile?.Contacts.FirstOrDefault(c => c.ContactId == id);
 
             if (contact == null)
@@ -693,18 +687,21 @@ namespace Kor.Inspections.App.Pages
         [EnableRateLimiting("contactMutation")]
         public async Task<IActionResult> OnPostDeleteContactAsync(int id)
         {
-            if (string.IsNullOrWhiteSpace(ProjectNumber) || string.IsNullOrWhiteSpace(ContactEmail))
+            var projectNumber = ProjectNumberHelper.Base5(ProjectNumber?.Trim() ?? string.Empty);
+            var contactEmail = ContactEmail?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(projectNumber) || string.IsNullOrWhiteSpace(contactEmail))
                 return new JsonResult(new { error = "Project number and email are required." }) { StatusCode = 400 };
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(ProjectNumber, ContactEmail, HttpContext.RequestAborted);
+                .EnsureVerifiedForProjectAccessAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
             if (!canAccess)
                 return new JsonResult(new { error = "Please verify your email before deleting a contact." }) { StatusCode = 403 };
 
             await _projectProfileService.DeleteContactAsync(
                 id,
-                ProjectNumber,
-                ContactEmail);
+                projectNumber,
+                contactEmail);
 
             if (SelectedContactId == id)
                 SelectedContactId = null;
@@ -729,8 +726,11 @@ namespace Kor.Inspections.App.Pages
 
             await LoadAllowedDatesAndTimesAsync();
 
+            var projectNumber = ProjectNumberHelper.Base5(ProjectNumber?.Trim() ?? string.Empty);
+            var contactEmail = ContactEmail?.Trim() ?? string.Empty;
+
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(ProjectNumber, ContactEmail, HttpContext.RequestAborted);
+                .EnsureVerifiedForProjectAccessAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
             if (!canAccess)
             {
                 ModelState.AddModelError(string.Empty, "Please verify your email before booking.");
@@ -746,7 +746,7 @@ namespace Kor.Inspections.App.Pages
             if (!ModelState.IsValid)
                 return Page();
 
-            var profile = await _projectProfileService.GetProfileAsync(ProjectNumber, ContactEmail);
+            var profile = await _projectProfileService.GetProfileAsync(projectNumber, contactEmail);
             var contact = profile?.Contacts.FirstOrDefault(c => c.ContactId == SelectedContactId.Value);
 
             if (contact == null)
@@ -805,7 +805,7 @@ namespace Kor.Inspections.App.Pages
                 endUtc = startUtc.AddMinutes(_inspectionRules.DefaultDurationMinutes);
             }
 
-            var submittedProjectNumber = ProjectNumber.Trim();
+            var submittedProjectNumber = projectNumber;
             var submittedContactEmail = contact.ContactEmail.Trim();
             var duplicateCutoffUtc = DateTime.UtcNow.AddMinutes(-2);
 
@@ -836,7 +836,7 @@ namespace Kor.Inspections.App.Pages
                 booking = await _bookingService.CreateBookingAsync(
                     submittedProjectNumber,
                     string.IsNullOrWhiteSpace(contact.ContactAddress)
-                        ? (string.IsNullOrWhiteSpace(ProjectAddress) ? $"{ProjectNumber.Trim()} Project Address" : ProjectAddress.Trim())
+                        ? (string.IsNullOrWhiteSpace(ProjectAddress) ? $"{projectNumber} Project Address" : ProjectAddress.Trim())
                         : contact.ContactAddress.Trim(),
                     contact.ContactName.Trim(),
                     PhoneNormalizer.Normalize(contact.ContactPhone),

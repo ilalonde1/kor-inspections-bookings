@@ -78,6 +78,9 @@ builder.Services.Configure<NotificationOptions>(
 builder.Services.Configure<AppOptions>(
     builder.Configuration.GetSection("App"));
 
+builder.Services.Configure<SupportOptions>(
+    builder.Configuration.GetSection("Support"));
+
 builder.Services.Configure<DeltekProjectOptions>(
     builder.Configuration.GetSection("Deltek"));
 

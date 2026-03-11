@@ -8,15 +8,14 @@
             DateTime endLocal)
         {
             if (!string.IsNullOrWhiteSpace(timePreference))
-                if (!string.IsNullOrWhiteSpace(timePreference))
+            {
+                return timePreference.ToUpper() switch
                 {
-                    return timePreference.ToUpper() switch
-                    {
-                        "AM" => "Anytime AM",
-                        "PM" => "Anytime PM",
-                        _ => $"{startLocal:HH:mm} - {endLocal:HH:mm}"
-                    };
-                }
+                    "AM" => "Anytime AM",
+                    "PM" => "Anytime PM",
+                    _ => $"{startLocal:HH:mm} - {endLocal:HH:mm}"
+                };
+            }
 
 
             return $"{startLocal:HH:mm} - {endLocal:HH:mm}";

@@ -1,4 +1,14 @@
-﻿(function () {
+window.escapeHtml = function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+};
+
+(function () {
 
     document.addEventListener("DOMContentLoaded", function () {
 
@@ -24,7 +34,6 @@
 
                 minDate: dateInput.dataset.mindate,
                 maxDate: dateInput.dataset.maxdate,
-                disableMobile: true,
 
                 //---------------------------------------
                 // Fix Razor postback timing bug
@@ -75,49 +84,6 @@
             highlightInput.scrollIntoView({ behavior: "smooth", block: "center" });
             highlightInput.focus();
         }
-
-
-        //---------------------------------------
-        // Auto-load saved contacts
-        //---------------------------------------
-
-        const projectInput = document.querySelector("input[name='ProjectNumber']");
-        const emailInput = document.querySelector("input[name='ContactEmail']");
-        const loadBtn = document.getElementById("loadSavedBtn");
-
-        // DO NOT return the whole script if missing.
-        // This was a hidden bug in your previous version.
-        if (projectInput && emailInput && loadBtn) {
-
-            let timeout = null;
-            let hasAutoLoaded = false;
-
-            function tryAutoLoad() {
-
-                if (hasAutoLoaded) return;
-
-                const project = projectInput.value.trim();
-                const email = emailInput.value.trim();
-
-                if (project.length >= 5 && email.includes("@")) {
-
-                    clearTimeout(timeout);
-
-                    timeout = setTimeout(() => {
-
-                        if (!document.querySelector(".saved-box")) {
-                            hasAutoLoaded = true;
-                            loadBtn.click();
-                        }
-
-                    }, 600);
-                }
-            }
-
-            projectInput.addEventListener("input", tryAutoLoad);
-            emailInput.addEventListener("input", tryAutoLoad);
-        }
-
 
     });
 

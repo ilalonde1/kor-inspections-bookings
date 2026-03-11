@@ -1,4 +1,6 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
+
+namespace Kor.Inspections.App.Services;
 
 public static class PhoneNormalizer
 {

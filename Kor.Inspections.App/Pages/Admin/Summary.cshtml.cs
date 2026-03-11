@@ -35,8 +35,12 @@ namespace Kor.Inspections.App.Pages.Admin
         }
 
         public DateTime SummaryDateLocal { get; private set; }
+        public DateTime SelectedDate { get; private set; }
 
         public IList<SummaryRow> Bookings { get; private set; } = new List<SummaryRow>();
+
+        [BindProperty(SupportsGet = true)]
+        public string? Date { get; set; }
 
         [BindProperty(SupportsGet = true)]
         public string? Sort { get; set; }
@@ -71,15 +75,27 @@ namespace Kor.Inspections.App.Pages.Admin
 
         public async Task OnGetAsync()
         {
+            ViewData["Title"] = "Summary";
             var tz = _timeRules.TimeZone;
-
             var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
-            var tomorrowLocal = nowLocal.Date.AddDays(1);
+            var defaultDate = nowLocal.Date.AddDays(1);
 
-            SummaryDateLocal = tomorrowLocal;
+            if (!DateTime.TryParseExact(
+                    Date,
+                    "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out var selectedDate))
+            {
+                selectedDate = defaultDate;
+            }
 
-            var startUtc = TimeZoneInfo.ConvertTimeToUtc(tomorrowLocal, tz);
-            var endUtc = TimeZoneInfo.ConvertTimeToUtc(tomorrowLocal.AddDays(1), tz);
+            SelectedDate = selectedDate.Date;
+            Date = SelectedDate.ToString("yyyy-MM-dd");
+            SummaryDateLocal = SelectedDate;
+
+            var startUtc = TimeZoneInfo.ConvertTimeToUtc(SelectedDate, tz);
+            var endUtc = TimeZoneInfo.ConvertTimeToUtc(SelectedDate.AddDays(1), tz);
 
             var query = _db.Bookings
                 .Where(b =>
@@ -197,6 +213,8 @@ var inspectorBookings = (inspector is null
             await OnGetAsync();
 
             var fromMailbox = _notificationOptions.FromMailbox;
+            var sentEmails = new List<string>();
+            var failedEmails = new List<string>();
 
             var inspectorsByName = Inspectors
                 .Where(i => !string.IsNullOrWhiteSpace(i.DisplayName) && !string.IsNullOrWhiteSpace(i.Email))
@@ -209,8 +227,6 @@ var inspectorBookings = (inspector is null
                     !string.Equals(b.AssignedTo, "Unassigned", StringComparison.OrdinalIgnoreCase))
                 .GroupBy(b => b.AssignedTo, StringComparer.OrdinalIgnoreCase)
                 .ToList();
-
-            var sentCount = 0;
 
             foreach (var group in groups)
             {
@@ -225,17 +241,30 @@ var inspectorBookings = (inspector is null
                 var subject = $"Your Field Reviews - {SummaryDateLocal:yyyy-MM-dd}";
                 var html = BuildEmailHtml(SummaryDateLocal, inspectorBookings);
 
-                await _mail.SendHtmlAsync(fromMailbox, inspectorEmail, subject, html);
-                sentCount++;
+                try
+                {
+                    await _mail.SendHtmlAsync(fromMailbox, inspectorEmail, subject, html);
+                    sentEmails.Add(inspectorEmail);
+                }
+                catch
+                {
+                    failedEmails.Add(inspectorEmail);
+                }
             }
 
-            if (sentCount == 0)
+            if (sentEmails.Count == 0 && failedEmails.Count == 0)
             {
                 StatusMessage = "No assigned inspector bookings found to email.";
             }
+            else if (failedEmails.Count == 0)
+            {
+                StatusMessage = $"Inspector summaries sent to {sentEmails.Count} inspector(s).";
+            }
             else
             {
-                StatusMessage = $"Inspector summaries sent to {sentCount} inspector(s).";
+                StatusMessage =
+                    $"Inspector summaries sent: {string.Join(", ", sentEmails)}. " +
+                    $"Failed: {string.Join(", ", failedEmails)}.";
             }
 
             return RedirectToPage();

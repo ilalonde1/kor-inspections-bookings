@@ -5,7 +5,9 @@ using Kor.Inspections.App.Pages;
 using Kor.Inspections.App.Services;
 using Kor.Inspections.Tests.Helpers;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -95,7 +97,7 @@ public class ManageModelTests
     }
 
     [Fact]
-    public async Task OnGetAsync_CancelledBookingWithClosedWindow_SetsTerminalStateAndHidesProject()
+    public async Task OnGetAsync_CancelledBookingWithClosedWindow_SetsTerminalStateAndShowsProject()
     {
         await using var db = CreateContext();
         var booking = await AddBookingAsync(db, "Cancelled", DateTime.UtcNow.AddDays(-1), DateTime.UtcNow);
@@ -106,7 +108,7 @@ public class ManageModelTests
         await model.OnGetAsync();
 
         Assert.True(model.IsTerminalState);
-        Assert.Equal(string.Empty, model.ProjectNumber);
+        Assert.Equal("30844", model.ProjectNumber);
     }
 
     [Fact]
@@ -190,7 +192,14 @@ public class ManageModelTests
             Options.Create(new AppOptions()));
 
         manageLogger = new ListLogger<ManageModel>();
-        return new ManageModel(db, timeRules, bookingService);
+        var model = new ManageModel(db, timeRules, bookingService);
+        model.PageContext = new PageContext
+        {
+            ViewData = new ViewDataDictionary(
+                new EmptyModelMetadataProvider(),
+                new ModelStateDictionary())
+        };
+        return model;
     }
 
     private static async Task<Booking> AddBookingAsync(

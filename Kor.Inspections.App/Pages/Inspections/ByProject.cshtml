@@ -7,9 +7,9 @@
 <h2>Project Inspections</h2>
 <p class="text-muted">Read-only list of inspections for this project.</p>
 
-@if (!Model.HasRequiredQuery)
+@if (string.IsNullOrWhiteSpace(Model.ProjectNumber))
 {
-    <p class="text-danger">Project number and email are required.</p>
+    <p class="text-danger">Project number is required.</p>
 }
 else
 {
@@ -25,50 +25,31 @@ else
     <div id="inspectionsStatus" class="text-muted">Loading inspections...</div>
 
     <div class="table-responsive">
-    <table id="inspectionsTable" class="table table-sm table-striped" hidden>
-        <thead>
-            <tr>
-                <th>Status</th>
-                <th>Scheduled</th>
-                <th>Assigned Inspector</th>
-                <th>Contact</th>
-                <th>Address</th>
-                <th>Comments</th>
-            </tr>
-        </thead>
-        <tbody id="inspectionsBody"></tbody>
-    </table>
+        <table id="inspectionsTable" class="table table-sm table-striped text-start" hidden>
+            <thead>
+                <tr>
+                    <th>Scheduled</th>
+                    <th>Contact</th>
+                    <th>Address</th>
+                    <th>Comments</th>
+                </tr>
+            </thead>
+            <tbody id="inspectionsBody"></tbody>
+        </table>
     </div>
 }
 
-@if (Model.HasRequiredQuery)
+@if (!string.IsNullOrWhiteSpace(Model.ProjectNumber))
 {
-    <style>
-        #inspectionsTable th,
-        #inspectionsTable td {
-            white-space: nowrap;
-        }
-    </style>
-
     <script>
         (function () {
             const projectNumber = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ProjectNumber));
-            const email = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Email));
             const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
             const token = tokenInput ? tokenInput.value : "";
 
             const statusEl = document.getElementById("inspectionsStatus");
             const tableEl = document.getElementById("inspectionsTable");
             const bodyEl = document.getElementById("inspectionsBody");
-
-            function escapeHtml(value) {
-                return String(value ?? "")
-                    .replaceAll("&", "&amp;")
-                    .replaceAll("<", "&lt;")
-                    .replaceAll(">", "&gt;")
-                    .replaceAll('"', "&quot;")
-                    .replaceAll("'", "&#39;");
-            }
 
             function asLocal(value) {
                 if (!value) return "";
@@ -83,6 +64,23 @@ else
                 }).format(d);
             }
 
+            function getDisplayStatus(inspection) {
+                const rawStatus = `${inspection.status || ""}`.trim().toLowerCase();
+                const start = inspection.startUtc ? new Date(inspection.startUtc) : null;
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                if (start && !Number.isNaN(start.getTime())) {
+                    const scheduledDay = new Date(start);
+                    scheduledDay.setHours(0, 0, 0, 0);
+                    if (scheduledDay >= today) {
+                        return "Received for a future inspection including that day";
+                    }
+                }
+
+                return rawStatus === "cancelled" ? "Cancelled" : "Completed";
+            }
+
             async function load() {
                 try {
                     const response = await fetch("/?handler=LookupInspections", {
@@ -91,7 +89,7 @@ else
                             "RequestVerificationToken": token,
                             "Content-Type": "application/json"
                         },
-                        body: JSON.stringify({ projectNumber: projectNumber, email: email })
+                        body: JSON.stringify({ projectNumber: projectNumber })
                     });
 
                     const text = await response.text();
@@ -109,17 +107,13 @@ else
                     }
 
                     const rows = data.map(i => {
-                        const status = escapeHtml(i.status || "");
                         const start = escapeHtml(asLocal(i.startUtc));
-                        const assigned = escapeHtml(i.assignedTo || "Unassigned");
-                        const contact = escapeHtml(`${i.contactName || ""} (${i.contactEmail || ""})`);
+                        const contact = escapeHtml(`${i.contactName || ""}${i.contactEmail ? ` (${i.contactEmail})` : ""}`);
                         const address = escapeHtml(i.address || "");
                         const comments = escapeHtml(i.comments || "");
 
                         return `<tr>
-                            <td>${status}</td>
                             <td>${start}</td>
-                            <td>${assigned}</td>
                             <td>${contact}</td>
                             <td>${address}</td>
                             <td>${comments}</td>

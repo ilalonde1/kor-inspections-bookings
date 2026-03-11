@@ -14,15 +14,18 @@ namespace Kor.Inspections.App.Pages
         private readonly BookingService _bookingService;
         private readonly TimeRuleService _timeRules;
         private readonly AppOptions _appOptions;
+        private readonly SupportOptions _supportOptions;
 
         public ConfirmModel(
             BookingService bookingService,
             TimeRuleService timeRules,
-            IOptions<AppOptions> appOptions)
+            IOptions<AppOptions> appOptions,
+            IOptions<SupportOptions> supportOptions)
         {
             _bookingService = bookingService;
             _timeRules = timeRules;
             _appOptions = appOptions.Value;
+            _supportOptions = supportOptions.Value;
         }
 
         public Booking? Booking { get; private set; }
@@ -31,16 +34,18 @@ namespace Kor.Inspections.App.Pages
         public string CancelUrl { get; private set; } = string.Empty;
         public TimeZoneInfo TimeZone => _timeRules.TimeZone;
         public string? TimePreference { get; private set; }
+        public SupportOptions Support { get; private set; } = new();
         public async Task<IActionResult> OnGetAsync(Guid id)
         {
+            ViewData["Title"] = "Booking Confirmed";
             Booking = await _bookingService.GetBookingAsync(id);
             if (Booking == null)
             {
                 return NotFound();
             }
 
-            // ADD THIS LINE
             TimePreference = Booking.TimePreference;
+            Support = _supportOptions;
 
 
             // Prefer configured public base URL if available (works behind proxies / load balancers)

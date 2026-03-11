@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <title>Kor Field Review Booking</title>
+    <title>@(ViewData["Title"] != null ? ViewData["Title"] + "  " : "")Kor Field Review Booking</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/x-icon" href="~/Assets/logo.ico" />
     <link rel="stylesheet" href="~/css/site.css?v=mobilefix1" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    @RenderSection("Styles", required: false)
 </head>
 @{
     var inspectorMode =
@@ -16,6 +16,7 @@
             StringComparison.OrdinalIgnoreCase);
 }
 <body data-inspector="@(inspectorMode ? "true" : "false")">
+    <a href="#main-content" class="skip-link">Skip to main content</a>
     <header>
         <div class="header site-header">
             <a href="https://www.korstructural.com"
@@ -38,13 +39,13 @@
 
     @if (isAdmin)
     {
-        <div class="admin-page-container">
+        <div id="main-content" class="admin-page-container">
             @RenderBody()
         </div>
     }
     else
     {
-        <div class="content page-container">
+        <div id="main-content" class="content page-container">
             @RenderBody()
         </div>
     }
@@ -52,8 +53,6 @@
     <footer class="site-footer">
         <p>&copy; @DateTime.Now.Year Kor Structural</p>
     </footer>
-    <!-- Flatpickr -->
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @RenderSection("Scripts", required: false)
     <script>

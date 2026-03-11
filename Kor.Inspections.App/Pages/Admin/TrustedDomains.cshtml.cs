@@ -1,5 +1,6 @@
 using Kor.Inspections.App.Data;
 using Kor.Inspections.App.Data.Models;
+using Kor.Inspections.App.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -44,14 +45,9 @@ namespace Kor.Inspections.App.Pages.Admin
             _db.ProjectDefaults.Remove(row);
             await _db.SaveChangesAsync();
 
-            _cache.Remove(BuildKey(row.ProjectNumber, row.EmailDomain));
+            _cache.Remove(ProjectCacheKeys.BuildVerificationKey(row.ProjectNumber, row.EmailDomain));
             StatusMessage = $"Revoked trust for {row.EmailDomain} on project {row.ProjectNumber}.";
             return RedirectToPage();
-        }
-
-        private static string BuildKey(string projectNumber, string domain)
-        {
-            return $"proj-bootstrap:{projectNumber}|{domain.Trim().ToLowerInvariant()}";
         }
     }
 }
