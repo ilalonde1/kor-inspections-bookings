@@ -1399,3 +1399,21 @@ display:none !important;
     pointer-events:none;
   }
 }
+
+/* Inspections table */
+#inspectionsTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#inspectionsTable th,
+#inspectionsTable td {
+    text-align: left;
+    padding: 6px 12px;
+    border-bottom: 1px solid #dee2e6;
+    white-space: nowrap;
+}
+
+#inspectionsTable thead tr {
+    border-bottom: 2px solid #adb5bd;
+}

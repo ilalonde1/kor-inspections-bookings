@@ -4,6 +4,10 @@
     ViewData["Title"] = "Project Inspections";
 }
 
+<style>
+    .content.page-container { --page-max-width: 1400px; }
+</style>
+
 <h2>Project Inspections</h2>
 <p class="text-muted">Read-only list of inspections for this project.</p>
 
@@ -50,6 +54,15 @@ else
             const statusEl = document.getElementById("inspectionsStatus");
             const tableEl = document.getElementById("inspectionsTable");
             const bodyEl = document.getElementById("inspectionsBody");
+
+            function escapeHtml(value) {
+                return String(value ?? "")
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll('"', "&quot;")
+                    .replaceAll("'", "&#39;");
+            }
 
             function asLocal(value) {
                 if (!value) return "";
