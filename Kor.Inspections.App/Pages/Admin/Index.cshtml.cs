@@ -205,6 +205,12 @@ namespace Kor.Inspections.App.Pages.Admin
                 return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
             }
 
+            _logger.LogInformation(
+                "Admin booking assignment: BookingId={BookingId} AssignedTo={AssignedTo} By={AdminUser}",
+                booking.BookingId,
+                assignedInspectorLabel,
+                User.Identity?.Name);
+
             if (wasUnassigned &&
                 booking.Status.Equals("Assigned", StringComparison.OrdinalIgnoreCase))
             {
@@ -251,6 +257,11 @@ namespace Kor.Inspections.App.Pages.Admin
                 StatusMessage = "This booking was just modified by another user. Please refresh and try again.";
                 return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
             }
+
+            _logger.LogInformation(
+                "Admin booking cancellation: BookingId={BookingId} By={AdminUser}",
+                booking.BookingId,
+                User.Identity?.Name);
 
             await _bookingService.SendCancellationEmailsAsync(booking);
 
