@@ -51,6 +51,8 @@ namespace Kor.Inspections.App.Data
                       .HasMaxLength(120)
                       .IsRequired();
 
+                entity.Property(b => b.RouteOrder);
+
                 entity.HasIndex(b => b.ContactEmail);
                 entity.HasIndex(b => b.ProjectNumber);
                 entity.HasIndex(b => b.Status);

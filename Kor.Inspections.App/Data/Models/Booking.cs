@@ -24,6 +24,7 @@ namespace Kor.Inspections.App.Data.Models
         public DateTime StartUtc { get; set; }
         public DateTime EndUtc { get; set; }
         public string? TimePreference { get; set; }
+        public int? RouteOrder { get; set; }
 
 
 
