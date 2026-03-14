@@ -408,18 +408,9 @@ namespace Kor.Inspections.App.Pages
                 return new JsonResult(new { error = "Invalid inspection id." });
             }
 
-            var at = emailRaw.IndexOf('@');
-            if (at <= 0 || at >= emailRaw.Length - 1)
-            {
-                Response.StatusCode = 400;
-                return new JsonResult(new { error = "Invalid email." });
-            }
-
-            var domain = emailRaw[(at + 1)..].Trim().ToLowerInvariant();
             var base5 = projectRaw;
-            var domainSuffix = "@" + domain;
 
-            if (string.IsNullOrWhiteSpace(base5) || string.IsNullOrWhiteSpace(domain))
+            if (string.IsNullOrWhiteSpace(base5))
             {
                 Response.StatusCode = 400;
                 return new JsonResult(new { error = "Invalid project scope." });
@@ -431,7 +422,9 @@ namespace Kor.Inspections.App.Pages
                     b.ProjectNumber != null &&
                     b.ProjectNumber.StartsWith(base5) &&
                     b.ContactEmail != null &&
-                    EF.Functions.Like(b.ContactEmail, "%" + domainSuffix));
+                    b.ContactEmail == emailRaw);
+            // Shared cancellation rights must be modelled as explicit delegation,
+            // not inferred from the email domain.
 
             if (booking == null)
             {

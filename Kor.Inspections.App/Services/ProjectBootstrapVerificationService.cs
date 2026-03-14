@@ -6,7 +6,6 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using Kor.Inspections.App.Data;
-using Kor.Inspections.App.Data.Models;
 using Kor.Inspections.App.Options;
 using Microsoft.Extensions.Options;
 
@@ -16,6 +15,7 @@ namespace Kor.Inspections.App.Services
     {
         private static readonly TimeSpan PendingTtl = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan VerifiedTtl = TimeSpan.FromHours(8);
+        private static readonly TimeSpan ExplicitDomainTrustTtl = TimeSpan.FromDays(30);
 
         private readonly IMemoryCache _cache;
         private readonly GraphMailService _mailService;
@@ -55,37 +55,12 @@ namespace Kor.Inspections.App.Services
             if (string.IsNullOrWhiteSpace(normalizedProject) || string.IsNullOrWhiteSpace(normalizedEmail))
                 return (false, false);
 
-            var at = normalizedEmail.IndexOf('@');
-            if (at <= 0 || at >= normalizedEmail.Length - 1)
-                return (true, false);
-
-            var domain = normalizedEmail[(at + 1)..].Trim().ToLowerInvariant();
-
-            // Persistent trust (ProjectDefaults)
-            var trusted = await _db.ProjectDefaults.AnyAsync(x =>
-                    x.ProjectNumber == normalizedProject &&
-                    x.EmailDomain == domain,
-                ct);
-
-            if (trusted)
-            {
-                var trustedKey = ProjectCacheKeys.BuildVerificationKey(normalizedProject, domain);
-                _cache.Set(
-                    trustedKey,
-                    new VerificationState
-                    {
-                        Code = string.Empty,
-                        Verified = true,
-                        FailedAttempts = 0
-                    },
-                    VerifiedTtl);
-                return (true, true);
-            }
-
-            // Temporary trust (cache)
-            var key = ProjectCacheKeys.BuildVerificationKey(normalizedProject, domain);
+            var key = BuildUserVerificationKey(normalizedProject, normalizedEmail);
 
             if (_cache.TryGetValue<VerificationState>(key, out var state) && state is { Verified: true })
+                return (true, true);
+
+            if (await HasExplicitDomainApprovalAsync(normalizedProject, normalizedEmail, ct))
                 return (true, true);
 
             return (true, false);
@@ -106,10 +81,8 @@ namespace Kor.Inspections.App.Services
             if (!status.RequiresVerification || status.IsVerified)
                 return true;
 
-            var key = ProjectCacheKeys.BuildVerificationKey(normalizedProject, normalizedEmail[(normalizedEmail.IndexOf('@') + 1)..]);
+            var key = BuildUserVerificationKey(normalizedProject, normalizedEmail);
 
-            // Domain-scoped verification: if another user from the same domain has
-            // already requested a code, reuse it to prevent invalidating concurrent requests.
             string code;
             if (_cache.TryGetValue<VerificationState>(key, out var existing)
                 && existing is { Verified: false }
@@ -178,10 +151,10 @@ namespace Kor.Inspections.App.Services
                 return false;
             }
 
-            // IMPORTANT: do NOT early-return here based on status.IsVerified,
-            // because we still need to persist the trusted domain to ProjectDefaults.
+            if (await HasExplicitDomainApprovalAsync(normalizedProject, normalizedEmail, ct))
+                return true;
 
-            var key = ProjectCacheKeys.BuildVerificationKey(normalizedProject, normalizedEmail[(normalizedEmail.IndexOf('@') + 1)..]);
+            var key = BuildUserVerificationKey(normalizedProject, normalizedEmail);
 
             if (!_cache.TryGetValue<VerificationState>(key, out var state) || state == null)
                 return false;
@@ -205,37 +178,6 @@ namespace Kor.Inspections.App.Services
             state.FailedAttempts = 0;
             _cache.Set(key, state, VerifiedTtl);
 
-            // Persist trust to ProjectDefaults
-            var at = normalizedEmail.IndexOf('@');
-            if (at <= 0 || at >= normalizedEmail.Length - 1)
-                return false;
-
-            var domain = normalizedEmail[(at + 1)..].Trim().ToLowerInvariant();
-
-            var existing = await _db.ProjectDefaults.SingleOrDefaultAsync(x =>
-                    x.ProjectNumber == normalizedProject &&
-                    x.EmailDomain == domain,
-                ct);
-
-            if (existing == null)
-            {
-                _db.ProjectDefaults.Add(new ProjectDefault
-                {
-                    ProjectNumber = normalizedProject,
-                    EmailDomain = domain,
-                    DefaultAddress = null,
-                    UpdatedUtc = DateTime.UtcNow
-                });
-
-                await _db.SaveChangesAsync(ct);
-            }
-            else
-            {
-                // keep your data current; does not change behavior
-                existing.UpdatedUtc = DateTime.UtcNow;
-                await _db.SaveChangesAsync(ct);
-            }
-
             return true;
         }
 
@@ -246,6 +188,57 @@ namespace Kor.Inspections.App.Services
         {
             var status = await GetStatusAsync(projectNumber, email, ct);
             return !status.RequiresVerification || status.IsVerified;
+        }
+
+        private async Task<bool> HasExplicitDomainApprovalAsync(
+            string normalizedProject,
+            string normalizedEmail,
+            CancellationToken ct)
+        {
+            var domain = GetEmailDomain(normalizedEmail);
+            if (string.IsNullOrWhiteSpace(domain))
+                return false;
+
+            var approval = await _db.ProjectDefaults
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    x => x.ProjectNumber == normalizedProject && x.EmailDomain == domain,
+                    ct);
+
+            if (approval == null)
+                return false;
+
+            var expiresAtUtc = approval.UpdatedUtc.Add(ExplicitDomainTrustTtl);
+            if (expiresAtUtc < DateTime.UtcNow)
+            {
+                _logger.LogInformation(
+                    "Explicit domain approval expired for project {ProjectNumber} and domain {EmailDomain} on {ExpiresAtUtc}.",
+                    normalizedProject,
+                    domain,
+                    expiresAtUtc);
+                return false;
+            }
+
+            _logger.LogInformation(
+                "Using explicit domain approval for project {ProjectNumber}, domain {EmailDomain}, and user {Email}.",
+                normalizedProject,
+                domain,
+                normalizedEmail);
+
+            return true;
+        }
+
+        private static string BuildUserVerificationKey(string projectNumber, string email)
+        {
+            return ProjectCacheKeys.BuildVerificationKey(projectNumber, email);
+        }
+
+        private static string GetEmailDomain(string email)
+        {
+            var at = email.LastIndexOf('@');
+            return (at > 0 && at < email.Length - 1)
+                ? email[(at + 1)..].Trim().ToLowerInvariant()
+                : string.Empty;
         }
 
         private static string NormalizeProject(string projectNumber)

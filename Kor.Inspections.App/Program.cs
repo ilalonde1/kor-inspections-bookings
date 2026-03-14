@@ -30,7 +30,11 @@ builder.Services
     .AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
     .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("HealthzAccess", policy =>
+        policy.RequireAuthenticatedUser());
+});
 builder.Services.AddMemoryCache();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -196,7 +200,8 @@ app.UseRateLimiter();
 // --------------------
 
 app.MapRazorPages();
-app.MapHealthChecks("/healthz");
+app.MapHealthChecks("/healthz")
+    .RequireAuthorization("HealthzAccess");
 
 app.Run();
 
