@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Kor.Inspections.App.Options;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -22,14 +23,20 @@ namespace Kor.Inspections.App.Services
     public class DeltekProjectService
     {
         private const int OdbcCommandTimeoutSeconds = 10;
+        private const int MaxConcurrentCalls = 4;
+        private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(60);
+        private static readonly SemaphoreSlim OdbcConcurrencyGate = new(MaxConcurrentCalls, MaxConcurrentCalls);
         private readonly DeltekProjectOptions _options;
+        private readonly IMemoryCache _cache;
         private readonly ILogger<DeltekProjectService> _logger;
 
         public DeltekProjectService(
             IOptions<DeltekProjectOptions> options,
+            IMemoryCache cache,
             ILogger<DeltekProjectService> logger)
         {
             _options = options.Value;
+            _cache = cache;
             _logger = logger;
         }
 
@@ -42,13 +49,18 @@ namespace Kor.Inspections.App.Services
             if (string.IsNullOrWhiteSpace(projectNumber))
                 return null;
 
+            var normalizedProject = projectNumber.Trim();
             if (string.IsNullOrWhiteSpace(_options.Sql_ProjectByNumber))
             {
                 _logger.LogWarning("Sql_ProjectByNumber not configured.");
                 return null;
             }
 
-            return await Task.Run(() =>
+            var cacheKey = BuildProjectCacheKey(normalizedProject);
+            if (_cache.TryGetValue<DeltekProjectInfo?>(cacheKey, out var cachedProject))
+                return cachedProject;
+
+            var projectInfo = await ExecuteBoundedAsync(() => Task.Run(() =>
             {
                 try
                 {
@@ -58,7 +70,7 @@ namespace Kor.Inspections.App.Services
                     using var cmd = conn.CreateCommand();
                     cmd.CommandTimeout = OdbcCommandTimeoutSeconds;
                     cmd.CommandText = _options.Sql_ProjectByNumber;
-                    AddParametersForPlaceholders(cmd, projectNumber.Trim());
+                    AddParametersForPlaceholders(cmd, normalizedProject);
 
                     using var reader = cmd.ExecuteReader();
                     if (!reader.Read())
@@ -77,10 +89,13 @@ namespace Kor.Inspections.App.Services
                 {
                     _logger.LogError(ex,
                         "Error reading project '{ProjectNumber}' from Deltek.",
-                        projectNumber);
+                        normalizedProject);
                     return null;
                 }
-            }, ct);
+            }, ct), ct);
+
+            _cache.Set(cacheKey, projectInfo, CacheTtl);
+            return projectInfo;
         }
 
         public async Task<IReadOnlyList<DeltekProjectInfo>> SearchProjectsAsync(
@@ -99,8 +114,13 @@ namespace Kor.Inspections.App.Services
 
             var capped = Math.Clamp(maxResults, 1, 50);
             var trimmed = term.Trim();
+            var cacheKey = BuildSearchCacheKey(trimmed, capped);
 
-            return await Task.Run(() =>
+            if (_cache.TryGetValue<IReadOnlyList<DeltekProjectInfo>>(cacheKey, out var cachedResults) &&
+                cachedResults is not null)
+                return cachedResults;
+
+            var results = await ExecuteBoundedAsync(() => Task.Run(() =>
             {
                 try
                 {
@@ -156,7 +176,33 @@ namespace Kor.Inspections.App.Services
                     _logger.LogError(ex, "Error searching Deltek projects for term '{Term}'.", term);
                     return Array.Empty<DeltekProjectInfo>();
                 }
-            }, ct);
+            }, ct), ct);
+
+            _cache.Set(cacheKey, results, CacheTtl);
+            return results;
+        }
+
+        private static string BuildProjectCacheKey(string projectNumber)
+        {
+            return $"deltek:project:{projectNumber.ToUpperInvariant()}";
+        }
+
+        private static string BuildSearchCacheKey(string term, int maxResults)
+        {
+            return $"deltek:search:{maxResults}:{term.ToUpperInvariant()}";
+        }
+
+        private async Task<T> ExecuteBoundedAsync<T>(Func<Task<T>> operation, CancellationToken ct)
+        {
+            await OdbcConcurrencyGate.WaitAsync(ct);
+            try
+            {
+                return await operation();
+            }
+            finally
+            {
+                OdbcConcurrencyGate.Release();
+            }
         }
 
         private List<DeltekProjectInfo> QueryProjects(string like, int cap, CancellationToken ct)
