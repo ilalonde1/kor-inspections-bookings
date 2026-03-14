@@ -16,6 +16,7 @@ namespace Kor.Inspections.App.Services
         private static readonly TimeSpan PendingTtl = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan VerifiedTtl = TimeSpan.FromHours(8);
         private static readonly TimeSpan ExplicitDomainTrustTtl = TimeSpan.FromDays(30);
+        internal static TimeSpan ExplicitDomainApprovalTtl => ExplicitDomainTrustTtl;
 
         private readonly IMemoryCache _cache;
         private readonly GraphMailService _mailService;
@@ -208,7 +209,7 @@ namespace Kor.Inspections.App.Services
             if (approval == null)
                 return false;
 
-            var expiresAtUtc = approval.UpdatedUtc.Add(ExplicitDomainTrustTtl);
+            var expiresAtUtc = GetExplicitDomainApprovalExpirationUtc(approval.UpdatedUtc);
             if (expiresAtUtc < DateTime.UtcNow)
             {
                 _logger.LogInformation(
@@ -226,6 +227,11 @@ namespace Kor.Inspections.App.Services
                 normalizedEmail);
 
             return true;
+        }
+
+        internal static DateTime GetExplicitDomainApprovalExpirationUtc(DateTime approvedUtc)
+        {
+            return approvedUtc.Add(ExplicitDomainTrustTtl);
         }
 
         private static string BuildUserVerificationKey(string projectNumber, string email)

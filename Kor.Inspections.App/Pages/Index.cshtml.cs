@@ -334,26 +334,29 @@ namespace Kor.Inspections.App.Pages
         public async Task<JsonResult> OnPostLookupInspectionsAsync([FromBody] LookupContactsRequest req)
         {
             var projectRaw = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
-            var emailRaw = (req.Email ?? "").Trim();
+            var emailRaw = (req.Email ?? "").Trim().ToLowerInvariant();
 
-            if (string.IsNullOrWhiteSpace(projectRaw))
-                return new JsonResult(Array.Empty<InspectionDto>());
-
-            if (!string.IsNullOrWhiteSpace(emailRaw))
+            if (string.IsNullOrWhiteSpace(projectRaw) || string.IsNullOrWhiteSpace(emailRaw))
             {
-                var canAccess = await _projectBootstrapVerificationService
-                    .EnsureVerifiedForProjectAccessAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
+                Response.StatusCode = 400;
+                return new JsonResult(new { error = "Project number and email are required." });
+            }
 
-                if (!canAccess)
-                {
-                    Response.StatusCode = 403;
-                    return new JsonResult(new { error = "Please verify your email before viewing inspections." });
-                }
+            var canAccess = await _projectBootstrapVerificationService
+                .EnsureVerifiedForProjectAccessAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
+
+            if (!canAccess)
+            {
+                Response.StatusCode = 403;
+                return new JsonResult(new { error = "Please verify your email before viewing inspections." });
             }
 
             var bookings = await _db.Bookings
                 .AsNoTracking()
-                .Where(b => b.ProjectNumber != null && b.ProjectNumber.StartsWith(projectRaw))
+                .Where(b =>
+                    b.ProjectNumber != null &&
+                    b.ProjectNumber.StartsWith(projectRaw) &&
+                    b.ContactEmail == emailRaw)
                 .OrderByDescending(b => b.StartUtc)
                 .ToListAsync();
 

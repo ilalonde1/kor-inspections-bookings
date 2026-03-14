@@ -48,6 +48,7 @@ else
     <script>
         (function () {
             const projectNumber = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ProjectNumber));
+            const email = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Email));
             const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
             const token = tokenInput ? tokenInput.value : "";
 
@@ -102,7 +103,7 @@ else
                             "RequestVerificationToken": token,
                             "Content-Type": "application/json"
                         },
-                        body: JSON.stringify({ projectNumber: projectNumber })
+                        body: JSON.stringify({ projectNumber: projectNumber, email: email })
                     });
 
                     const text = await response.text();
