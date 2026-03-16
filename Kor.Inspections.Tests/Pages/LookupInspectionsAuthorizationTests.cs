@@ -88,10 +88,10 @@ public class LookupInspectionsAuthorizationTests
     /// Regression test for the +7-hour display bug.
     /// SQL Server returns DateTime with Kind=Unspecified; System.Text.Json omits the 'Z' suffix
     /// for Unspecified datetimes, causing JS new Date() to treat a UTC value as local time.
-    /// The handler must normalise Kind to Utc before serialising.
+    /// The handler must normalize Kind to Utc before serializing.
     /// </summary>
     [Fact]
-    public async Task OnPostLookupInspectionsAsync_StartUtcKindIsUtc_SoJsonIncludesZSuffix()
+    public async Task OnPostLookupInspectionsAsync_DtoDateTimes_HaveUtcKind()
     {
         await using var db = CreateContext();
 
