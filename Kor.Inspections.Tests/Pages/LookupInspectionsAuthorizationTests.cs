@@ -84,6 +84,62 @@ public class LookupInspectionsAuthorizationTests
         Assert.Equal("verified@example.com", inspections[0].ContactEmail);
     }
 
+    /// <summary>
+    /// Regression test for the +7-hour display bug.
+    /// SQL Server returns DateTime with Kind=Unspecified; System.Text.Json omits the 'Z' suffix
+    /// for Unspecified datetimes, causing JS new Date() to treat a UTC value as local time.
+    /// The handler must normalise Kind to Utc before serialising.
+    /// </summary>
+    [Fact]
+    public async Task OnPostLookupInspectionsAsync_StartUtcKindIsUtc_SoJsonIncludesZSuffix()
+    {
+        await using var db = CreateContext();
+
+        // Simulate what EF Core returns from SQL Server datetime columns: Kind = Unspecified
+        var unspecifiedStart = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(2), DateTimeKind.Unspecified);
+        var unspecifiedEnd   = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(2).AddHours(1), DateTimeKind.Unspecified);
+
+        db.Bookings.Add(new Booking
+        {
+            BookingId      = Guid.NewGuid(),
+            CancelToken    = Guid.NewGuid(),
+            ProjectNumber  = "30844",
+            ProjectAddress = "123 Test St",
+            ContactName    = "Jane Doe",
+            ContactPhone   = "6045551212",
+            ContactEmail   = "tz@example.com",
+            StartUtc       = unspecifiedStart,
+            EndUtc         = unspecifiedEnd,
+            Status         = "Unassigned",
+            CreatedUtc     = DateTime.UtcNow
+        });
+        db.ProjectDefaults.Add(new ProjectDefault
+        {
+            ProjectNumber = "30844",
+            EmailDomain   = "example.com",
+            UpdatedUtc    = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var cache = new MemoryCache(new MemoryCacheOptions());
+        var model = CreateModel(db, cache);
+
+        var result = await model.OnPostLookupInspectionsAsync(new IndexModel.LookupContactsRequest
+        {
+            ProjectNumber = "30844",
+            Email         = "tz@example.com"
+        });
+
+        var payload     = Assert.IsType<JsonResult>(result);
+        var inspections = Assert.IsAssignableFrom<IEnumerable<IndexModel.InspectionDto>>(payload.Value).ToList();
+        Assert.Single(inspections);
+
+        // Kind must be Utc so System.Text.Json emits the 'Z' suffix and the
+        // browser's new Date() interprets it as UTC rather than local time.
+        Assert.Equal(DateTimeKind.Utc, inspections[0].StartUtc.Kind);
+        Assert.Equal(DateTimeKind.Utc, inspections[0].EndUtc.Kind);
+    }
+
     private static IndexModel CreateModel(InspectionsContext db, IMemoryCache cache)
     {
         var timeZone = TimeRuleServiceTestFactory.FindZone(nowLocal =>

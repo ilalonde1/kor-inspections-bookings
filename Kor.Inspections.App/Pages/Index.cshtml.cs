@@ -371,8 +371,8 @@ namespace Kor.Inspections.App.Pages
                 .Select(b => new InspectionDto
                 {
                     Id = b.BookingId.ToString(),
-                    StartUtc = b.StartUtc,
-                    EndUtc = b.EndUtc,
+                    StartUtc = DateTime.SpecifyKind(b.StartUtc, DateTimeKind.Utc),
+                    EndUtc = DateTime.SpecifyKind(b.EndUtc, DateTimeKind.Utc),
                     Status = b.Status,
                     AssignedTo = ResolveAssignedToDisplay(b.AssignedTo, inspectorsByEmail),
                     ContactName = b.ContactName,
