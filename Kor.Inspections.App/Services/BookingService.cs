@@ -588,7 +588,7 @@ namespace Kor.Inspections.App.Services
             {
                 sb.Append("<br/><p><strong>Please note:</strong></p>");
                 sb.Append("<ul>");
-                sb.Append("<li>Bookings for the following day close at 2:00 p.m. Pacific.</li>");
+                sb.Append("<li>Bookings for the following day close at 2:00 p.m. Pacific. If a booking is required after this time for the next day please contact Tyler directly at 604-816-3327 to check for availability.</li>");
                 sb.Append("<li>Our normal working hours are Monday to Friday, 7:30 a.m. to 4:00 p.m.</li>");
                 sb.Append("<li>To change or cancel a booked Field Review, please provide notice by 2:00 p.m. the day before the scheduled review.</li>");
                 sb.Append("</ul>");
