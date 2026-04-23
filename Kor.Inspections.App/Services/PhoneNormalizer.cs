@@ -28,6 +28,6 @@ public static class PhoneNormalizer
         if (digits.Length != 10)
             return phone; // don't corrupt unexpected formats
 
-        return $"({digits[..3]})-{digits[3..6]}-{digits[6..]}";
+        return $"{digits[..3]}-{digits[3..6]}-{digits[6..]}";
     }
 }
