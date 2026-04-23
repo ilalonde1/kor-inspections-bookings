@@ -10,8 +10,98 @@
             StringComparison.OrdinalIgnoreCase);
     ViewData["InspectorMode"] = inspectorMobileToolsEnabled ? "true" : "false";
 }
-
 <h2>Field Reviews</h2>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-info" style="margin-bottom:12px;">
+            @Model.StatusMessage
+        </div>
+    }
+
+    <details id="manualBookingPanel" class="phase-box" style="margin-bottom:20px;" @(ViewContext.ModelState.ErrorCount > 0 ? "open" : null)>
+        <summary style="cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <span style="font-size:1.5rem; font-weight:600;">Create Booking On Behalf Of Client</span>
+            <span id="manualBookingPanelToggleText" class="helper-text-muted">
+                @(ViewContext.ModelState.ErrorCount > 0 ? "Collapse" : "Expand")
+            </span>
+        </summary>
+
+        <div style="margin-top:16px;">
+            <div class="step-helper">Creates a booking from the admin backend and sends the normal booking emails. Use the cutoff override only when you need to allow a next-day booking after 2:00 p.m.</div>
+
+            <div asp-validation-summary="All" class="text-danger" style="margin-bottom:12px;"></div>
+
+            <form method="post" asp-page-handler="Create" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px 20px; align-items:start;">
+                <div class="form-group">
+                    <label asp-for="ManualBooking.ProjectNumber"></label>
+                    <input asp-for="ManualBooking.ProjectNumber" class="form-control" />
+                    <span asp-validation-for="ManualBooking.ProjectNumber" class="text-danger"></span>
+                </div>
+                <div class="form-group">
+                    <label asp-for="ManualBooking.ProjectAddress"></label>
+                    <input asp-for="ManualBooking.ProjectAddress" class="form-control" />
+                    <span asp-validation-for="ManualBooking.ProjectAddress" class="text-danger"></span>
+                </div>
+                <div class="form-group">
+                    <label asp-for="ManualBooking.ContactName"></label>
+                    <input asp-for="ManualBooking.ContactName" class="form-control" />
+                    <span asp-validation-for="ManualBooking.ContactName" class="text-danger"></span>
+                </div>
+                <div class="form-group">
+                    <label asp-for="ManualBooking.ContactPhone"></label>
+                    <input asp-for="ManualBooking.ContactPhone" type="tel" class="form-control" />
+                    <span asp-validation-for="ManualBooking.ContactPhone" class="text-danger"></span>
+                </div>
+                <div class="form-group">
+                    <label asp-for="ManualBooking.ContactEmail"></label>
+                    <input asp-for="ManualBooking.ContactEmail" class="form-control" />
+                    <span asp-validation-for="ManualBooking.ContactEmail" class="text-danger"></span>
+                </div>
+                <div class="form-group">
+                    <label asp-for="ManualBooking.RequestedDate"></label>
+                    <input asp-for="ManualBooking.RequestedDate"
+                           id="requestedDate"
+                           type="date"
+                           class="form-control" />
+                    <span asp-validation-for="ManualBooking.RequestedDate" class="text-danger"></span>
+                </div>
+
+                <button type="submit"
+                        asp-page-handler="RefreshManualTimes"
+                        formnovalidate
+                        id="refreshManualTimesBtn"
+                        style="display:none;">
+                </button>
+
+                <div class="form-group">
+                    <label asp-for="ManualBooking.RequestedTime"></label>
+                    <select asp-for="ManualBooking.RequestedTime" class="form-control">
+                        <option value="">-- Select a time --</option>
+                        <option value="AM">Anytime AM</option>
+                        <option value="PM">Anytime PM</option>
+                        @foreach (var t in Model.AvailableManualTimes)
+                        {
+                            <option value="@t">@t</option>
+                        }
+                    </select>
+                    <span asp-validation-for="ManualBooking.RequestedTime" class="text-danger"></span>
+                </div>
+                <div class="form-group" style="grid-column:1 / -1;">
+                    <label asp-for="ManualBooking.Comments"></label>
+                    <textarea asp-for="ManualBooking.Comments" class="form-control comments-textarea" placeholder="Specify floor and element details"></textarea>
+                    <span asp-validation-for="ManualBooking.Comments" class="text-danger"></span>
+                </div>
+                <div class="form-group" style="grid-column:1 / -1; display:flex; gap:8px; align-items:center; margin-bottom:0;">
+                    <input asp-for="ManualBooking.OverrideCutoff" />
+                    <label asp-for="ManualBooking.OverrideCutoff" style="margin:0;"></label>
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-primary">Create Booking</button>
+                </div>
+            </form>
+        </div>
+    </details>
 
     <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center;">
         <a asp-page="./Index"
@@ -194,12 +284,12 @@
 
                             <td>@b.AssignedTo</td>
 
-                            <td>
+                            <td class="admin-actions-cell">
 
-                                <form method="post" asp-page-handler="Assign" class="assign-inline" data-inline-confirm-form>
+                                <form method="post" asp-page-handler="Assign" class="assign-inline">
                                     <input type="hidden" name="id" value="@b.BookingId" />
 
-                                    <select name="assignedTo">
+                                    <select name="assignedTo" class="form-control admin-assign-select">
                                         <option value="Unassigned">Unassigned</option>
 
                                         @foreach (var inspector in Model.Inspectors)
@@ -211,22 +301,18 @@
                                         }
                                     </select>
 
-                                    <button type="button" class="admin-btn admin-btn-set" data-confirm-trigger>
-                                        <span data-confirm-label>Assign</span>
+                                    <button type="submit" class="admin-btn admin-btn-set admin-action-full">
+                                        Assign
                                     </button>
-                                    <span data-confirm-controls hidden style="display:inline-flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                                        <span>Are you sure?</span>
-                                        <button type="submit" class="admin-btn admin-btn-set">Confirm</button>
-                                        <button type="button" class="admin-btn btn-secondary" data-confirm-cancel>Cancel</button>
-                                    </span>
                                 </form>
 
                                 <div class="action-stack">
 
                                     <form method="post"
-                                          asp-page-handler="Cancel">
+                                          asp-page-handler="Cancel"
+                                          class="admin-cancel-form">
                                         <input type="hidden" name="id" value="@b.BookingId" />
-                                        <button class="admin-btn admin-btn-cancel">Cancel</button>
+                                        <button class="admin-btn admin-btn-cancel admin-action-full">Cancel Booking</button>
                                     </form>
 
                                 </div>
@@ -257,6 +343,30 @@
     }
 
 @section Scripts {
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const manualBookingPanel = document.getElementById("manualBookingPanel");
+    const manualBookingPanelToggleText = document.getElementById("manualBookingPanelToggleText");
+    const requestedDate = document.getElementById("requestedDate");
+    const refreshBtn = document.getElementById("refreshManualTimesBtn");
+
+    function syncManualBookingToggle() {
+        if (!manualBookingPanel || !manualBookingPanelToggleText) return;
+        manualBookingPanelToggleText.textContent = manualBookingPanel.open ? "Collapse" : "Expand";
+    }
+
+    if (manualBookingPanel) {
+        syncManualBookingToggle();
+        manualBookingPanel.addEventListener("toggle", syncManualBookingToggle);
+    }
+
+    if (!requestedDate || !refreshBtn) return;
+
+    requestedDate.addEventListener("change", function () {
+        refreshBtn.click();
+    });
+});
+</script>
 @if (inspectorMobileToolsEnabled)
 {
 <script>
@@ -434,31 +544,4 @@ document.addEventListener("DOMContentLoaded", function () {
 
 }
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll("[data-inline-confirm-form]").forEach(function (form) {
-        const trigger = form.querySelector("[data-confirm-trigger]");
-        const label = form.querySelector("[data-confirm-label]");
-        const controls = form.querySelector("[data-confirm-controls]");
-        const cancel = form.querySelector("[data-confirm-cancel]");
-
-        if (!trigger || !label || !controls || !cancel) return;
-
-        trigger.addEventListener("click", function () {
-            trigger.disabled = true;
-            label.hidden = true;
-            controls.hidden = false;
-            controls.style.display = "inline-flex";
-            controls.querySelector('button[type="submit"]')?.focus();
-        });
-
-        cancel.addEventListener("click", function () {
-            controls.hidden = true;
-            label.hidden = false;
-            trigger.disabled = false;
-            trigger.focus();
-        });
-    });
-});
-</script>
 

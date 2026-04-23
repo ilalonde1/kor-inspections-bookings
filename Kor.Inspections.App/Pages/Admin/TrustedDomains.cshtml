@@ -7,7 +7,7 @@
 <h2>Trusted Domains</h2>
 
 <p>
-    These entries grant project access to all users at the trusted email domain for the listed project.
+    These entries are explicit admin-managed domain approvals. They grant project access to users at the listed email domain for the listed project until the approval expires or is revoked.
 </p>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -25,13 +25,15 @@ else
 {
     <div class="admin-table-container">
         <div class="table-responsive-mobile">
-            <table class="admin-table">
+            <table class="admin-table" style="text-align:left;">
                 <thead>
                     <tr>
-                        <th>Project Number</th>
-                        <th>Trusted Domain</th>
-                        <th>Date Added</th>
-                        <th>Actions</th>
+                        <th style="text-align:left;">Project Number</th>
+                        <th style="text-align:left;">Approved Domain</th>
+                        <th style="text-align:left;">Approved At</th>
+                        <th style="text-align:left;">Expires At</th>
+                        <th style="text-align:left;">Status</th>
+                        <th style="text-align:left;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -40,7 +42,9 @@ else
                         <tr>
                             <td>@row.ProjectNumber</td>
                             <td>@row.EmailDomain</td>
-                            <td>@row.UpdatedUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@row.ApprovedUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@row.ExpiresUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@(row.IsExpired ? "Expired" : "Active")</td>
                             <td>
                                 <form method="post" asp-page-handler="Revoke" style="margin:0;">
                                     <input type="hidden" name="id" value="@row.Id" />

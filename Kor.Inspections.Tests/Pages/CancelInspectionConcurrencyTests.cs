@@ -153,6 +153,7 @@ public class CancelInspectionConcurrencyTests
             new ProjectProfileService(db),
             new DeltekProjectService(
                 Options.Create(new DeltekProjectOptions()),
+                cache,
                 NullLogger<DeltekProjectService>.Instance),
             new ProjectBootstrapVerificationService(
                 cache,

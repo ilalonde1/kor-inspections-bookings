@@ -344,7 +344,7 @@ ADMIN TABLE � PROFESSIONAL DISPATCH STYLE
 }
 
 .col-actions {
-    width: 190px;
+    width: 210px;
 }
 
 /* phone */
@@ -460,27 +460,41 @@ ASSIGN + ACTION BUTTONS
 
 .assign-inline {
     display: flex;
-    gap: 6px;
-    margin-bottom: 6px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 8px;
 }
 
-    .assign-inline select {
-        flex: 1;
-        min-height: 32px;
-    }
+.admin-actions-cell {
+    min-width: 200px;
+}
+
+.admin-assign-select {
+    width: 100%;
+    min-height: 38px;
+}
 
 .action-stack {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 8px;
+    align-items: stretch;
 }
 
 .admin-btn {
-    font-size: .7rem;
-    padding: 4px 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+    font-size: .75rem;
+    font-weight: 600;
+    padding: 6px 10px;
     border-radius: 6px;
     border: none;
     cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
 }
 
 .admin-btn-set {
@@ -491,6 +505,38 @@ ASSIGN + ACTION BUTTONS
 .admin-btn-cancel {
     background: #d83b01;
     color: white;
+}
+
+.admin-btn-secondary {
+    background: #eef2f7;
+    color: #2d4154;
+    border: 1px solid #cfd7e3;
+}
+
+.admin-confirm-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+    border: 1px solid #d7dee8;
+    border-radius: 8px;
+    background: #f7fbff;
+}
+
+.admin-confirm-text {
+    font-size: .75rem;
+    font-weight: 600;
+    color: #33485c;
+    margin-right: 2px;
+}
+
+.admin-cancel-form {
+    margin: 0;
+}
+
+.admin-action-full {
+    width: 100%;
 }
 
 /* NEW small helpers */

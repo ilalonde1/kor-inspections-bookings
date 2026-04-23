@@ -4,25 +4,32 @@ using Kor.Inspections.App.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 
 namespace Kor.Inspections.App.Pages.Admin
 {
     public class TrustedDomainsModel : PageModel
     {
         private readonly InspectionsContext _db;
-        private readonly IMemoryCache _cache;
 
-        public TrustedDomainsModel(InspectionsContext db, IMemoryCache cache)
+        public TrustedDomainsModel(InspectionsContext db)
         {
             _db = db;
-            _cache = cache;
         }
 
-        public IList<ProjectDefault> TrustedDomains { get; private set; } = new List<ProjectDefault>();
+        public IList<TrustedDomainRow> TrustedDomains { get; private set; } = new List<TrustedDomainRow>();
 
         [TempData]
         public string? StatusMessage { get; set; }
+
+        public sealed class TrustedDomainRow
+        {
+            public int Id { get; init; }
+            public string ProjectNumber { get; init; } = string.Empty;
+            public string EmailDomain { get; init; } = string.Empty;
+            public DateTime ApprovedUtc { get; init; }
+            public DateTime ExpiresUtc { get; init; }
+            public bool IsExpired { get; init; }
+        }
 
         public async Task OnGetAsync()
         {
@@ -30,6 +37,15 @@ namespace Kor.Inspections.App.Pages.Admin
                 .AsNoTracking()
                 .OrderBy(x => x.ProjectNumber)
                 .ThenBy(x => x.EmailDomain)
+                .Select(x => new TrustedDomainRow
+                {
+                    Id = x.Id,
+                    ProjectNumber = x.ProjectNumber,
+                    EmailDomain = x.EmailDomain,
+                    ApprovedUtc = x.UpdatedUtc,
+                    ExpiresUtc = ProjectBootstrapVerificationService.GetExplicitDomainApprovalExpirationUtc(x.UpdatedUtc),
+                    IsExpired = ProjectBootstrapVerificationService.GetExplicitDomainApprovalExpirationUtc(x.UpdatedUtc) < DateTime.UtcNow
+                })
                 .ToListAsync();
         }
 
@@ -45,8 +61,7 @@ namespace Kor.Inspections.App.Pages.Admin
             _db.ProjectDefaults.Remove(row);
             await _db.SaveChangesAsync();
 
-            _cache.Remove(ProjectCacheKeys.BuildVerificationKey(row.ProjectNumber, row.EmailDomain));
-            StatusMessage = $"Revoked trust for {row.EmailDomain} on project {row.ProjectNumber}.";
+            StatusMessage = $"Revoked explicit domain approval for {row.EmailDomain} on project {row.ProjectNumber}.";
             return RedirectToPage();
         }
     }

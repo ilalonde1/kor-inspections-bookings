@@ -11,6 +11,7 @@ using Kor.Inspections.App.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Kor.Inspections.App.Pages.Admin
@@ -21,17 +22,20 @@ namespace Kor.Inspections.App.Pages.Admin
         private readonly TimeRuleService _timeRules;
         private readonly GraphMailService _mail;
         private readonly NotificationOptions _notificationOptions;
+        private readonly ILogger<SummaryModel> _logger;
 
         public SummaryModel(
             InspectionsContext db,
             TimeRuleService timeRules,
             GraphMailService mail,
-            IOptions<NotificationOptions> notificationOptions)
+            IOptions<NotificationOptions> notificationOptions,
+            ILogger<SummaryModel> logger)
         {
             _db = db;
             _timeRules = timeRules;
             _mail = mail;
             _notificationOptions = notificationOptions.Value;
+            _logger = logger;
         }
 
         public DateTime SummaryDateLocal { get; private set; }
@@ -60,6 +64,7 @@ namespace Kor.Inspections.App.Pages.Admin
 
             public DateTime StartLocal { get; set; }
             public DateTime EndLocal { get; set; }
+            public int? RouteOrder { get; set; }
             public string? TimePreference { get; set; }
             public string ProjectNumber { get; set; } = string.Empty;
             public string ProjectAddress { get; set; } = string.Empty;
@@ -69,8 +74,15 @@ namespace Kor.Inspections.App.Pages.Admin
 
             public string Status { get; set; } = string.Empty;
             public string AssignedTo { get; set; } = string.Empty;
+            public string? AssignedToValue { get; set; }
 
             public string Comments { get; set; } = string.Empty;
+        }
+
+        public sealed class RouteOrderRequest
+        {
+            public string? InspectorEmail { get; set; }
+            public string? OrderedBookingIds { get; set; }
         }
 
         public async Task OnGetAsync()
@@ -140,6 +152,7 @@ namespace Kor.Inspections.App.Pages.Admin
                         BookingId = b.BookingId,
                         StartLocal = startLocalRow,
                         EndLocal = endLocalRow,
+                        RouteOrder = b.RouteOrder,
                         TimePreference = b.TimePreference,
                         ProjectNumber = b.ProjectNumber,
                         ProjectAddress = b.ProjectAddress ?? string.Empty,
@@ -147,6 +160,7 @@ namespace Kor.Inspections.App.Pages.Admin
                         ContactPhone = b.ContactPhone,
                         Status = b.Status,
                         AssignedTo = ResolveAssignedToDisplay(b.AssignedTo, inspectorsByEmail),
+                        AssignedToValue = b.AssignedTo,
                         Comments = b.Comments ?? string.Empty
                     };
                 })
@@ -163,9 +177,10 @@ namespace Kor.Inspections.App.Pages.Admin
             var fromMailbox = _notificationOptions.FromMailbox;
             var toEmail = _notificationOptions.FromMailbox;
             var subject = $"Kor Field Reviews - {SummaryDateLocal:yyyy-MM-dd} (Tomorrow)";
-            var html = BuildEmailHtml(SummaryDateLocal, Bookings);
+            var html = BuildEmailHtml(SummaryDateLocal, Bookings, routeUrl: null);
 
-            await _mail.SendHtmlAsync(fromMailbox, toEmail, subject, html);
+            if (!await TrySendSummaryEmailAsync(fromMailbox, toEmail, subject, html, "full summary"))
+                return RedirectToPage();
 
             StatusMessage = $"Summary email sent to {toEmail}.";
             return RedirectToPage();
@@ -182,15 +197,12 @@ namespace Kor.Inspections.App.Pages.Admin
             await OnGetAsync();
 
             var inspector = await _db.Inspectors
-    .AsNoTracking()
-    .FirstOrDefaultAsync(i => i.Email == inspectorEmail && i.Enabled);
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.Email == inspectorEmail && i.Enabled);
 
-var inspectorBookings = (inspector is null
-    ? Enumerable.Empty<SummaryRow>()
-    : Bookings.Where(b =>
-        !string.Equals(b.AssignedTo, "Unassigned", StringComparison.OrdinalIgnoreCase) &&
-        string.Equals(b.AssignedTo, inspector.DisplayName, StringComparison.OrdinalIgnoreCase)))
-    .ToList();
+            var inspectorBookings = inspector is null
+                ? new List<SummaryRow>()
+                : GetOrderedInspectorBookings(inspector.Email).ToList();
 
             if (!inspectorBookings.Any())
             {
@@ -200,9 +212,14 @@ var inspectorBookings = (inspector is null
 
             var fromMailbox = _notificationOptions.FromMailbox;
             var subject = $"Your Field Reviews - {SummaryDateLocal:yyyy-MM-dd}";
-            var html = BuildEmailHtml(SummaryDateLocal, inspectorBookings);
+            var html = BuildEmailHtml(
+                SummaryDateLocal,
+                inspectorBookings,
+                BuildGoogleMapsRouteUrl(inspectorBookings),
+                preserveRowOrder: true);
 
-            await _mail.SendHtmlAsync(fromMailbox, inspectorEmail, subject, html);
+            if (!await TrySendSummaryEmailAsync(fromMailbox, inspectorEmail, subject, html, $"inspector summary for {inspectorEmail}"))
+                return RedirectToPage();
 
             StatusMessage = $"Inspector summary sent to {inspectorEmail}.";
             return RedirectToPage();
@@ -223,31 +240,40 @@ var inspectorBookings = (inspector is null
 
             var groups = Bookings
                 .Where(b =>
-                    !string.IsNullOrWhiteSpace(b.AssignedTo) &&
+                    !string.IsNullOrWhiteSpace(b.AssignedToValue) &&
                     !string.Equals(b.AssignedTo, "Unassigned", StringComparison.OrdinalIgnoreCase))
-                .GroupBy(b => b.AssignedTo, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(b => b.AssignedToValue!, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             foreach (var group in groups)
             {
-                var assignedName = group.Key ?? string.Empty;
-                if (!inspectorsByName.TryGetValue(assignedName, out var inspectorEmail))
+                var inspectorEmail = group.Key ?? string.Empty;
+                if (!inspectorsByName.Values.Contains(inspectorEmail, StringComparer.OrdinalIgnoreCase))
                     continue;
 
-                var inspectorBookings = group.ToList();
+                var inspectorBookings = OrderForRoute(group.ToList()).ToList();
                 if (inspectorBookings.Count == 0)
                     continue;
 
                 var subject = $"Your Field Reviews - {SummaryDateLocal:yyyy-MM-dd}";
-                var html = BuildEmailHtml(SummaryDateLocal, inspectorBookings);
+                var html = BuildEmailHtml(
+                    SummaryDateLocal,
+                    inspectorBookings,
+                    BuildGoogleMapsRouteUrl(inspectorBookings),
+                    preserveRowOrder: true);
 
                 try
                 {
                     await _mail.SendHtmlAsync(fromMailbox, inspectorEmail, subject, html);
                     sentEmails.Add(inspectorEmail);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    _logger.LogError(
+                        ex,
+                        "Failed to send inspector summary for {SummaryDate} to {InspectorEmail}.",
+                        SummaryDateLocal,
+                        inspectorEmail);
                     failedEmails.Add(inspectorEmail);
                 }
             }
@@ -270,13 +296,115 @@ var inspectorBookings = (inspector is null
             return RedirectToPage();
         }
 
-        private static string BuildEmailHtml(DateTime dateLocal, IList<SummaryRow> rows)
+        public async Task<IActionResult> OnPostSaveRouteOrderAsync(RouteOrderRequest request)
+        {
+            await OnGetAsync();
+
+            var persisted = await PersistRouteOrderAsync(request);
+            if (persisted.Count == 0)
+            {
+                StatusMessage = "No valid route order was provided.";
+                return RedirectToPage(new { date = Date });
+            }
+
+            StatusMessage = "Route order saved.";
+            return RedirectToPage(new { date = Date });
+        }
+
+        public async Task<IActionResult> OnPostEmailRouteAsync(RouteOrderRequest request)
+        {
+            await OnGetAsync();
+
+            var persisted = await PersistRouteOrderAsync(request);
+            if (persisted.Count == 0 || string.IsNullOrWhiteSpace(request.InspectorEmail))
+            {
+                StatusMessage = "No valid route order was provided.";
+                return RedirectToPage(new { date = Date });
+            }
+
+            var inspector = await _db.Inspectors
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.Email == request.InspectorEmail && i.Enabled);
+
+            if (inspector == null)
+            {
+                StatusMessage = "Inspector not found.";
+                return RedirectToPage(new { date = Date });
+            }
+
+            var persistedSet = persisted.ToHashSet();
+            var inspectorBookings = OrderForRoute(
+                    Bookings.Where(b =>
+                        string.Equals(b.AssignedToValue, inspector.Email, StringComparison.OrdinalIgnoreCase) &&
+                        persistedSet.Contains(b.BookingId))
+                    .ToList())
+                .ToList();
+
+            if (inspectorBookings.Count == 0)
+            {
+                StatusMessage = "No bookings found for that inspector.";
+                return RedirectToPage(new { date = Date });
+            }
+
+            var html = BuildEmailHtml(
+                SummaryDateLocal,
+                inspectorBookings,
+                BuildGoogleMapsRouteUrl(inspectorBookings),
+                preserveRowOrder: true);
+
+            if (!await TrySendSummaryEmailAsync(
+                    _notificationOptions.FromMailbox,
+                    inspector.Email,
+                    $"Your Field Reviews - {SummaryDateLocal:yyyy-MM-dd}",
+                    html,
+                    $"inspector summary for {inspector.Email}"))
+            {
+                return RedirectToPage(new { date = Date });
+            }
+
+            StatusMessage = $"Inspector summary sent to {inspector.Email}.";
+            return RedirectToPage(new { date = Date });
+        }
+
+        private async Task<bool> TrySendSummaryEmailAsync(
+            string fromMailbox,
+            string toEmail,
+            string subject,
+            string html,
+            string operationName)
+        {
+            try
+            {
+                await _mail.SendHtmlAsync(fromMailbox, toEmail, subject, html);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to send {OperationName} email for {SummaryDate} to {Recipient}.",
+                    operationName,
+                    SummaryDateLocal,
+                    toEmail);
+                StatusMessage = $"Unable to send the {operationName}. Please try again.";
+                return false;
+            }
+        }
+
+        private static string BuildEmailHtml(DateTime dateLocal, IList<SummaryRow> rows, string? routeUrl, bool preserveRowOrder = false)
         {
             var sb = new StringBuilder();
 
             sb.Append("<h2>Field Reviews for ")
               .Append(WebUtility.HtmlEncode(dateLocal.ToString("yyyy-MM-dd")))
               .Append("</h2>");
+
+            if (!string.IsNullOrWhiteSpace(routeUrl))
+            {
+                sb.Append("<p><a href=\"")
+                  .Append(WebUtility.HtmlEncode(routeUrl))
+                  .Append("\">Open inspector route in Google Maps</a></p>");
+            }
 
             if (rows.Count == 0)
             {
@@ -297,7 +425,9 @@ var inspectorBookings = (inspector is null
               .Append("<th>Comments</th>")
               .Append("</tr></thead><tbody>");
 
-            foreach (var b in rows.OrderBy(r => r.StartLocal))
+            var orderedRows = preserveRowOrder ? rows : rows.OrderBy(r => r.StartLocal).ToList();
+
+            foreach (var b in orderedRows)
             {
                 var timeText = $"{b.StartLocal:HH:mm} - {b.EndLocal:HH:mm}";
                 var contactText = $"{b.ContactName} ({b.ContactPhone})";
@@ -315,6 +445,101 @@ var inspectorBookings = (inspector is null
 
             sb.Append("</tbody></table>");
             return sb.ToString();
+        }
+
+        private static string? BuildGoogleMapsRouteUrl(IList<SummaryRow> rows)
+        {
+            var addresses = new List<string>();
+
+            foreach (var row in rows)
+            {
+                var address = row.ProjectAddress?.Trim();
+                if (string.IsNullOrWhiteSpace(address))
+                    continue;
+
+                if (!addresses.Contains(address, StringComparer.OrdinalIgnoreCase))
+                    addresses.Add(address);
+            }
+
+            if (addresses.Count == 0)
+                return null;
+
+            var origin = Uri.EscapeDataString(addresses[0]!);
+            var destination = Uri.EscapeDataString(addresses[^1]!);
+            var waypoints = addresses.Skip(1).SkipLast(1).Select(Uri.EscapeDataString).ToList();
+
+            var routeUrl = new StringBuilder("https://www.google.com/maps/dir/?api=1")
+                .Append("&origin=").Append(origin)
+                .Append("&destination=").Append(destination);
+
+            if (waypoints.Count > 0)
+                routeUrl.Append("&waypoints=").Append(string.Join("|", waypoints));
+
+            return routeUrl.ToString();
+        }
+
+        private IEnumerable<SummaryRow> GetOrderedInspectorBookings(string inspectorEmail)
+        {
+            return OrderForRoute(
+                Bookings.Where(b =>
+                        string.Equals(b.AssignedToValue, inspectorEmail, StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(b.AssignedTo, "Unassigned", StringComparison.OrdinalIgnoreCase))
+                    .ToList());
+        }
+
+        private static IEnumerable<SummaryRow> OrderForRoute(IEnumerable<SummaryRow> rows)
+        {
+            return rows
+                .OrderBy(r => r.RouteOrder ?? int.MaxValue)
+                .ThenBy(r => r.StartLocal)
+                .ThenBy(r => r.ProjectAddress, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private async Task<IReadOnlyList<Guid>> PersistRouteOrderAsync(RouteOrderRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.InspectorEmail))
+                return Array.Empty<Guid>();
+
+            var orderedIds = ParseOrderedBookingIds(request.OrderedBookingIds);
+            if (orderedIds.Count == 0)
+                return Array.Empty<Guid>();
+
+            var startUtc = TimeZoneInfo.ConvertTimeToUtc(SelectedDate, _timeRules.TimeZone);
+            var endUtc = TimeZoneInfo.ConvertTimeToUtc(SelectedDate.AddDays(1), _timeRules.TimeZone);
+
+            var bookings = await _db.Bookings
+                .Where(b =>
+                    b.StartUtc >= startUtc &&
+                    b.StartUtc < endUtc &&
+                    b.Status != "Cancelled" &&
+                    b.AssignedTo == request.InspectorEmail &&
+                    orderedIds.Contains(b.BookingId))
+                .ToListAsync();
+
+            if (bookings.Count == 0)
+                return Array.Empty<Guid>();
+
+            var positions = orderedIds
+                .Select((id, index) => new { id, index })
+                .ToDictionary(x => x.id, x => x.index);
+
+            foreach (var booking in bookings)
+            {
+                booking.RouteOrder = positions[booking.BookingId];
+            }
+
+            await _db.SaveChangesAsync();
+            return bookings.Select(b => b.BookingId).ToList();
+        }
+
+        private static List<Guid> ParseOrderedBookingIds(string? orderedBookingIds)
+        {
+            return (orderedBookingIds ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(value => Guid.TryParse(value, out var parsed) ? parsed : Guid.Empty)
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToList();
         }
 
         public string ToggleDir(string column)

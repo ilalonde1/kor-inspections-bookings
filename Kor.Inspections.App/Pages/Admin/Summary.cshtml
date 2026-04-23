@@ -8,7 +8,7 @@
         based on Kor's local time.
     </p>
 
-    <p class="assign-inline" style="align-items:center; margin-bottom:14px;">
+    <div class="assign-inline" style="align-items:center; margin-bottom:14px; flex-direction:row; flex-wrap:wrap;">
         <a asp-page="./Summary"
            asp-route-date="@Model.SelectedDate.AddDays(-1).ToString("yyyy-MM-dd")"
            asp-route-sort="@Model.Sort"
@@ -20,7 +20,13 @@
            asp-route-sort="@Model.Sort"
            asp-route-dir="@Model.Dir"
            class="btn-smooth">Next Day</a>
-    </p>
+        <form method="post" asp-page-handler="Email" style="margin:0;">
+            <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
+            <button type="submit" class="btn-primary">
+                Email Tomorrow's Summary
+            </button>
+        </form>
+    </div>
 
     @if (!string.IsNullOrEmpty(Model.StatusMessage))
     {
@@ -28,47 +34,6 @@
             @Model.StatusMessage
         </div>
     }
-
-    <div class="assign-inline" style="flex-wrap:wrap; align-items:center; margin-bottom:14px;">
-        <form method="post" asp-page-handler="EmailAllInspectors" style="margin:0;" data-inline-confirm-form>
-            <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
-            <button type="button" class="btn-primary" data-confirm-trigger>
-                <span data-confirm-label>Email All Assigned Inspectors</span>
-            </button>
-            <span data-confirm-controls hidden style="display:inline-flex; gap:8px; align-items:center; margin-left:8px;">
-                <span>Are you sure?</span>
-                <button type="submit" class="btn-primary">Confirm</button>
-                <button type="button" class="btn-secondary" data-confirm-cancel>Cancel</button>
-            </span>
-        </form>
-
-        <form method="post" asp-page-handler="Email" style="margin:0;">
-            <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
-            <button type="submit" class="btn-primary">
-                Email Full Summary
-            </button>
-        </form>
-
-        <form method="post" asp-page-handler="EmailInspector" class="assign-inline" style="margin:0;">
-            <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
-
-            <select name="inspectorEmail" required class="inspector-dropdown">
-                <option value="">Select inspector...</option>
-
-                @foreach (var inspector in Model.Inspectors)
-                {
-                    <option value="@inspector.Email">
-                        @inspector.DisplayName
-                    </option>
-                }
-            </select>
-
-            <button type="submit" class="btn-primary">
-                Email Inspector Summary
-            </button>
-
-        </form>
-    </div>
 
     @if (!Model.Bookings.Any())
     {
@@ -88,14 +53,15 @@
 
         <div class="admin-table-container">
             <div class="table-responsive-mobile">
-            <table class="admin-table">
+            <table class="admin-table" style="text-align:left;">
                 <thead>
                     <tr>
                         <th class="col-time">
                             <a asp-page="./Summary"
                                asp-route-sort="time"
                                asp-route-dir="@Model.ToggleDir("time")"
-                               class="sort-link">
+                               class="sort-link"
+                               style="text-align:left; display:inline-block;">
                                 Time ⇅
                             </a>
                         </th>
@@ -103,7 +69,8 @@
                             <a asp-page="./Summary"
                                asp-route-sort="job"
                                asp-route-dir="@Model.ToggleDir("job")"
-                               class="sort-link">
+                               class="sort-link"
+                               style="text-align:left; display:inline-block;">
                                 Job # ⇅
                             </a>
                         </th>
@@ -111,7 +78,8 @@
                             <a asp-page="./Summary"
                                asp-route-sort="address"
                                asp-route-dir="@Model.ToggleDir("address")"
-                               class="sort-link">
+                               class="sort-link"
+                               style="text-align:left; display:inline-block;">
                                 Site Address ⇅
                             </a>
                         </th>
@@ -120,7 +88,8 @@
                             <a asp-page="./Summary"
                                asp-route-sort="assigned"
                                asp-route-dir="@Model.ToggleDir("assigned")"
-                               class="sort-link">
+                               class="sort-link"
+                               style="text-align:left; display:inline-block;">
                                 Assigned To ⇅
                             </a>
                         </th>
@@ -128,7 +97,8 @@
                             <a asp-page="./Summary"
                                asp-route-sort="status"
                                asp-route-dir="@Model.ToggleDir("status")"
-                               class="sort-link">
+                               class="sort-link"
+                               style="text-align:left; display:inline-block;">
                                 Status ⇅
                             </a>
                         </th>
@@ -162,8 +132,10 @@
         </div>
 
         var inspectorGroups = Model.Bookings
-            .Where(b => !string.Equals(b.AssignedTo, "Unassigned", StringComparison.OrdinalIgnoreCase))
-            .GroupBy(b => b.AssignedTo)
+            .Where(b =>
+                !string.IsNullOrWhiteSpace(b.AssignedToValue) &&
+                !string.Equals(b.AssignedTo, "Unassigned", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(b => b.AssignedToValue)
             .OrderBy(g => g.Key)
             .ToList();
 
@@ -175,18 +147,39 @@
 
                 @foreach (var group in inspectorGroups)
                 {
-                    <section class="summary-route-card" data-inspector="@group.Key">
+                    var orderedGroup = group
+                        .OrderBy(x => x.RouteOrder ?? int.MaxValue)
+                        .ThenBy(x => x.StartLocal)
+                        .ThenBy(x => x.ProjectAddress, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    var inspectorEmail = group.Key ?? string.Empty;
+                    var inspectorLabel = orderedGroup.FirstOrDefault()?.AssignedTo ?? inspectorEmail;
+
+                    <section class="summary-route-card" data-inspector="@inspectorLabel" data-inspector-email="@inspectorEmail">
                         <div class="summary-route-head">
-                            <h4>@group.Key</h4>
+                            <h4>@inspectorLabel</h4>
                             <div class="summary-route-actions">
+                                <form method="post" asp-page-handler="SaveRouteOrder" class="summary-route-order-form" style="display:inline;">
+                                    <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
+                                    <input type="hidden" name="request.InspectorEmail" value="@inspectorEmail" />
+                                    <input type="hidden" name="request.OrderedBookingIds" value="" />
+                                    <button type="submit" class="btn-smooth summary-save-route-btn">Save Route Order</button>
+                                </form>
+                                <form method="post" asp-page-handler="EmailRoute" class="summary-route-email-form" style="display:inline;">
+                                    <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
+                                    <input type="hidden" name="request.InspectorEmail" value="@inspectorEmail" />
+                                    <input type="hidden" name="request.OrderedBookingIds" value="" />
+                                    <button type="submit" class="btn-smooth summary-email-route-btn">Email This Route</button>
+                                </form>
                                 <button type="button" class="btn-smooth summary-nav-route-btn">Navigate Route</button>
                             </div>
                         </div>
 
                         <ul class="summary-route-list">
-                            @foreach (var b in group.OrderBy(x => x.StartLocal))
+                            @foreach (var b in orderedGroup)
                             {
                                 <li class="summary-route-item"
+                                    draggable="true"
                                     data-booking-id="@b.BookingId"
                                     data-address="@b.ProjectAddress">
                                     <span class="summary-route-time">
@@ -224,12 +217,30 @@ document.addEventListener("DOMContentLoaded", function () {
     cards.forEach((card) => {
         const list = card.querySelector(".summary-route-list");
         const navBtn = card.querySelector(".summary-nav-route-btn");
+        const saveForm = card.querySelector(".summary-route-order-form");
+        const emailForm = card.querySelector(".summary-route-email-form");
         const tableRows = Array.from(document.querySelectorAll(".summary-booking-row"));
+        let draggedItem = null;
 
         if (!list) return;
 
         function getItems() {
             return Array.from(list.querySelectorAll(".summary-route-item"));
+        }
+
+        function getOrderedBookingIds() {
+            return getItems()
+                .map(i => (i.dataset.bookingId || "").trim())
+                .filter(Boolean)
+                .join(",");
+        }
+
+        function syncRouteForms() {
+            const orderedIds = getOrderedBookingIds();
+            [saveForm, emailForm].forEach((form) => {
+                const input = form?.querySelector('input[name="request.OrderedBookingIds"]');
+                if (input) input.value = orderedIds;
+            });
         }
 
         getItems().forEach((item) => {
@@ -247,7 +258,49 @@ document.addEventListener("DOMContentLoaded", function () {
                     targetRow.scrollIntoView({ behavior: "smooth", block: "center" });
                 }
             });
+
+            item.addEventListener("dragstart", function (event) {
+                draggedItem = item;
+                item.classList.add("summary-route-dragging");
+                if (event.dataTransfer) {
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", item.dataset.bookingId || "");
+                }
+            });
+
+            item.addEventListener("dragend", function () {
+                item.classList.remove("summary-route-dragging");
+                draggedItem = null;
+                syncRouteForms();
+            });
         });
+
+        list.addEventListener("dragover", function (event) {
+            if (!draggedItem) return;
+            event.preventDefault();
+
+            const targetItem = event.target.closest(".summary-route-item");
+            if (!targetItem || targetItem === draggedItem) return;
+
+            const targetRect = targetItem.getBoundingClientRect();
+            const insertAfter = event.clientY > targetRect.top + (targetRect.height / 2);
+
+            if (insertAfter) {
+                if (targetItem.nextSibling !== draggedItem) {
+                    list.insertBefore(draggedItem, targetItem.nextSibling);
+                }
+            } else if (targetItem !== draggedItem.nextSibling) {
+                list.insertBefore(draggedItem, targetItem);
+            }
+        });
+
+        list.addEventListener("drop", function (event) {
+            if (!draggedItem) return;
+            event.preventDefault();
+            syncRouteForms();
+        });
+
+        syncRouteForms();
 
         if (navBtn) {
             navBtn.addEventListener("click", function () {
@@ -256,7 +309,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     .filter(Boolean);
 
                 if (!addresses.length) {
-                    setStatus("No valid addresses in this route.");
                     return;
                 }
 

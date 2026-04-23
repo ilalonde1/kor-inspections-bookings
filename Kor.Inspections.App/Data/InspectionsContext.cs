@@ -51,7 +51,13 @@ namespace Kor.Inspections.App.Data
                       .HasMaxLength(120)
                       .IsRequired();
 
+                entity.Property(b => b.RouteOrder);
+
                 entity.HasIndex(b => b.ContactEmail);
+                entity.HasIndex(b => b.ProjectNumber);
+                entity.HasIndex(b => b.Status);
+                entity.HasIndex(b => b.StartUtc);
+                entity.HasIndex(b => new { b.ProjectNumber, b.StartUtc });
                 entity.HasIndex(b => new { b.ProjectNumber, b.ContactEmail, b.StartUtc })
                       .IsUnique()
                       .HasFilter("[Status] != 'Cancelled'")

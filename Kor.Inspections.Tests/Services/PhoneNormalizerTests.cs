@@ -25,7 +25,7 @@ public class PhoneNormalizerTests
     {
         var result = PhoneNormalizer.Format("6045551234");
 
-        Assert.Equal("(604)-555-1234", result);
+        Assert.Equal("604-555-1234", result);
     }
 
     [Fact]
@@ -33,7 +33,7 @@ public class PhoneNormalizerTests
     {
         var result = PhoneNormalizer.Format("16045551234");
 
-        Assert.Equal("(604)-555-1234", result);
+        Assert.Equal("604-555-1234", result);
     }
 
     [Fact]

@@ -4,9 +4,7 @@ using Kor.Inspections.App.Options;
 using Kor.Inspections.App.Pages.Admin;
 using Kor.Inspections.App.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -18,8 +16,7 @@ public class TrustedDomainsModelTests
     public async Task OnGetAsync_NoRows_ReturnsEmptyList()
     {
         await using var db = CreateContext();
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        var model = new TrustedDomainsModel(db, cache);
+        var model = new TrustedDomainsModel(db);
 
         await model.OnGetAsync();
 
@@ -36,8 +33,7 @@ public class TrustedDomainsModelTests
             new ProjectDefault { ProjectNumber = "30844", EmailDomain = "alpha.com", UpdatedUtc = DateTime.UtcNow });
         await db.SaveChangesAsync();
 
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        var model = new TrustedDomainsModel(db, cache);
+        var model = new TrustedDomainsModel(db);
 
         await model.OnGetAsync();
 
@@ -74,25 +70,20 @@ public class TrustedDomainsModelTests
         db.ProjectDefaults.Add(row);
         await db.SaveChangesAsync();
 
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        cache.Set("proj-bootstrap:30844|acme.com", "trusted");
-
-        var model = new TrustedDomainsModel(db, cache);
+        var model = new TrustedDomainsModel(db);
 
         var result = await model.OnPostRevokeAsync(row.Id);
 
         Assert.IsType<RedirectToPageResult>(result);
         Assert.Empty(db.ProjectDefaults);
-        Assert.False(cache.TryGetValue("proj-bootstrap:30844|acme.com", out _));
-        Assert.Contains("Revoked trust", model.StatusMessage, StringComparison.Ordinal);
+        Assert.Contains("Revoked explicit domain approval", model.StatusMessage, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task OnPostRevokeAsync_MissingId_SetsNotFoundStatusMessage()
     {
         await using var db = CreateContext();
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        var model = new TrustedDomainsModel(db, cache);
+        var model = new TrustedDomainsModel(db);
 
         var result = await model.OnPostRevokeAsync(999);
 
@@ -113,10 +104,8 @@ public class TrustedDomainsModelTests
         db.ProjectDefaults.Add(row);
         await db.SaveChangesAsync();
 
-        var cache = new MemoryCache(new MemoryCacheOptions());
-        cache.Set("proj-bootstrap:30844|acme.com", true);
-
-        var model = new TrustedDomainsModel(db, cache);
+        var cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions());
+        var model = new TrustedDomainsModel(db);
         await model.OnPostRevokeAsync(row.Id);
 
         var service = CreateVerificationService(db, cache);
@@ -126,7 +115,28 @@ public class TrustedDomainsModelTests
         Assert.False(status.IsVerified);
     }
 
-    private static ProjectBootstrapVerificationService CreateVerificationService(InspectionsContext db, IMemoryCache cache)
+    [Fact]
+    public async Task OnGetAsync_ExpiredApproval_IsMarkedExpired()
+    {
+        await using var db = CreateContext();
+        db.ProjectDefaults.Add(new ProjectDefault
+        {
+            ProjectNumber = "30844",
+            EmailDomain = "expired.com",
+            UpdatedUtc = DateTime.UtcNow - TimeSpan.FromDays(30) - TimeSpan.FromMinutes(1)
+        });
+        await db.SaveChangesAsync();
+
+        var model = new TrustedDomainsModel(db);
+
+        await model.OnGetAsync();
+
+        var row = Assert.Single(model.TrustedDomains);
+        Assert.True(row.IsExpired);
+        Assert.True(row.ExpiresUtc < DateTime.UtcNow);
+    }
+
+    private static ProjectBootstrapVerificationService CreateVerificationService(InspectionsContext db, Microsoft.Extensions.Caching.Memory.IMemoryCache cache)
     {
         return new ProjectBootstrapVerificationService(
             cache,
