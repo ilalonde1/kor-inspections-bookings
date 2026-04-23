@@ -832,7 +832,7 @@
             const row = document.createElement("button");
             row.type = "button";
             row.className = "project-suggestion-item";
-            row.textContent = item.display || item.projectNumber || "";
+            row.textContent = item.projectNumber || "";
             row.addEventListener("click", () => applyProjectSuggestion(item));
             row.addEventListener("mouseenter", () => {
                 activeProjectSuggestionIndex = index;

@@ -262,11 +262,7 @@ namespace Kor.Inspections.App.Pages
                 {
                     var value = m.ProjectNumber.Trim();
                     var projectName = string.IsNullOrWhiteSpace(m.ProjectName) ? null : m.ProjectName.Trim();
-                    var labelParts = new List<string> { value };
-                    if (!string.IsNullOrWhiteSpace(projectName))
-                        labelParts.Add(projectName);
-
-                    var label = string.Join(" - ", labelParts);
+                    var label = value;
 
                     return new ProjectSuggestionDto
                     {
