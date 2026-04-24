@@ -52,6 +52,44 @@ namespace Kor.Inspections.App.Services
             return _db.Bookings.FirstOrDefaultAsync(b => b.BookingId == id);
         }
 
+        /// <summary>
+        /// Returns true when the caller can place a booking into the given
+        /// window without exceeding InspectionRules.MaxBookingsPerSlot.
+        /// Uses the same padding + overlap math as CreateBookingAsync.
+        /// If excludeBookingId is supplied, that booking is excluded from
+        /// the overlap count (e.g., when rescheduling a booking to a new
+        /// slot, it shouldn't conflict with itself).
+        /// </summary>
+        public async Task<bool> IsSlotAvailableAsync(
+            DateTime startUtc,
+            DateTime endUtc,
+            Guid? excludeBookingId = null,
+            CancellationToken ct = default)
+        {
+            var tz = _timeRules.TimeZone;
+            var slotStartLocal = TimeZoneInfo.ConvertTimeFromUtc(startUtc, tz);
+            var slotEndLocal = TimeZoneInfo.ConvertTimeFromUtc(endUtc, tz);
+            var padding = TimeSpan.FromMinutes(_inspectionRules.TravelPaddingMinutes);
+
+            var checkStartLocal = DateTime.SpecifyKind(slotStartLocal - padding, DateTimeKind.Unspecified);
+            var checkEndLocal = DateTime.SpecifyKind(slotEndLocal + padding, DateTimeKind.Unspecified);
+
+            var checkStartUtc = TimeZoneInfo.ConvertTimeToUtc(checkStartLocal, tz);
+            var checkEndUtc = TimeZoneInfo.ConvertTimeToUtc(checkEndLocal, tz);
+
+            var query = _db.Bookings
+                .Where(b => b.Status != "Cancelled" &&
+                            b.StartUtc < checkEndUtc &&
+                            b.EndUtc > checkStartUtc);
+
+            if (excludeBookingId.HasValue)
+                query = query.Where(b => b.BookingId != excludeBookingId.Value);
+
+            var overlapCount = await query.CountAsync(ct);
+            var maxBookingsPerSlot = Math.Max(1, _inspectionRules.MaxBookingsPerSlot);
+            return overlapCount < maxBookingsPerSlot;
+        }
+
         public Task<Booking?> GetBookingByCancelTokenAsync(Guid token)
         {
             return _db.Bookings.FirstOrDefaultAsync(b => b.CancelToken == token);
@@ -264,7 +302,7 @@ namespace Kor.Inspections.App.Services
                     if (inspector != null && !string.IsNullOrWhiteSpace(inspector.Email))
                     {
                         var inspectorSubject =
-                            $"Field Review Assigned – {booking.ProjectNumber} – {startLocal:yyyy-MM-dd HH:mm}";
+                            $"Field Review Assigned – {FormatJobLine(booking)} – {startLocal:yyyy-MM-dd HH:mm}";
 
                         var inspectorBody = BuildAssignmentEmailHtml(
                             booking,
@@ -309,7 +347,7 @@ namespace Kor.Inspections.App.Services
                 var manageUrl = BuildManageUrl(booking);
 
                 var submitterSubject =
-                    $"Kor Field Review Booking - {booking.ProjectNumber} - {startLocal:yyyy-MM-dd HH:mm}";
+                    $"Kor Field Review Booking - {FormatJobLine(booking)} - {startLocal:yyyy-MM-dd HH:mm}";
 
                 var submitterBody = BuildDetailedBookingHtml(
                     booking,
@@ -327,7 +365,7 @@ namespace Kor.Inspections.App.Services
                     submitterBody);
 
                 var adminSubject =
-                    $"NEW Field Review Booking – {booking.ProjectNumber} – {startLocal:yyyy-MM-dd HH:mm}";
+                    $"NEW Field Review Booking – {FormatJobLine(booking)} – {startLocal:yyyy-MM-dd HH:mm}";
 
                 var adminBody = BuildDetailedBookingHtml(
                     booking,
@@ -370,7 +408,7 @@ namespace Kor.Inspections.App.Services
                 // CLIENT EMAIL (always)
                 // -------------------------
                 var clientSubject =
-                    $"Field Review Cancelled – {booking.ProjectNumber} – {startLocal:yyyy-MM-dd HH:mm}";
+                    $"Field Review Cancelled – {FormatJobLine(booking)} – {startLocal:yyyy-MM-dd HH:mm}";
 
                 var clientBody = BuildCancellationEmailHtml(
                     booking, startLocal, endLocal, displayName, isInspector: false);
@@ -392,7 +430,7 @@ namespace Kor.Inspections.App.Services
                     if (inspector != null && !string.IsNullOrWhiteSpace(inspector.Email))
                     {
                         var inspectorSubject =
-                            $"Field Review Cancelled – {booking.ProjectNumber} – {startLocal:yyyy-MM-dd HH:mm}";
+                            $"Field Review Cancelled – {FormatJobLine(booking)} – {startLocal:yyyy-MM-dd HH:mm}";
 
                         var inspectorBody = BuildCancellationEmailHtml(
                             booking, startLocal, endLocal, displayName, isInspector: true);
