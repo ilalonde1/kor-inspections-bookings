@@ -144,7 +144,7 @@ namespace Kor.Inspections.App.Pages.Admin
             public DateTime? RequestedDate { get; set; }
 
             [Required(ErrorMessage = "Requested time is required.")]
-            [RegularExpression(@"^\d{2}:\d{2}$", ErrorMessage = "Requested time must use HH:mm.")]
+            [RegularExpression(@"^(AM|PM|\d{2}:\d{2})$", ErrorMessage = "Requested time must be AM, PM, or HH:mm.")]
             [Display(Name = "Requested Time")]
             public string RequestedTime { get; set; } = string.Empty;
 
