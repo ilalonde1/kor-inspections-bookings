@@ -171,6 +171,55 @@ public class AdminIndexModelEditBookingTests
     }
 
     [Fact]
+    public async Task OnPostEditAsync_TargetSlotAtCapacity_BlocksRescheduleWithFriendlyMessage()
+    {
+        await using var fixture = await SqlServerFixture.CreateAsync();
+        var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
+
+        // Fill day+3 AM (MaxBookingsPerSlot = 3 in the test factory) with 3
+        // distinct clients so every AM slot on that day is at capacity.
+        var targetDate = nowLocal.Date.AddDays(3);
+        for (int i = 0; i < 3; i++)
+        {
+            await fixture.SeedBookingAsync(
+                status: "Unassigned",
+                startUtc: ToUtc(timeZone, targetDate, 8, 0),
+                endUtc: ToUtc(timeZone, targetDate, 12, 0),
+                timePreference: "AM",
+                contactEmail: $"client{i}@example.com");
+        }
+
+        // Booking to edit lives on a different day so it doesn't count toward
+        // day+3's AM overlap when it's being moved in.
+        var editingBooking = await fixture.SeedBookingAsync(
+            status: "Assigned",
+            startUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 12, 0),
+            endUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 16, 0),
+            timePreference: "PM",
+            contactEmail: "editing@example.com");
+
+        await using var db = fixture.CreateContext();
+        var model = CreateModel(db, timeZone);
+
+        var result = await model.OnPostEditAsync(editingBooking.BookingId, new IndexModel.EditBookingInput
+        {
+            RequestedDate = targetDate,
+            RequestedTime = "AM",
+            OverrideCutoff = false
+        });
+
+        Assert.IsType<RedirectToPageResult>(result);
+        Assert.Contains("no longer available", model.StatusMessage ?? "", StringComparison.OrdinalIgnoreCase);
+
+        await using var verify = fixture.CreateContext();
+        var unchanged = await verify.Bookings.AsNoTracking().SingleAsync(b => b.BookingId == editingBooking.BookingId);
+        Assert.Equal(editingBooking.StartUtc, unchanged.StartUtc);
+        Assert.Equal("PM", unchanged.TimePreference);
+        Assert.Empty(await verify.BookingActions.AsNoTracking()
+            .Where(a => a.BookingId == editingBooking.BookingId).ToListAsync());
+    }
+
+    [Fact]
     public async Task OnPostEditAsync_ConcurrentModification_SetsConcurrencyStatusMessage()
     {
         await using var fixture = await SqlServerFixture.CreateAsync();
@@ -314,7 +363,8 @@ public class AdminIndexModelEditBookingTests
             DateTime startUtc,
             DateTime endUtc,
             string? timePreference,
-            int? routeOrder = null)
+            int? routeOrder = null,
+            string contactEmail = "jane@example.com")
         {
             var booking = new Booking
             {
@@ -324,7 +374,7 @@ public class AdminIndexModelEditBookingTests
                 ProjectAddress = "123 Test St",
                 ContactName = "Jane Doe",
                 ContactPhone = "6045551212",
-                ContactEmail = "jane@example.com",
+                ContactEmail = contactEmail,
                 StartUtc = startUtc,
                 EndUtc = endUtc,
                 TimePreference = timePreference,

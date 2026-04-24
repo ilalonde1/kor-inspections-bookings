@@ -585,6 +585,20 @@ namespace Kor.Inspections.App.Pages.Admin
                 return RedirectToPage(redirectArgs);
             }
 
+            // Authoritative overlap check (exclude self). Protects AM/PM branches that
+            // otherwise wouldn't catch a slot that's already at capacity, and tightens
+            // the HH:mm race window between the upstream availableSlots check and save.
+            var slotAvailable = await _bookingService.IsSlotAvailableAsync(
+                newStartUtc,
+                newEndUtc,
+                excludeBookingId: id,
+                ct: HttpContext.RequestAborted);
+            if (!slotAvailable)
+            {
+                StatusMessage = "Selected time is no longer available. Please choose another time.";
+                return RedirectToPage(redirectArgs);
+            }
+
             booking.StartUtc = newStartUtc;
             booking.EndUtc = newEndUtc;
             booking.TimePreference = newTimePreference;
