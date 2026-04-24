@@ -26,7 +26,6 @@ public class CancelInspectionConcurrencyTests
         await fixture.SeedProjectDefaultAsync("30844", "acme.com");
 
         var cache = new MemoryCache(new MemoryCacheOptions());
-        cache.Set("proj-bootstrap:30844|acme.com", true);
 
         await using var staleContext = fixture.CreateContext();
         _ = await staleContext.Bookings.SingleAsync(b => b.BookingId == booking.BookingId);
@@ -58,7 +57,6 @@ public class CancelInspectionConcurrencyTests
         await fixture.SeedProjectDefaultAsync("30844", "acme.com");
 
         var cache = new MemoryCache(new MemoryCacheOptions());
-        cache.Set("proj-bootstrap:30844|acme.com", true);
 
         await using var staleContext = fixture.CreateContext();
         _ = await staleContext.Bookings.SingleAsync(b => b.BookingId == booking.BookingId);
@@ -90,7 +88,6 @@ public class CancelInspectionConcurrencyTests
         await fixture.SeedProjectDefaultAsync("30844", "acme.com");
 
         var cache = new MemoryCache(new MemoryCacheOptions());
-        cache.Set("proj-bootstrap:30844|acme.com", true);
 
         await using var db = fixture.CreateContext();
         var model = CreateModel(db, cache);
@@ -156,7 +153,6 @@ public class CancelInspectionConcurrencyTests
                 cache,
                 NullLogger<DeltekProjectService>.Instance),
             new ProjectBootstrapVerificationService(
-                cache,
                 new GraphMailService(new ThrowingTokenProvider(), new NoOpHttpClientFactory()),
                 Options.Create(new NotificationOptions
                 {

@@ -104,11 +104,10 @@ public class TrustedDomainsModelTests
         db.ProjectDefaults.Add(row);
         await db.SaveChangesAsync();
 
-        var cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions());
         var model = new TrustedDomainsModel(db);
         await model.OnPostRevokeAsync(row.Id);
 
-        var service = CreateVerificationService(db, cache);
+        var service = CreateVerificationService(db);
         var status = await service.GetStatusAsync("30844", "user@acme.com");
 
         Assert.True(status.RequiresVerification);
@@ -136,10 +135,9 @@ public class TrustedDomainsModelTests
         Assert.True(row.ExpiresUtc < DateTime.UtcNow);
     }
 
-    private static ProjectBootstrapVerificationService CreateVerificationService(InspectionsContext db, Microsoft.Extensions.Caching.Memory.IMemoryCache cache)
+    private static ProjectBootstrapVerificationService CreateVerificationService(InspectionsContext db)
     {
         return new ProjectBootstrapVerificationService(
-            cache,
             new GraphMailService(new ThrowingTokenProvider(), new NoOpHttpClientFactory()),
             Options.Create(new NotificationOptions
             {
