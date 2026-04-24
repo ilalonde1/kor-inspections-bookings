@@ -254,7 +254,7 @@ namespace Kor.Inspections.App.Pages.Admin
                     return Page();
                 }
 
-                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingForDate).ToList();
+                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate).ToList();
 
                 if (!availableSlots.Contains(requestedTime))
                 {
@@ -560,7 +560,7 @@ namespace Kor.Inspections.App.Pages.Admin
                 // Slot availability — EXCLUDE the booking being edited so it doesn't conflict with itself.
                 var existingForDate = await GetExistingBookingsForLocalDateAsync(requestedDate);
                 var existingExcludingSelf = existingForDate.Where(b => b.BookingId != id).ToList();
-                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingExcludingSelf).ToList();
+                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate).ToList();
 
                 if (!availableSlots.Contains(requestedTime))
                 {
@@ -866,9 +866,10 @@ namespace Kor.Inspections.App.Pages.Admin
                 return;
 
             var requestedDate = DateOnly.FromDateTime(ManualBooking.RequestedDate.Value);
+            var minDate = GetMinimumManualBookingDate(ManualBooking.OverrideCutoff);
             var existingForDate = await GetExistingBookingsForLocalDateAsync(requestedDate);
             AvailableManualTimes = _timeRules
-                .GetAvailableSlotsForDate(requestedDate, existingForDate)
+                .GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate)
                 .Select(t => t.ToString("HH:mm"))
                 .ToList();
 
