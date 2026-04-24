@@ -183,7 +183,6 @@ public class LookupInspectionsAuthorizationTests
                 cache,
                 NullLogger<DeltekProjectService>.Instance),
             new ProjectBootstrapVerificationService(
-                cache,
                 new GraphMailService(new ThrowingTokenProvider(), new NoOpHttpClientFactory()),
                 Options.Create(new NotificationOptions
                 {

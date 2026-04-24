@@ -20,6 +20,9 @@ namespace Kor.Inspections.App.Data
         public DbSet<ProjectDefault> ProjectDefaults => Set<ProjectDefault>();
         public DbSet<ProjectContact> ProjectContacts => Set<ProjectContact>();
 
+        // Persistent OTP verification state (replaces in-memory cache).
+        public DbSet<ProjectVerification> ProjectVerifications => Set<ProjectVerification>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -218,6 +221,47 @@ namespace Kor.Inspections.App.Data
                       .HasDefaultValue(false);
 
                 entity.Property(pc => pc.UpdatedUtc)
+                      .HasDefaultValueSql("SYSUTCDATETIME()");
+            });
+
+            // ==================================================
+            // ProjectVerifications (OTP state — one row per project+email)
+            // ==================================================
+            modelBuilder.Entity<ProjectVerification>(entity =>
+            {
+                entity.ToTable("ProjectVerifications");
+                entity.HasKey(pv => pv.Id);
+
+                entity.HasIndex(pv => new { pv.ProjectNumber, pv.Email })
+                      .IsUnique()
+                      .HasDatabaseName("IX_ProjectVerifications_ProjectEmail");
+
+                // Supports cheap filtering of expired rows for lookups and cleanup.
+                entity.HasIndex(pv => pv.ExpiresUtc)
+                      .HasDatabaseName("IX_ProjectVerifications_ExpiresUtc");
+
+                entity.Property(pv => pv.ProjectNumber)
+                      .HasMaxLength(50)
+                      .IsRequired();
+
+                entity.Property(pv => pv.Email)
+                      .HasMaxLength(200)
+                      .IsRequired();
+
+                entity.Property(pv => pv.Code)
+                      .HasMaxLength(10)
+                      .IsRequired();
+
+                entity.Property(pv => pv.Verified)
+                      .HasDefaultValue(false);
+
+                entity.Property(pv => pv.FailedAttempts)
+                      .HasDefaultValue(0);
+
+                entity.Property(pv => pv.CreatedUtc)
+                      .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                entity.Property(pv => pv.UpdatedUtc)
                       .HasDefaultValueSql("SYSUTCDATETIME()");
             });
 
