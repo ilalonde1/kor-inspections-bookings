@@ -483,6 +483,160 @@ namespace Kor.Inspections.App.Pages.Admin
         }
 
         // --------------------------------------------------
+        // EDIT (reschedule) — date/time only
+        // --------------------------------------------------
+
+        public sealed class EditBookingInput
+        {
+            [Required(ErrorMessage = "Requested date is required.")]
+            public DateTime? RequestedDate { get; set; }
+
+            [Required(ErrorMessage = "Requested time is required.")]
+            [RegularExpression(@"^(AM|PM|\d{2}:\d{2})$", ErrorMessage = "Requested time must be AM, PM, or HH:mm.")]
+            public string RequestedTime { get; set; } = string.Empty;
+
+            public bool OverrideCutoff { get; set; }
+        }
+
+        public async Task<IActionResult> OnPostEditAsync(Guid id, [FromForm] EditBookingInput edit)
+        {
+            var redirectArgs = new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex };
+
+            var booking = await _db.Bookings.FirstOrDefaultAsync(b => b.BookingId == id);
+            if (booking == null)
+            {
+                StatusMessage = "Booking not found.";
+                return RedirectToPage(redirectArgs);
+            }
+
+            if (string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(booking.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            {
+                StatusMessage = "Booking cannot be modified.";
+                return RedirectToPage(redirectArgs);
+            }
+
+            if (!edit.RequestedDate.HasValue ||
+                string.IsNullOrWhiteSpace(edit.RequestedTime))
+            {
+                StatusMessage = "Requested date and time are required.";
+                return RedirectToPage(redirectArgs);
+            }
+
+            var requestedDate = DateOnly.FromDateTime(edit.RequestedDate.Value);
+            var (_, maxDate) = _timeRules.GetAllowedDateRangeUtcNow();
+            var minDate = GetMinimumManualBookingDate(edit.OverrideCutoff);
+
+            if (requestedDate < minDate || requestedDate > maxDate)
+            {
+                StatusMessage = edit.OverrideCutoff
+                    ? "Selected date is outside the allowed booking window, even with the cutoff override."
+                    : "Selected date is outside the allowed booking window.";
+                return RedirectToPage(redirectArgs);
+            }
+
+            DateTime newStartUtc;
+            DateTime newEndUtc;
+            string? newTimePreference = null;
+
+            if (edit.RequestedTime == "AM" || edit.RequestedTime == "PM")
+            {
+                newTimePreference = edit.RequestedTime;
+                var anchorTime = edit.RequestedTime == "AM"
+                    ? new TimeOnly(8, 0)
+                    : new TimeOnly(12, 0);
+
+                newStartUtc = _timeRules.ConvertLocalToUtc(requestedDate, anchorTime);
+                newEndUtc = newStartUtc.AddHours(4);
+            }
+            else
+            {
+                if (!TimeOnly.TryParseExact(edit.RequestedTime, "HH:mm", out var requestedTime))
+                {
+                    StatusMessage = "Invalid time selected.";
+                    return RedirectToPage(redirectArgs);
+                }
+
+                // Slot availability — EXCLUDE the booking being edited so it doesn't conflict with itself.
+                var existingForDate = await GetExistingBookingsForLocalDateAsync(requestedDate);
+                var existingExcludingSelf = existingForDate.Where(b => b.BookingId != id).ToList();
+                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingExcludingSelf).ToList();
+
+                if (!availableSlots.Contains(requestedTime))
+                {
+                    StatusMessage = "Selected time is no longer available. Please choose another time.";
+                    return RedirectToPage(redirectArgs);
+                }
+
+                newStartUtc = _timeRules.ConvertLocalToUtc(requestedDate, requestedTime);
+                newEndUtc = newStartUtc.AddMinutes(60);
+            }
+
+            var oldStartUtc = booking.StartUtc;
+            var oldEndUtc = booking.EndUtc;
+            var oldTimePreference = booking.TimePreference;
+
+            // Skip if nothing actually changed.
+            if (newStartUtc == oldStartUtc &&
+                newEndUtc == oldEndUtc &&
+                string.Equals(newTimePreference, oldTimePreference, StringComparison.Ordinal))
+            {
+                StatusMessage = "No changes made.";
+                return RedirectToPage(redirectArgs);
+            }
+
+            booking.StartUtc = newStartUtc;
+            booking.EndUtc = newEndUtc;
+            booking.TimePreference = newTimePreference;
+
+            // If the local date changed, the saved RouteOrder is meaningless on the new day.
+            var tz = _timeRules.TimeZone;
+            var oldDateLocal = TimeZoneInfo.ConvertTimeFromUtc(oldStartUtc, tz).Date;
+            var newDateLocal = TimeZoneInfo.ConvertTimeFromUtc(newStartUtc, tz).Date;
+            if (oldDateLocal != newDateLocal)
+                booking.RouteOrder = null;
+
+            _db.BookingActions.Add(new BookingAction
+            {
+                BookingId = booking.BookingId,
+                ActionType = "Edited",
+                PerformedBy = User.Identity?.Name,
+                Notes = $"From {oldStartUtc:yyyy-MM-dd HH:mm}Z to {newStartUtc:yyyy-MM-dd HH:mm}Z",
+                ActionUtc = DateTime.UtcNow
+            });
+
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _db.ChangeTracker.Clear();
+                StatusMessage = "This booking was just modified by another user. Please refresh and try again.";
+                return RedirectToPage(redirectArgs);
+            }
+            catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_Bookings_NoDuplicateActiveSlot", StringComparison.Ordinal) == true)
+            {
+                _db.ChangeTracker.Clear();
+                StatusMessage = "Cannot reschedule: another active booking already exists for this contact at the selected time.";
+                return RedirectToPage(redirectArgs);
+            }
+
+            _logger.LogInformation(
+                "Admin booking edit: BookingId={BookingId} OldStartUtc={OldStartUtc} NewStartUtc={NewStartUtc} By={AdminUser} OverrideCutoff={OverrideCutoff}",
+                booking.BookingId,
+                oldStartUtc,
+                newStartUtc,
+                User.Identity?.Name,
+                edit.OverrideCutoff);
+
+            await _bookingService.SendRescheduledEmailsAsync(booking, oldStartUtc, oldEndUtc, oldTimePreference);
+
+            StatusMessage = "Booking rescheduled.";
+            return RedirectToPage(redirectArgs);
+        }
+
+        // --------------------------------------------------
         // LOAD GRID
         // --------------------------------------------------
 

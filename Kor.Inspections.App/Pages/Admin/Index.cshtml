@@ -315,6 +315,30 @@
                                         <button class="admin-btn admin-btn-cancel admin-action-full">Cancel Booking</button>
                                     </form>
 
+                                    <details class="admin-edit-panel" style="margin-top:6px;">
+                                        <summary class="admin-btn admin-action-full" style="cursor:pointer; list-style:none;">Edit Booking</summary>
+                                        <form method="post" asp-page-handler="Edit" class="admin-edit-form" style="margin-top:6px; display:flex; flex-direction:column; gap:6px;">
+                                            <input type="hidden" name="id" value="@b.BookingId" />
+                                            <input type="date"
+                                                   name="edit.RequestedDate"
+                                                   value="@b.StartLocal.ToString("yyyy-MM-dd")"
+                                                   class="form-control" required />
+                                            <select name="edit.RequestedTime" class="form-control" required>
+                                                <option value="AM" selected="@(b.TimePreference == "AM")">Anytime AM</option>
+                                                <option value="PM" selected="@(b.TimePreference == "PM")">Anytime PM</option>
+                                                @foreach (var t in Model.AvailableManualTimes)
+                                                {
+                                                    <option value="@t" selected="@(b.TimePreference == null && b.StartLocal.ToString("HH:mm") == t)">@t</option>
+                                                }
+                                            </select>
+                                            <label style="display:flex; gap:6px; align-items:center; font-size:0.85rem;">
+                                                <input type="checkbox" name="edit.OverrideCutoff" value="true" />
+                                                Override 2 p.m. cutoff
+                                            </label>
+                                            <button type="submit" class="admin-btn admin-btn-set admin-action-full">Save Changes</button>
+                                        </form>
+                                    </details>
+
                                 </div>
 
                             </td>

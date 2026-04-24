@@ -417,6 +417,90 @@ namespace Kor.Inspections.App.Services
             }
         }
 
+        // --------------------------------------------------
+        // RESCHEDULED EMAILS (CLIENT + INSPECTOR if assigned)
+        // --------------------------------------------------
+        public async Task SendRescheduledEmailsAsync(
+            Booking booking,
+            DateTime oldStartUtc,
+            DateTime oldEndUtc,
+            string? oldTimePreference)
+        {
+            try
+            {
+                var tz = _timeRules.TimeZone;
+                var oldStartLocal = TimeZoneInfo.ConvertTimeFromUtc(oldStartUtc, tz);
+                var oldEndLocal = TimeZoneInfo.ConvertTimeFromUtc(oldEndUtc, tz);
+                var newStartLocal = TimeZoneInfo.ConvertTimeFromUtc(booking.StartUtc, tz);
+                var newEndLocal = TimeZoneInfo.ConvertTimeFromUtc(booking.EndUtc, tz);
+
+                var fromMailbox = _notificationOptions.FromMailbox;
+                var displayName = _notificationOptions.DisplayName ?? "Kor Structural";
+                var manageUrl = BuildManageUrl(booking);
+
+                // -------------------------
+                // CLIENT EMAIL (always)
+                // -------------------------
+                var clientSubject =
+                    $"Field Review Rescheduled – {FormatJobLine(booking)} – {newStartLocal:yyyy-MM-dd HH:mm}";
+
+                var clientBody = BuildRescheduledEmailHtml(
+                    booking,
+                    oldStartLocal, oldEndLocal, oldTimePreference,
+                    newStartLocal, newEndLocal,
+                    displayName,
+                    manageUrl,
+                    BuildProjectInspectionsUrl(booking.ProjectNumber, booking.ContactEmail),
+                    isInspector: false);
+
+                await _graphMail.SendHtmlAsync(
+                    fromMailbox,
+                    booking.ContactEmail,
+                    clientSubject,
+                    clientBody);
+
+                // -------------------------
+                // INSPECTOR EMAIL (only if assigned)
+                // -------------------------
+                if (!string.IsNullOrWhiteSpace(booking.AssignedTo))
+                {
+                    // If they were assigned, notify regardless of current Enabled state.
+                    var inspector = await GetAssignedInspectorAsync(booking.AssignedTo, requireEnabled: false);
+
+                    if (inspector != null && !string.IsNullOrWhiteSpace(inspector.Email))
+                    {
+                        var inspectorSubject =
+                            $"Field Review Rescheduled – {FormatJobLine(booking)} – {newStartLocal:yyyy-MM-dd HH:mm}";
+
+                        var inspectorBody = BuildRescheduledEmailHtml(
+                            booking,
+                            oldStartLocal, oldEndLocal, oldTimePreference,
+                            newStartLocal, newEndLocal,
+                            displayName,
+                            manageUrl: null,
+                            projectInspectionsUrl: null,
+                            isInspector: true);
+
+                        await _graphMail.SendHtmlAsync(
+                            fromMailbox,
+                            inspector.Email,
+                            inspectorSubject,
+                            inspectorBody);
+                    }
+                }
+
+                _logger.LogInformation(
+                    "Rescheduled emails sent for booking {BookingId}.", booking.BookingId);
+            }
+            catch (Exception ex)
+            {
+                // Never block a reschedule because email failed
+                _logger.LogError(ex,
+                    "Failed to send rescheduled emails for booking {BookingId}.",
+                    booking.BookingId);
+            }
+        }
+
         private string? BuildManageUrl(Booking booking)
         {
             var baseUrl = (_appOptions.PublicBaseUrl ?? string.Empty).TrimEnd('/');
@@ -532,6 +616,66 @@ namespace Kor.Inspections.App.Services
             if (!isInspector)
             {
                 sb.Append("<p>If you still need a field review, please submit a new booking request.</p>");
+            }
+
+            sb.Append("<p><strong>Any issues, contact the office - 604-685-9533</strong></p>");
+
+            sb.Append("<p>Regards,<br/>")
+              .Append(WebUtility.HtmlEncode(displayName))
+              .Append("<br/>Kor Structural</p>");
+
+            return sb.ToString();
+        }
+
+        private static string BuildRescheduledEmailHtml(
+            Booking booking,
+            DateTime oldStartLocal,
+            DateTime oldEndLocal,
+            string? oldTimePreference,
+            DateTime newStartLocal,
+            DateTime newEndLocal,
+            string displayName,
+            string? manageUrl,
+            string? projectInspectionsUrl,
+            bool isInspector)
+        {
+            var sb = new StringBuilder();
+
+            if (isInspector)
+                sb.Append("<p><strong>A field review you are assigned to has been rescheduled.</strong></p>");
+            else
+                sb.Append("<p><strong>Your field review has been rescheduled.</strong></p>");
+
+            sb.Append("<table border='1' cellpadding='6' cellspacing='0' ")
+              .Append("style='border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;font-size:13px;'>");
+
+            sb.AppendRow("Kor Job #", FormatJobLine(booking));
+            sb.AppendRow("Project Address", booking.ProjectAddress);
+            sb.AppendRow("Previous Date",
+                $"{oldStartLocal:yyyy-MM-dd} ({BookingDisplayHelper.GetTimeDisplay(oldTimePreference, oldStartLocal, oldEndLocal)})");
+            sb.AppendRow("New Date",
+                $"{newStartLocal:yyyy-MM-dd} ({BookingDisplayHelper.GetTimeDisplay(booking.TimePreference, newStartLocal, newEndLocal)})");
+
+            if (!string.IsNullOrWhiteSpace(booking.Comments))
+                sb.AppendRow("Additional Comments", booking.Comments);
+
+            sb.Append("</table>");
+
+            if (!isInspector && !string.IsNullOrWhiteSpace(manageUrl))
+            {
+                sb.Append("<p>You can view the current status of this field review and cancel it (if permitted) at:<br/>")
+                  .Append("<a href=\"")
+                  .Append(WebUtility.HtmlEncode(manageUrl))
+                  .Append("\">")
+                  .Append(WebUtility.HtmlEncode(manageUrl))
+                  .Append("</a></p>");
+            }
+
+            if (!isInspector && !string.IsNullOrWhiteSpace(projectInspectionsUrl))
+            {
+                sb.Append("<p><a href=\"")
+                  .Append(WebUtility.HtmlEncode(projectInspectionsUrl))
+                  .Append("\">View all inspections for this project</a></p>");
             }
 
             sb.Append("<p><strong>Any issues, contact the office - 604-685-9533</strong></p>");
