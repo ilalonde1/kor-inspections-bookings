@@ -9,14 +9,15 @@ internal static class TimeRuleServiceTestFactory
     public static TimeRuleService Create(
         TimeZoneInfo timeZone,
         int cutoffHourLocal,
-        int maxBookingsPerSlot = 3)
+        int maxBookingsPerSlot = 3,
+        int defaultDurationMinutes = 60)
     {
         var options = Options.Create(new InspectionRulesOptions
         {
             CutoffHourLocal = cutoffHourLocal,
             BookingWindowDays = 7,
             SlotMinutes = 30,
-            DefaultDurationMinutes = 60,
+            DefaultDurationMinutes = defaultDurationMinutes,
             TravelPaddingMinutes = 15,
             MaxBookingsPerSlot = maxBookingsPerSlot,
             WorkStart = "07:30",

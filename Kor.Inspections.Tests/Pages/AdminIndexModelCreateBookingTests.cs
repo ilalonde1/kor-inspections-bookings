@@ -85,6 +85,28 @@ public class AdminIndexModelCreateBookingTests
         Assert.Equal("30961-01", booking.ProjectNumberDisplay);
     }
 
+    [Fact]
+    public async Task OnPostCreateAsync_UsesConfiguredDefaultDurationNotHardcoded60()
+    {
+        // Regression for Codex finding #2: admin create previously hardcoded
+        // AddMinutes(60). If InspectionRules.DefaultDurationMinutes is anything
+        // else, admin-created bookings would drift from config. This test
+        // configures 90 min and verifies the stored endUtc - startUtc matches.
+        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var db = fixture.CreateContext();
+        var model = CreateModel(db, out var nowLocal, defaultDurationMinutes: 90);
+
+        model.ManualBooking = CreateManualBooking(nowLocal.Date.AddDays(1), overrideCutoff: true);
+
+        var result = await model.OnPostCreateAsync();
+        Assert.IsType<RedirectToPageResult>(result);
+
+        await using var verifyDb = fixture.CreateContext();
+        var booking = Assert.Single(await verifyDb.Bookings.AsNoTracking().ToListAsync());
+        var durationMinutes = (booking.EndUtc - booking.StartUtc).TotalMinutes;
+        Assert.Equal(90, durationMinutes);
+    }
+
     private static IndexModel.ManualBookingInput CreateManualBooking(DateTime requestedDateLocal, bool overrideCutoff)
     {
         return new IndexModel.ManualBookingInput
@@ -101,14 +123,14 @@ public class AdminIndexModelCreateBookingTests
         };
     }
 
-    private static IndexModel CreateModel(InspectionsContext db, out DateTime nowLocal)
+    private static IndexModel CreateModel(InspectionsContext db, out DateTime nowLocal, int defaultDurationMinutes = 60)
     {
         var timeZone = TimeRuleServiceTestFactory.FindZone(localNow =>
             localNow.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
             localNow.Hour >= 15 &&
             localNow.Hour <= 22);
         nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
-        var timeRules = TimeRuleServiceTestFactory.Create(timeZone, cutoffHourLocal: 14);
+        var timeRules = TimeRuleServiceTestFactory.Create(timeZone, cutoffHourLocal: 14, defaultDurationMinutes: defaultDurationMinutes);
 
         var bookingService = new BookingService(
             db,

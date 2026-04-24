@@ -24,6 +24,7 @@ namespace Kor.Inspections.App.Services
         }
 
         public TimeZoneInfo TimeZone => _tz;
+        public int DefaultDurationMinutes => _options.DefaultDurationMinutes;
 
         // --------------------------------------------------
         // Allowed Booking Window
