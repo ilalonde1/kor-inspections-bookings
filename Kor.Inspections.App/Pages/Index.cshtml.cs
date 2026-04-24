@@ -293,7 +293,7 @@ namespace Kor.Inspections.App.Pages
         public async Task<JsonResult> OnPostLookupContactsAsync([FromBody] LookupContactsRequest req)
         {
             var project = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
-            var email = (req.Email ?? "").Trim();
+            var email = (req.Email ?? "").Trim().ToLowerInvariant();
 
             if (string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(email))
                 return new JsonResult(Array.Empty<ContactDto>());
@@ -384,7 +384,7 @@ namespace Kor.Inspections.App.Pages
         public async Task<JsonResult> OnPostCancelInspectionAsync([FromBody] CancelInspectionRequest req)
         {
             var projectRaw = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
-            var emailRaw = (req.Email ?? "").Trim();
+            var emailRaw = (req.Email ?? "").Trim().ToLowerInvariant();
             var idRaw = (req.Id ?? "").Trim();
 
             if (string.IsNullOrWhiteSpace(projectRaw) || string.IsNullOrWhiteSpace(emailRaw) || string.IsNullOrWhiteSpace(idRaw))
@@ -494,7 +494,7 @@ namespace Kor.Inspections.App.Pages
             [FromBody] ProjectEmailVerificationRequest req)
         {
             var project = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
-            var email = (req.Email ?? "").Trim();
+            var email = (req.Email ?? "").Trim().ToLowerInvariant();
 
             if (string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(email))
                 return new JsonResult(new { requiresVerification = false, isVerified = false });
@@ -516,7 +516,7 @@ namespace Kor.Inspections.App.Pages
             [FromBody] ProjectEmailVerificationRequest req)
         {
             var project = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
-            var email = (req.Email ?? "").Trim();
+            var email = (req.Email ?? "").Trim().ToLowerInvariant();
 
             if (string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(email))
             {
@@ -543,7 +543,7 @@ namespace Kor.Inspections.App.Pages
             [FromBody] VerifyProjectEmailCodeRequest req)
         {
             var project = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
-            var email = (req.Email ?? "").Trim();
+            var email = (req.Email ?? "").Trim().ToLowerInvariant();
             var code = (req.Code ?? "").Trim();
 
             if (string.IsNullOrWhiteSpace(project) ||
@@ -573,10 +573,10 @@ namespace Kor.Inspections.App.Pages
         public async Task<JsonResult> OnPostSaveContactAjaxAsync([FromBody] SaveContactRequest req)
         {
             var project = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
-            var requesterEmail = string.IsNullOrWhiteSpace(ContactEmail)
+            var requesterEmail = (string.IsNullOrWhiteSpace(ContactEmail)
                 ? (req.Email ?? "").Trim()
-                : ContactEmail.Trim();
-            var contactEmail = (req.Email ?? "").Trim();
+                : ContactEmail.Trim()).ToLowerInvariant();
+            var contactEmail = (req.Email ?? "").Trim().ToLowerInvariant();
             var name = (req.Name ?? "").Trim();
             var phone = (req.Phone ?? "").Trim();
             var address = (req.Address ?? "").Trim();
@@ -633,7 +633,7 @@ namespace Kor.Inspections.App.Pages
         public async Task<JsonResult> OnPostSelectContactAsync(int id)
         {
             var projectNumber = ProjectNumberHelper.Base5(ProjectNumber?.Trim() ?? string.Empty);
-            var contactEmail = ContactEmail?.Trim() ?? string.Empty;
+            var contactEmail = (ContactEmail?.Trim() ?? string.Empty).ToLowerInvariant();
 
             if (string.IsNullOrWhiteSpace(projectNumber) || string.IsNullOrWhiteSpace(contactEmail))
             {
@@ -680,7 +680,7 @@ namespace Kor.Inspections.App.Pages
         public async Task<IActionResult> OnPostDeleteContactAsync(int id)
         {
             var projectNumber = ProjectNumberHelper.Base5(ProjectNumber?.Trim() ?? string.Empty);
-            var contactEmail = ContactEmail?.Trim() ?? string.Empty;
+            var contactEmail = (ContactEmail?.Trim() ?? string.Empty).ToLowerInvariant();
 
             if (string.IsNullOrWhiteSpace(projectNumber) || string.IsNullOrWhiteSpace(contactEmail))
                 return new JsonResult(new { error = "Project number and email are required." }) { StatusCode = 400 };
@@ -738,7 +738,7 @@ namespace Kor.Inspections.App.Pages
                         submittedProjectNumberDisplay);
                 }
             }
-            var contactEmail = ContactEmail?.Trim() ?? string.Empty;
+            var contactEmail = (ContactEmail?.Trim() ?? string.Empty).ToLowerInvariant();
 
             var canAccess = await _projectBootstrapVerificationService
                 .EnsureVerifiedForProjectAccessAsync(projectNumber, contactEmail, HttpContext.RequestAborted);

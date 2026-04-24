@@ -196,9 +196,10 @@ namespace Kor.Inspections.App.Pages.Admin
 
             await OnGetAsync();
 
+            var normalizedInspectorEmail = (inspectorEmail ?? string.Empty).Trim().ToLowerInvariant();
             var inspector = await _db.Inspectors
                 .AsNoTracking()
-                .FirstOrDefaultAsync(i => i.Email == inspectorEmail && i.Enabled);
+                .FirstOrDefaultAsync(i => i.Email.ToLower() == normalizedInspectorEmail && i.Enabled);
 
             var inspectorBookings = inspector is null
                 ? new List<SummaryRow>()
@@ -322,9 +323,10 @@ namespace Kor.Inspections.App.Pages.Admin
                 return RedirectToPage(new { date = Date });
             }
 
+            var normalizedInspectorEmail = (request.InspectorEmail ?? string.Empty).Trim().ToLowerInvariant();
             var inspector = await _db.Inspectors
                 .AsNoTracking()
-                .FirstOrDefaultAsync(i => i.Email == request.InspectorEmail && i.Enabled);
+                .FirstOrDefaultAsync(i => i.Email.ToLower() == normalizedInspectorEmail && i.Enabled);
 
             if (inspector == null)
             {
@@ -500,6 +502,7 @@ namespace Kor.Inspections.App.Pages.Admin
             if (string.IsNullOrWhiteSpace(request.InspectorEmail))
                 return Array.Empty<Guid>();
 
+            var normalizedInspectorEmailRoute = (request.InspectorEmail ?? string.Empty).Trim().ToLowerInvariant();
             var orderedIds = ParseOrderedBookingIds(request.OrderedBookingIds);
             if (orderedIds.Count == 0)
                 return Array.Empty<Guid>();
@@ -512,7 +515,8 @@ namespace Kor.Inspections.App.Pages.Admin
                     b.StartUtc >= startUtc &&
                     b.StartUtc < endUtc &&
                     b.Status != "Cancelled" &&
-                    b.AssignedTo == request.InspectorEmail &&
+                    b.AssignedTo != null &&
+                    b.AssignedTo.ToLower() == normalizedInspectorEmailRoute &&
                     orderedIds.Contains(b.BookingId))
                 .ToListAsync();
 

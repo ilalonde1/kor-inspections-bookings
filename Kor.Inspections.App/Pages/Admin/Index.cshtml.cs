@@ -231,7 +231,7 @@ namespace Kor.Inspections.App.Pages.Admin
                     "Deltek lookup failed for project name on admin manual create ({ProjectNumber}). Continuing without name.",
                     submittedProjectNumberDisplay);
             }
-            var submittedContactEmail = ManualBooking.ContactEmail.Trim();
+            var submittedContactEmail = ManualBooking.ContactEmail.Trim().ToLowerInvariant();
             DateTime startUtc;
             DateTime endUtc;
 
