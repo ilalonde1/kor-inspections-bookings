@@ -267,7 +267,7 @@ namespace Kor.Inspections.App.Pages.Admin
                 }
 
                 startUtc = _timeRules.ConvertLocalToUtc(requestedDate, requestedTime);
-                endUtc = startUtc.AddMinutes(60);
+                endUtc = startUtc.AddMinutes(_timeRules.DefaultDurationMinutes);
             }
             var duplicateCutoffUtc = DateTime.UtcNow.AddMinutes(-2);
 
@@ -361,8 +361,7 @@ namespace Kor.Inspections.App.Pages.Admin
                 return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
             }
 
-            var wasUnassigned =
-                string.Equals(booking.Status, "Unassigned", StringComparison.OrdinalIgnoreCase);
+            var oldAssignedTo = booking.AssignedTo;
 
             if (!string.IsNullOrWhiteSpace(assignedTo) &&
                 !assignedTo.Equals("Unassigned", StringComparison.OrdinalIgnoreCase))
@@ -424,8 +423,16 @@ namespace Kor.Inspections.App.Pages.Admin
                 assignedInspectorLabel,
                 User.Identity?.Name);
 
-            if (wasUnassigned &&
-                booking.Status.Equals("Assigned", StringComparison.OrdinalIgnoreCase))
+            // Notify on any AssignedTo change to a new non-null inspector — covers both
+            // the initial Unassigned -> Assigned transition and reassignments A -> B.
+            // Unassigning (X -> null) does not trigger an email here; that path can be
+            // added separately when an explicit "unassigned" notification is designed.
+            var assignedToChanged = !string.Equals(
+                oldAssignedTo ?? string.Empty,
+                booking.AssignedTo ?? string.Empty,
+                StringComparison.OrdinalIgnoreCase);
+
+            if (assignedToChanged && !string.IsNullOrWhiteSpace(booking.AssignedTo))
             {
                 await _bookingService.SendAssignmentEmailAsync(booking);
             }
@@ -569,7 +576,7 @@ namespace Kor.Inspections.App.Pages.Admin
                 }
 
                 newStartUtc = _timeRules.ConvertLocalToUtc(requestedDate, requestedTime);
-                newEndUtc = newStartUtc.AddMinutes(60);
+                newEndUtc = newStartUtc.AddMinutes(_timeRules.DefaultDurationMinutes);
             }
 
             var oldStartUtc = booking.StartUtc;

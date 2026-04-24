@@ -75,6 +75,36 @@ public class BookingUniqueIndexTests
         Assert.Equal(2, await db.Bookings.CountAsync());
     }
 
+    [Fact]
+    public async Task CreateBookingAsync_NullProjectAddress_PersistsNullWithoutFabrication()
+    {
+        // Regression for Codex finding #4: public booking previously fabricated
+        // "${projectNumber} Project Address" when both saved-contact and form
+        // address were empty. Now nulls are preserved unchanged so downstream
+        // emails and UI render "not provided" state instead of fake garbage.
+        await using var fixture = await SqlServerFixture.CreateAsync();
+        var startUtc = DateTime.UtcNow.AddDays(3);
+        var endUtc = startUtc.AddHours(1);
+
+        await using var db = fixture.CreateContext();
+        var service = CreateBookingService(db);
+
+        var booking = await service.CreateBookingAsync(
+            "30844",
+            projectAddress: null,
+            "Jane Doe",
+            "6045551212",
+            "alice@example.com",
+            comments: null,
+            startUtc,
+            endUtc,
+            timePreference: null);
+
+        await using var verify = fixture.CreateContext();
+        var stored = await verify.Bookings.AsNoTracking().SingleAsync(b => b.BookingId == booking.BookingId);
+        Assert.Null(stored.ProjectAddress);
+    }
+
     private static BookingService CreateBookingService(InspectionsContext db)
     {
         var timeZone = TimeRuleServiceTestFactory.FindZone(nowLocal =>

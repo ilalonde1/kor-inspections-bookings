@@ -841,14 +841,20 @@ namespace Kor.Inspections.App.Pages
                 return Page();
             }
 
+            // Address resolution order: saved contact address -> form-supplied address -> null.
+            // Never fabricate a placeholder; a null address is valid at the data layer and
+            // downstream renderers handle it gracefully.
+            string? effectiveAddress =
+                !string.IsNullOrWhiteSpace(contact.ContactAddress) ? contact.ContactAddress.Trim()
+                : !string.IsNullOrWhiteSpace(ProjectAddress) ? ProjectAddress.Trim()
+                : null;
+
             Booking booking;
             try
             {
                 booking = await _bookingService.CreateBookingAsync(
                     submittedProjectNumber,
-                    string.IsNullOrWhiteSpace(contact.ContactAddress)
-                        ? (string.IsNullOrWhiteSpace(ProjectAddress) ? $"{projectNumber} Project Address" : ProjectAddress.Trim())
-                        : contact.ContactAddress.Trim(),
+                    effectiveAddress,
                     contact.ContactName.Trim(),
                     PhoneNormalizer.Normalize(contact.ContactPhone),
                     submittedContactEmail,

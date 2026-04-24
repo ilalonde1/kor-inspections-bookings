@@ -131,7 +131,7 @@ namespace Kor.Inspections.App.Services
         // --------------------------------------------------
         public async Task<Booking> CreateBookingAsync(
             string projectNumber,
-            string projectAddress,
+            string? projectAddress,
             string contactName,
             string contactPhone,
             string contactEmail,
