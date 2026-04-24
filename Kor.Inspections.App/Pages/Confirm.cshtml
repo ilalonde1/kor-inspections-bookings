@@ -12,7 +12,15 @@
     <p>Thank you. Your field review request has been received.</p>
 
     <ul>
-        <li>Job: @Model.Booking.ProjectNumber</li>
+        <li>
+            Job:
+            @{
+                var displayNumber = string.IsNullOrWhiteSpace(Model.Booking.ProjectNumberDisplay)
+                    ? Model.Booking.ProjectNumber
+                    : Model.Booking.ProjectNumberDisplay;
+            }
+            @displayNumber@(string.IsNullOrWhiteSpace(Model.Booking.ProjectName) ? "" : " " + Model.Booking.ProjectName)
+        </li>
         <li>Address: @Model.Booking.ProjectAddress</li>
         <li>Contact: @Model.Booking.ContactName (@Model.Booking.ContactPhone)</li>
         <li>

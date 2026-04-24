@@ -53,6 +53,12 @@ namespace Kor.Inspections.App.Data
 
                 entity.Property(b => b.RouteOrder);
 
+                entity.Property(b => b.ProjectNumberDisplay)
+                      .HasMaxLength(50);
+
+                entity.Property(b => b.ProjectName)
+                      .HasMaxLength(200);
+
                 entity.HasIndex(b => b.ContactEmail);
                 entity.HasIndex(b => b.ProjectNumber);
                 entity.HasIndex(b => b.Status);
