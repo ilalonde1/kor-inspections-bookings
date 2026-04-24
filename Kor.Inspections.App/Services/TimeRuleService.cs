@@ -55,11 +55,13 @@ namespace Kor.Inspections.App.Services
 
         public IEnumerable<TimeOnly> GetAvailableSlotsForDate(
             DateOnly date,
-            IEnumerable<Booking> existingBookingsUtc)
+            IEnumerable<Booking> existingBookingsUtc,
+            DateOnly? minDateOverride = null)
         {
-            var (minDate, maxDate) = GetAllowedDateRangeUtcNow();
+            var (defaultMinDate, maxDate) = GetAllowedDateRangeUtcNow();
+            var effectiveMinDate = minDateOverride ?? defaultMinDate;
 
-            if (date < minDate || date > maxDate)
+            if (date < effectiveMinDate || date > maxDate)
                 return Enumerable.Empty<TimeOnly>();
 
             var workStart = TimeOnly.ParseExact(
