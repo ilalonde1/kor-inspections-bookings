@@ -100,7 +100,9 @@ namespace Kor.Inspections.App.Services
             string? comments,
             DateTime startUtc,
             DateTime endUtc,
-            string? timePreference)
+            string? timePreference,
+            string? projectNumberDisplay = null,
+            string? projectName = null)
         {
             await using var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
@@ -133,6 +135,8 @@ namespace Kor.Inspections.App.Services
             var booking = new Booking
             {
                 ProjectNumber = projectNumber,
+                ProjectNumberDisplay = projectNumberDisplay,
+                ProjectName = projectName,
                 ProjectAddress = projectAddress,
                 ContactName = contactName,
                 ContactPhone = contactPhone,
@@ -436,6 +440,16 @@ namespace Kor.Inspections.App.Services
         // --------------------------------------------------
         // EMAIL BUILDERS
         // --------------------------------------------------
+        private static string FormatJobLine(Booking booking)
+        {
+            var displayNumber = string.IsNullOrWhiteSpace(booking.ProjectNumberDisplay)
+                ? booking.ProjectNumber
+                : booking.ProjectNumberDisplay;
+            return string.IsNullOrWhiteSpace(booking.ProjectName)
+                ? displayNumber
+                : $"{displayNumber} {booking.ProjectName}";
+        }
+
         private static string BuildAssignmentEmailHtml(
             Booking booking,
             DateTime startLocal,
@@ -451,7 +465,7 @@ namespace Kor.Inspections.App.Services
                 sb.Append("<p>Your field review request has been scheduled.</p>");
 
             sb.Append("<ul>");
-            sb.Append($"<li><strong>Job #:</strong> {WebUtility.HtmlEncode(booking.ProjectNumber)}</li>");
+            sb.Append($"<li><strong>Job #:</strong> {WebUtility.HtmlEncode(FormatJobLine(booking))}</li>");
             sb.Append($"<li><strong>Date:</strong> {startLocal:yyyy-MM-dd}</li>");
             sb.Append($"<li><strong>Time:</strong> {BookingDisplayHelper.GetTimeDisplay(
     booking.TimePreference,
@@ -498,7 +512,7 @@ namespace Kor.Inspections.App.Services
                 sb.Append("<p><strong>Your field review has been cancelled.</strong></p>");
 
             sb.Append("<ul>");
-            sb.Append($"<li><strong>Job #:</strong> {WebUtility.HtmlEncode(booking.ProjectNumber)}</li>");
+            sb.Append($"<li><strong>Job #:</strong> {WebUtility.HtmlEncode(FormatJobLine(booking))}</li>");
             sb.Append($"<li><strong>Date:</strong> {startLocal:yyyy-MM-dd}</li>");
             sb.Append($"<li><strong>Time:</strong> {BookingDisplayHelper.GetTimeDisplay(
     booking.TimePreference,
@@ -566,7 +580,7 @@ namespace Kor.Inspections.App.Services
             sb.Append("<table border='1' cellpadding='6' cellspacing='0' ")
               .Append("style='border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;font-size:13px;'>");
 
-            sb.AppendRow("Kor Job #", booking.ProjectNumber);
+            sb.AppendRow("Kor Job #", FormatJobLine(booking));
             sb.AppendRow("Project Address", booking.ProjectAddress);
             sb.AppendRow("Site Contact",
                 $"{booking.ContactName} ({booking.ContactPhone}, {booking.ContactEmail})");

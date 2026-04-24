@@ -719,6 +719,25 @@ namespace Kor.Inspections.App.Pages
             await LoadAllowedDatesAndTimesAsync();
 
             var projectNumber = ProjectNumberHelper.Base5(ProjectNumber?.Trim() ?? string.Empty);
+            var submittedProjectNumberDisplay = (ProjectNumber ?? string.Empty).Trim();
+            string? resolvedProjectName = null;
+            if (!string.IsNullOrWhiteSpace(submittedProjectNumberDisplay))
+            {
+                try
+                {
+                    var deltekProject = await _deltekProjectService
+                        .GetProjectByNumberAsync(submittedProjectNumberDisplay, HttpContext.RequestAborted);
+                    resolvedProjectName = string.IsNullOrWhiteSpace(deltekProject?.ProjectName)
+                        ? null
+                        : deltekProject.ProjectName.Trim();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Deltek lookup failed for project name on submit ({ProjectNumber}). Continuing without name.",
+                        submittedProjectNumberDisplay);
+                }
+            }
             var contactEmail = ContactEmail?.Trim() ?? string.Empty;
 
             var canAccess = await _projectBootstrapVerificationService
@@ -836,7 +855,9 @@ namespace Kor.Inspections.App.Pages
                     string.IsNullOrWhiteSpace(Comments) ? null : Comments.Trim(),
                     startUtc,
                     endUtc,
-                    timePreference);
+                    timePreference,
+                    submittedProjectNumberDisplay,
+                    resolvedProjectName);
             }
             catch (BookingSlotUnavailableException)
             {

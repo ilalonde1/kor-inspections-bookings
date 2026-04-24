@@ -8,8 +8,11 @@ using Kor.Inspections.App.Services;
 using Kor.Inspections.Tests.Helpers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
@@ -56,6 +59,30 @@ public class AdminIndexModelCreateBookingTests
         var booking = Assert.Single(await verifyDb.Bookings.AsNoTracking().ToListAsync());
         Assert.Equal("30844", booking.ProjectNumber);
         Assert.Equal("client@example.com", booking.ContactEmail);
+    }
+
+    [Fact]
+    public async Task OnPostCreateAsync_PersistsProjectNumberDisplayWhenSubNumberSubmitted()
+    {
+        // Regression for V1.1 #3a: admin manual create must store the original
+        // sub-numbered input (e.g., "30961-01") on Booking.ProjectNumberDisplay
+        // while Booking.ProjectNumber stays Base5 ("30961"). Deltek lookup
+        // uses an empty DSN here so it throws; resolvedProjectName falls back
+        // to null, exercising the safe-fallback path.
+        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var db = fixture.CreateContext();
+        var model = CreateModel(db, out var nowLocal);
+
+        model.ManualBooking = CreateManualBooking(nowLocal.Date.AddDays(1), overrideCutoff: true);
+        model.ManualBooking.ProjectNumber = "30961-01";
+
+        var result = await model.OnPostCreateAsync();
+        Assert.IsType<RedirectToPageResult>(result);
+
+        await using var verifyDb = fixture.CreateContext();
+        var booking = Assert.Single(await verifyDb.Bookings.AsNoTracking().ToListAsync());
+        Assert.Equal("30961", booking.ProjectNumber);
+        Assert.Equal("30961-01", booking.ProjectNumberDisplay);
     }
 
     private static IndexModel.ManualBookingInput CreateManualBooking(DateTime requestedDateLocal, bool overrideCutoff)
@@ -108,10 +135,16 @@ public class AdminIndexModelCreateBookingTests
             }),
             Options.Create(new AppOptions()));
 
+        var deltekProjectService = new DeltekProjectService(
+            Options.Create(new DeltekProjectOptions()),
+            new MemoryCache(new MemoryCacheOptions()),
+            NullLogger<DeltekProjectService>.Instance);
+
         var model = new IndexModel(
             db,
             timeRules,
             bookingService,
+            deltekProjectService,
             NullLogger<IndexModel>.Instance);
 
         model.PageContext = new PageContext
@@ -122,7 +155,10 @@ public class AdminIndexModelCreateBookingTests
                     new ClaimsIdentity(
                         [new Claim(ClaimTypes.Name, "admin@example.com")],
                         "TestAuth"))
-            }
+            },
+            ViewData = new ViewDataDictionary(
+                new EmptyModelMetadataProvider(),
+                new ModelStateDictionary())
         };
 
         return model;

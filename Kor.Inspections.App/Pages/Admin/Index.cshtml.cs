@@ -21,17 +21,20 @@ namespace Kor.Inspections.App.Pages.Admin
         private readonly InspectionsContext _db;
         private readonly TimeRuleService _timeRules;
         private readonly BookingService _bookingService;
+        private readonly DeltekProjectService _deltekProjectService;
         private readonly ILogger<IndexModel> _logger;
 
         public IndexModel(
             InspectionsContext db,
             TimeRuleService timeRules,
             BookingService bookingService,
+            DeltekProjectService deltekProjectService,
             ILogger<IndexModel> logger)
         {
             _db = db;
             _timeRules = timeRules;
             _bookingService = bookingService;
+            _deltekProjectService = deltekProjectService;
             _logger = logger;
         }
 
@@ -212,6 +215,22 @@ namespace Kor.Inspections.App.Pages.Admin
 
             var existingForDate = await GetExistingBookingsForLocalDateAsync(requestedDate);
             var projectNumber = ProjectNumberHelper.Base5(ManualBooking.ProjectNumber.Trim());
+            var submittedProjectNumberDisplay = ManualBooking.ProjectNumber.Trim();
+            string? resolvedProjectName = null;
+            try
+            {
+                var deltekProject = await _deltekProjectService
+                    .GetProjectByNumberAsync(submittedProjectNumberDisplay, HttpContext.RequestAborted);
+                resolvedProjectName = string.IsNullOrWhiteSpace(deltekProject?.ProjectName)
+                    ? null
+                    : deltekProject.ProjectName.Trim();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Deltek lookup failed for project name on admin manual create ({ProjectNumber}). Continuing without name.",
+                    submittedProjectNumberDisplay);
+            }
             var submittedContactEmail = ManualBooking.ContactEmail.Trim();
             DateTime startUtc;
             DateTime endUtc;
@@ -282,7 +301,9 @@ namespace Kor.Inspections.App.Pages.Admin
                     string.IsNullOrWhiteSpace(ManualBooking.Comments) ? null : ManualBooking.Comments.Trim(),
                     startUtc,
                     endUtc,
-                    ManualBooking.RequestedTime is "AM" or "PM" ? ManualBooking.RequestedTime : null);
+                    ManualBooking.RequestedTime is "AM" or "PM" ? ManualBooking.RequestedTime : null,
+                    submittedProjectNumberDisplay,
+                    resolvedProjectName);
             }
             catch (BookingSlotUnavailableException)
             {
