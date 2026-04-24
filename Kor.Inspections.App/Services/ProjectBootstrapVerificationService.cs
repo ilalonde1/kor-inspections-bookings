@@ -2,43 +2,40 @@ using System;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using Kor.Inspections.App.Data;
+using Kor.Inspections.App.Data.Models;
 using Kor.Inspections.App.Options;
 using Microsoft.Extensions.Options;
 
 namespace Kor.Inspections.App.Services
 {
+    /// <summary>
+    /// Email-OTP verification for the public booking flow. Verification state
+    /// is persisted in the ProjectVerifications table (one row per
+    /// project+email) so it survives IIS app-pool recycles and is safe under
+    /// multi-instance deployment. Expiry is driven by ExpiresUtc on each row.
+    /// </summary>
     public class ProjectBootstrapVerificationService
     {
         private static readonly TimeSpan PendingTtl = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan VerifiedTtl = TimeSpan.FromHours(8);
         private static readonly TimeSpan ExplicitDomainTrustTtl = TimeSpan.FromDays(30);
         internal static TimeSpan ExplicitDomainApprovalTtl => ExplicitDomainTrustTtl;
+        private const int MaxFailedAttempts = 5;
 
-        private readonly IMemoryCache _cache;
         private readonly GraphMailService _mailService;
         private readonly NotificationOptions _notificationOptions;
         private readonly ILogger<ProjectBootstrapVerificationService> _logger;
         private readonly InspectionsContext _db;
 
-        private sealed class VerificationState
-        {
-            public string Code { get; set; } = string.Empty;
-            public bool Verified { get; set; }
-            public int FailedAttempts { get; set; }
-        }
-
         public ProjectBootstrapVerificationService(
-            IMemoryCache cache,
             GraphMailService mailService,
             IOptions<NotificationOptions> notificationOptions,
             InspectionsContext db,
             ILogger<ProjectBootstrapVerificationService> logger)
         {
-            _cache = cache;
             _mailService = mailService;
             _notificationOptions = notificationOptions.Value;
             _db = db;
@@ -56,9 +53,18 @@ namespace Kor.Inspections.App.Services
             if (string.IsNullOrWhiteSpace(normalizedProject) || string.IsNullOrWhiteSpace(normalizedEmail))
                 return (false, false);
 
-            var key = BuildUserVerificationKey(normalizedProject, normalizedEmail);
+            var now = DateTime.UtcNow;
 
-            if (_cache.TryGetValue<VerificationState>(key, out var state) && state is { Verified: true })
+            var activeVerified = await _db.ProjectVerifications
+                .AsNoTracking()
+                .AnyAsync(v =>
+                    v.ProjectNumber == normalizedProject &&
+                    v.Email == normalizedEmail &&
+                    v.Verified &&
+                    v.ExpiresUtc > now,
+                    ct);
+
+            if (activeVerified)
                 return (true, true);
 
             if (await HasExplicitDomainApprovalAsync(normalizedProject, normalizedEmail, ct))
@@ -82,29 +88,54 @@ namespace Kor.Inspections.App.Services
             if (!status.RequiresVerification || status.IsVerified)
                 return true;
 
-            var key = BuildUserVerificationKey(normalizedProject, normalizedEmail);
+            var now = DateTime.UtcNow;
+            var existing = await _db.ProjectVerifications
+                .FirstOrDefaultAsync(v =>
+                    v.ProjectNumber == normalizedProject &&
+                    v.Email == normalizedEmail,
+                    ct);
 
             string code;
-            if (_cache.TryGetValue<VerificationState>(key, out var existing)
-                && existing is { Verified: false }
-                && existing.FailedAttempts == 0)
+            if (existing != null &&
+                !existing.Verified &&
+                existing.FailedAttempts == 0 &&
+                existing.ExpiresUtc > now)
             {
+                // Reuse the existing pending code and refresh its window.
+                // Matches pre-refactor UX: clicking "Send code" twice quickly
+                // does not spam a new code each time.
                 code = existing.Code;
+                existing.ExpiresUtc = now + PendingTtl;
+                existing.UpdatedUtc = now;
             }
             else
             {
                 code = RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
-
-                _cache.Set(
-                    key,
-                    new VerificationState
+                if (existing != null)
+                {
+                    existing.Code = code;
+                    existing.Verified = false;
+                    existing.FailedAttempts = 0;
+                    existing.ExpiresUtc = now + PendingTtl;
+                    existing.UpdatedUtc = now;
+                }
+                else
+                {
+                    _db.ProjectVerifications.Add(new ProjectVerification
                     {
+                        ProjectNumber = normalizedProject,
+                        Email = normalizedEmail,
                         Code = code,
                         Verified = false,
-                        FailedAttempts = 0
-                    },
-                    PendingTtl);
+                        FailedAttempts = 0,
+                        ExpiresUtc = now + PendingTtl,
+                        CreatedUtc = now,
+                        UpdatedUtc = now
+                    });
+                }
             }
+
+            await _db.SaveChangesAsync(ct);
 
             try
             {
@@ -155,29 +186,36 @@ namespace Kor.Inspections.App.Services
             if (await HasExplicitDomainApprovalAsync(normalizedProject, normalizedEmail, ct))
                 return true;
 
-            var key = BuildUserVerificationKey(normalizedProject, normalizedEmail);
+            var now = DateTime.UtcNow;
+            var row = await _db.ProjectVerifications
+                .FirstOrDefaultAsync(v =>
+                    v.ProjectNumber == normalizedProject &&
+                    v.Email == normalizedEmail,
+                    ct);
 
-            if (!_cache.TryGetValue<VerificationState>(key, out var state) || state == null)
+            if (row == null || row.ExpiresUtc <= now)
                 return false;
 
-            if (!string.Equals(state.Code, normalizedCode, StringComparison.Ordinal))
+            if (!string.Equals(row.Code, normalizedCode, StringComparison.Ordinal))
             {
-                state.FailedAttempts++;
-                if (state.FailedAttempts >= 5)
+                row.FailedAttempts++;
+                row.UpdatedUtc = now;
+
+                if (row.FailedAttempts >= MaxFailedAttempts)
                 {
-                    _cache.Remove(key);
-                }
-                else
-                {
-                    _cache.Set(key, state, PendingTtl);
+                    // Expire immediately — caller must request a new code.
+                    row.ExpiresUtc = now;
                 }
 
+                await _db.SaveChangesAsync(ct);
                 return false;
             }
 
-            state.Verified = true;
-            state.FailedAttempts = 0;
-            _cache.Set(key, state, VerifiedTtl);
+            row.Verified = true;
+            row.FailedAttempts = 0;
+            row.ExpiresUtc = now + VerifiedTtl;
+            row.UpdatedUtc = now;
+            await _db.SaveChangesAsync(ct);
 
             return true;
         }
@@ -232,11 +270,6 @@ namespace Kor.Inspections.App.Services
         internal static DateTime GetExplicitDomainApprovalExpirationUtc(DateTime approvedUtc)
         {
             return approvedUtc.Add(ExplicitDomainTrustTtl);
-        }
-
-        private static string BuildUserVerificationKey(string projectNumber, string email)
-        {
-            return ProjectCacheKeys.BuildVerificationKey(projectNumber, email);
         }
 
         private static string GetEmailDomain(string email)
