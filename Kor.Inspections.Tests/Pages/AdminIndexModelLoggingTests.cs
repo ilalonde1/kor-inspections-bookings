@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -88,10 +89,16 @@ public class AdminIndexModelLoggingTests
             }),
             Options.Create(new AppOptions()));
 
+        var deltekProjectService = new DeltekProjectService(
+            Options.Create(new DeltekProjectOptions()),
+            new MemoryCache(new MemoryCacheOptions()),
+            NullLogger<DeltekProjectService>.Instance);
+
         var model = new IndexModel(
             db,
             timeRules,
             bookingService,
+            deltekProjectService,
             logger);
 
         model.PageContext = new PageContext

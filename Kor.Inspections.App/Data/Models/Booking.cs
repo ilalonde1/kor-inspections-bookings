@@ -39,5 +39,9 @@ namespace Kor.Inspections.App.Data.Models
 
         // Cancellation
         public Guid CancelToken { get; set; }
+
+        // Display fields captured at booking creation; ProjectNumber stays Base5.
+        public string? ProjectNumberDisplay { get; set; }
+        public string? ProjectName { get; set; }
     }
 }
