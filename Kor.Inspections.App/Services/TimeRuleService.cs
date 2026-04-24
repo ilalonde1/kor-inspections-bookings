@@ -45,6 +45,14 @@ namespace Kor.Inspections.App.Services
             else
                 minDate = today.AddDays(2);
 
+            // Inspections only run Mon-Fri. If minDate lands on a weekend,
+            // advance to the next business day. Matches IsCancellationAllowed.
+            while (minDate.DayOfWeek == DayOfWeek.Saturday ||
+                   minDate.DayOfWeek == DayOfWeek.Sunday)
+            {
+                minDate = minDate.AddDays(1);
+            }
+
             var maxDate = today.AddDays(_options.BookingWindowDays);
 
             return (minDate, maxDate);

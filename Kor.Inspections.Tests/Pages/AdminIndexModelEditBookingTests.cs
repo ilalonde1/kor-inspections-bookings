@@ -24,11 +24,12 @@ public class AdminIndexModelEditBookingTests
     {
         await using var fixture = await SqlServerFixture.CreateAsync();
         var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
+        var sameAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
         // Seed booking at day+2 local 12:00 as "PM".
         var seededBooking = await fixture.SeedBookingAsync(
             status: "Unassigned",
-            startUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 12, 0),
-            endUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 16, 0),
+            startUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
+            endUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 16, 0),
             timePreference: "PM");
 
         await using var db = fixture.CreateContext();
@@ -36,7 +37,7 @@ public class AdminIndexModelEditBookingTests
 
         var result = await model.OnPostEditAsync(seededBooking.BookingId, new IndexModel.EditBookingInput
         {
-            RequestedDate = nowLocal.Date.AddDays(2),
+            RequestedDate = sameAllowedDate.ToDateTime(TimeOnly.MinValue),
             RequestedTime = "AM",
             OverrideCutoff = false
         });
@@ -48,7 +49,7 @@ public class AdminIndexModelEditBookingTests
         var updated = await verify.Bookings.AsNoTracking().SingleAsync(b => b.BookingId == seededBooking.BookingId);
         Assert.Equal("AM", updated.TimePreference);
         var newStartLocal = TimeZoneInfo.ConvertTimeFromUtc(updated.StartUtc, timeZone);
-        Assert.Equal(new DateTime(nowLocal.Year, nowLocal.Month, nowLocal.Day).AddDays(2).AddHours(8), newStartLocal);
+        Assert.Equal(sameAllowedDate.ToDateTime(new TimeOnly(8, 0)), newStartLocal);
 
         var action = Assert.Single(await verify.BookingActions.AsNoTracking().ToListAsync());
         Assert.Equal("Edited", action.ActionType);
@@ -61,10 +62,11 @@ public class AdminIndexModelEditBookingTests
     {
         await using var fixture = await SqlServerFixture.CreateAsync();
         var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
+        var sameAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
         var seededBooking = await fixture.SeedBookingAsync(
             status: "Cancelled",
-            startUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 12, 0),
-            endUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 13, 0),
+            startUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
+            endUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 13, 0),
             timePreference: null);
 
         await using var db = fixture.CreateContext();
@@ -72,7 +74,7 @@ public class AdminIndexModelEditBookingTests
 
         var result = await model.OnPostEditAsync(seededBooking.BookingId, new IndexModel.EditBookingInput
         {
-            RequestedDate = nowLocal.Date.AddDays(2),
+            RequestedDate = sameAllowedDate.ToDateTime(TimeOnly.MinValue),
             RequestedTime = "AM",
             OverrideCutoff = false
         });
@@ -91,10 +93,11 @@ public class AdminIndexModelEditBookingTests
     {
         await using var fixture = await SqlServerFixture.CreateAsync();
         var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
+        var sameAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
         var seededBooking = await fixture.SeedBookingAsync(
             status: "Unassigned",
-            startUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 8, 0),
-            endUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 12, 0),
+            startUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 8, 0),
+            endUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
             timePreference: "AM");
 
         await using var db = fixture.CreateContext();
@@ -102,7 +105,7 @@ public class AdminIndexModelEditBookingTests
 
         var result = await model.OnPostEditAsync(seededBooking.BookingId, new IndexModel.EditBookingInput
         {
-            RequestedDate = nowLocal.Date.AddDays(2),
+            RequestedDate = sameAllowedDate.ToDateTime(TimeOnly.MinValue),
             RequestedTime = "AM",
             OverrideCutoff = false
         });
@@ -117,10 +120,12 @@ public class AdminIndexModelEditBookingTests
     {
         await using var fixture = await SqlServerFixture.CreateAsync();
         var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
+        var initialAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
+        var nextAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 1);
         var seededBooking = await fixture.SeedBookingAsync(
             status: "Assigned",
-            startUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 12, 0),
-            endUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 16, 0),
+            startUtc: ToUtc(timeZone, initialAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
+            endUtc: ToUtc(timeZone, initialAllowedDate.ToDateTime(TimeOnly.MinValue), 16, 0),
             timePreference: "PM",
             routeOrder: 3);
 
@@ -129,7 +134,7 @@ public class AdminIndexModelEditBookingTests
 
         var result = await model.OnPostEditAsync(seededBooking.BookingId, new IndexModel.EditBookingInput
         {
-            RequestedDate = nowLocal.Date.AddDays(3),
+            RequestedDate = nextAllowedDate.ToDateTime(TimeOnly.MinValue),
             RequestedTime = "PM",
             OverrideCutoff = false
         });
@@ -146,10 +151,11 @@ public class AdminIndexModelEditBookingTests
     {
         await using var fixture = await SqlServerFixture.CreateAsync();
         var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
+        var sameAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
         var seededBooking = await fixture.SeedBookingAsync(
             status: "Assigned",
-            startUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 12, 0),
-            endUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 16, 0),
+            startUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
+            endUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 16, 0),
             timePreference: "PM",
             routeOrder: 5);
 
@@ -158,7 +164,7 @@ public class AdminIndexModelEditBookingTests
 
         var result = await model.OnPostEditAsync(seededBooking.BookingId, new IndexModel.EditBookingInput
         {
-            RequestedDate = nowLocal.Date.AddDays(2),
+            RequestedDate = sameAllowedDate.ToDateTime(TimeOnly.MinValue),
             RequestedTime = "AM",
             OverrideCutoff = false
         });
@@ -178,13 +184,14 @@ public class AdminIndexModelEditBookingTests
 
         // Fill day+3 AM (MaxBookingsPerSlot = 3 in the test factory) with 3
         // distinct clients so every AM slot on that day is at capacity.
-        var targetDate = nowLocal.Date.AddDays(3);
+        var initialAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
+        var targetDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 1);
         for (int i = 0; i < 3; i++)
         {
             await fixture.SeedBookingAsync(
                 status: "Unassigned",
-                startUtc: ToUtc(timeZone, targetDate, 8, 0),
-                endUtc: ToUtc(timeZone, targetDate, 12, 0),
+                startUtc: ToUtc(timeZone, targetDate.ToDateTime(TimeOnly.MinValue), 8, 0),
+                endUtc: ToUtc(timeZone, targetDate.ToDateTime(TimeOnly.MinValue), 12, 0),
                 timePreference: "AM",
                 contactEmail: $"client{i}@example.com");
         }
@@ -193,8 +200,8 @@ public class AdminIndexModelEditBookingTests
         // day+3's AM overlap when it's being moved in.
         var editingBooking = await fixture.SeedBookingAsync(
             status: "Assigned",
-            startUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 12, 0),
-            endUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 16, 0),
+            startUtc: ToUtc(timeZone, initialAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
+            endUtc: ToUtc(timeZone, initialAllowedDate.ToDateTime(TimeOnly.MinValue), 16, 0),
             timePreference: "PM",
             contactEmail: "editing@example.com");
 
@@ -203,7 +210,7 @@ public class AdminIndexModelEditBookingTests
 
         var result = await model.OnPostEditAsync(editingBooking.BookingId, new IndexModel.EditBookingInput
         {
-            RequestedDate = targetDate,
+            RequestedDate = targetDate.ToDateTime(TimeOnly.MinValue),
             RequestedTime = "AM",
             OverrideCutoff = false
         });
@@ -224,10 +231,11 @@ public class AdminIndexModelEditBookingTests
     {
         await using var fixture = await SqlServerFixture.CreateAsync();
         var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
+        var sameAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
         var seededBooking = await fixture.SeedBookingAsync(
             status: "Unassigned",
-            startUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 12, 0),
-            endUtc: ToUtc(timeZone, nowLocal.Date.AddDays(2), 16, 0),
+            startUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
+            endUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 16, 0),
             timePreference: "PM");
 
         await using var staleContext = fixture.CreateContext();
@@ -244,7 +252,7 @@ public class AdminIndexModelEditBookingTests
         var model = CreateModel(staleContext, timeZone);
         var result = await model.OnPostEditAsync(seededBooking.BookingId, new IndexModel.EditBookingInput
         {
-            RequestedDate = nowLocal.Date.AddDays(2),
+            RequestedDate = sameAllowedDate.ToDateTime(TimeOnly.MinValue),
             RequestedTime = "AM",
             OverrideCutoff = false
         });
@@ -270,6 +278,17 @@ public class AdminIndexModelEditBookingTests
     {
         var local = new DateTime(dateLocal.Year, dateLocal.Month, dateLocal.Day, hour, minute, 0, DateTimeKind.Unspecified);
         return TimeZoneInfo.ConvertTimeToUtc(local, zone);
+    }
+
+    private static DateOnly GetAllowedDate(DateTime nowLocal, int cutoffHourLocal, int dayOffset)
+    {
+        var minDate = DateOnly.FromDateTime(nowLocal.Date)
+            .AddDays(nowLocal.Hour < cutoffHourLocal ? 1 : 2);
+
+        while (minDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            minDate = minDate.AddDays(1);
+
+        return minDate.AddDays(dayOffset);
     }
 
     private static IndexModel CreateModel(InspectionsContext db, TimeZoneInfo timeZone)
