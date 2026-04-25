@@ -139,7 +139,7 @@ namespace Kor.Inspections.App.Services
 
             try
             {
-                var subject = $"KOR verification code: {code}";
+                var subject = "KOR verification code";
                 var body =
                     "<p>Use this verification code to access project contacts:</p>" +
                     $"<p><strong>{code}</strong></p>" +
