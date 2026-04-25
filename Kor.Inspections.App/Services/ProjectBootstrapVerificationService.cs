@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
@@ -142,8 +143,8 @@ namespace Kor.Inspections.App.Services
                 var subject = "KOR verification code";
                 var body =
                     "<p>Use this verification code to access project contacts:</p>" +
-                    $"<p><strong>{code}</strong></p>" +
-                    $"<p>Project: {normalizedProject}</p>" +
+                    $"<p><strong>{WebUtility.HtmlEncode(code)}</strong></p>" +
+                    $"<p>Project: {WebUtility.HtmlEncode(normalizedProject)}</p>" +
                     "<p>This code expires in 15 minutes.</p>";
 
                 await _mailService.SendHtmlAsync(
