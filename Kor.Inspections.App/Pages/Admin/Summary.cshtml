@@ -329,30 +329,3 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 </script>
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll("[data-inline-confirm-form]").forEach(function (form) {
-        const trigger = form.querySelector("[data-confirm-trigger]");
-        const label = form.querySelector("[data-confirm-label]");
-        const controls = form.querySelector("[data-confirm-controls]");
-        const cancel = form.querySelector("[data-confirm-cancel]");
-
-        if (!trigger || !label || !controls || !cancel) return;
-
-        trigger.addEventListener("click", function () {
-            trigger.disabled = true;
-            label.hidden = true;
-            controls.hidden = false;
-            controls.style.display = "inline-flex";
-            controls.querySelector('button[type="submit"]')?.focus();
-        });
-
-        cancel.addEventListener("click", function () {
-            controls.hidden = true;
-            label.hidden = false;
-            trigger.disabled = false;
-            trigger.focus();
-        });
-    });
-});
-</script>
