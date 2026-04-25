@@ -104,9 +104,7 @@ namespace Kor.Inspections.App.Services
             if (requireEnabled)
                 query = query.Where(i => i.Enabled);
 
-            return query.FirstOrDefaultAsync(i =>
-                i.Email == assignedTo ||
-                i.DisplayName == assignedTo);
+            return query.FirstOrDefaultAsync(i => i.Email == assignedTo);
         }
 
         private void RecordAction(

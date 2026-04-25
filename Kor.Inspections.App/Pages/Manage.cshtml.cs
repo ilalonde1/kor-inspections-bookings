@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Kor.Inspections.App.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using Kor.Inspections.App.Services;
@@ -49,6 +50,7 @@ namespace Kor.Inspections.App.Pages
             await LoadAsync();
         }
 
+        [EnableRateLimiting("booking")]
         public async Task<IActionResult> OnPostAsync()
         {
             var booking = await _bookingService.GetBookingByCancelTokenAsync(Token);
