@@ -878,7 +878,8 @@
             closeModal();
 
             step2.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
+        })
+        .catch(err => alert(err.message || "Failed to select contact."));
     }
 
     function deleteContact(id) {
