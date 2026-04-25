@@ -36,6 +36,8 @@ namespace Kor.Inspections.App.Pages
 
         // Display fields
         public string ProjectNumber { get; private set; } = "";
+        public string? ProjectNumberDisplay { get; private set; }
+        public string? ProjectName { get; private set; }
         public string LocalDateText { get; private set; } = "";
         public string LocalTimeText { get; private set; } = "";
         public string StatusText { get; private set; } = "";
@@ -106,6 +108,8 @@ namespace Kor.Inspections.App.Pages
             var localEnd = TimeZoneInfo.ConvertTimeFromUtc(booking.EndUtc, tz);
 
             ProjectNumber = booking.ProjectNumber;
+            ProjectNumberDisplay = booking.ProjectNumberDisplay;
+            ProjectName = booking.ProjectName;
             LocalDateText = localStart.ToString("yyyy-MM-dd (ddd)");
             LocalTimeText = BookingDisplayHelper.GetTimeDisplay(
                 booking.TimePreference,

@@ -395,12 +395,10 @@ namespace Kor.Inspections.App.Pages.Admin
 
         private static string FormatJobLine(SummaryRow row)
         {
-            var displayNumber = string.IsNullOrWhiteSpace(row.ProjectNumberDisplay)
-                ? row.ProjectNumber
-                : row.ProjectNumberDisplay;
-            return string.IsNullOrWhiteSpace(row.ProjectName)
-                ? displayNumber
-                : $"{displayNumber} {row.ProjectName}";
+            return BookingDisplayHelper.FormatJobLine(
+                row.ProjectNumberDisplay,
+                row.ProjectName,
+                row.ProjectNumber);
         }
 
         private static string BuildEmailHtml(DateTime dateLocal, IList<SummaryRow> rows, string? routeUrl, bool preserveRowOrder = false)
