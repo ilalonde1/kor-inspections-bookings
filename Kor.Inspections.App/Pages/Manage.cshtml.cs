@@ -86,7 +86,9 @@ namespace Kor.Inspections.App.Pages
                 return Page();
             }
 
-            var cancelled = await _bookingService.CancelBookingByTokenAsync(Token);
+            var cancelled = await _bookingService.CancelBookingByTokenAsync(
+                Token,
+                HttpContext.RequestAborted);
             CancelledSuccessfully = cancelled;
             await LoadAsync(booking);
             return Page();

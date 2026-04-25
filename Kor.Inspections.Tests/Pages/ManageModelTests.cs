@@ -4,6 +4,7 @@ using Kor.Inspections.App.Options;
 using Kor.Inspections.App.Pages;
 using Kor.Inspections.App.Services;
 using Kor.Inspections.Tests.Helpers;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -160,7 +161,7 @@ public class ManageModelTests
         out ListLogger<ManageModel> manageLogger)
     {
         var timeZone = TimeRuleServiceTestFactory.FindZone(nowLocal =>
-            nowLocal.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
+            nowLocal.AddDays(1).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
             nowLocal.Hour <= 22);
         var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
         var timeRules = TimeRuleServiceTestFactory.Create(timeZone, nowLocal.Hour + 1);
@@ -195,6 +196,7 @@ public class ManageModelTests
         var model = new ManageModel(db, timeRules, bookingService);
         model.PageContext = new PageContext
         {
+            HttpContext = new DefaultHttpContext(),
             ViewData = new ViewDataDictionary(
                 new EmptyModelMetadataProvider(),
                 new ModelStateDictionary())

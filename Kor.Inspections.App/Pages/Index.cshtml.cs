@@ -150,7 +150,10 @@ namespace Kor.Inspections.App.Pages
                 !string.IsNullOrWhiteSpace(ContactEmail) &&
                 SelectedContactId.HasValue)
             {
-                LoadedProfile = await _projectProfileService.GetProfileAsync(ProjectNumber, ContactEmail);
+                LoadedProfile = await _projectProfileService.GetProfileAsync(
+                    ProjectNumber,
+                    ContactEmail,
+                    HttpContext.RequestAborted);
 
                 var contact = LoadedProfile?.Contacts.FirstOrDefault(c => c.ContactId == SelectedContactId.Value);
                 if (contact != null)
@@ -307,7 +310,10 @@ namespace Kor.Inspections.App.Pages
                 return new JsonResult(new { error = "Please verify your email before accessing project contacts." });
             }
 
-            var profile = await _projectProfileService.GetProfileAsync(project, email);
+            var profile = await _projectProfileService.GetProfileAsync(
+                project,
+                email,
+                HttpContext.RequestAborted);
 
             var list = (profile?.Contacts ?? new List<ProjectContact>())
                 .Select(c => new ContactDto
@@ -603,7 +609,8 @@ namespace Kor.Inspections.App.Pages
                     name,
                     PhoneNormalizer.Normalize(phone),
                     contactEmail,
-                    string.IsNullOrWhiteSpace(address) ? null : address);
+                    string.IsNullOrWhiteSpace(address) ? null : address,
+                    HttpContext.RequestAborted);
             }
             catch (ContactNotFoundException ex)
             {
@@ -653,7 +660,10 @@ namespace Kor.Inspections.App.Pages
                 return new JsonResult(new { error = "Please verify your email before selecting a contact." });
             }
 
-            var profile = await _projectProfileService.GetProfileAsync(projectNumber, contactEmail);
+            var profile = await _projectProfileService.GetProfileAsync(
+                projectNumber,
+                contactEmail,
+                HttpContext.RequestAborted);
             var contact = profile?.Contacts.FirstOrDefault(c => c.ContactId == id);
 
             if (contact == null)
@@ -694,10 +704,29 @@ namespace Kor.Inspections.App.Pages
             if (!canAccess)
                 return new JsonResult(new { error = "Please verify your email before deleting a contact." }) { StatusCode = 403 };
 
-            await _projectProfileService.DeleteContactAsync(
-                id,
-                projectNumber,
-                contactEmail);
+            try
+            {
+                await _projectProfileService.DeleteContactAsync(
+                    id,
+                    projectNumber,
+                    contactEmail,
+                    HttpContext.RequestAborted);
+            }
+            catch (ContactNotFoundException ex)
+            {
+                Response.StatusCode = 404;
+                return new JsonResult(new { error = ex.Message });
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to delete contact. Id={Id} Project={Project}",
+                    id,
+                    projectNumber);
+                Response.StatusCode = 500;
+                return new JsonResult(new { error = "Could not delete this contact. Please try again." });
+            }
 
             if (SelectedContactId == id)
                 SelectedContactId = null;
@@ -769,7 +798,10 @@ namespace Kor.Inspections.App.Pages
             if (!ModelState.IsValid)
                 return Page();
 
-            var profile = await _projectProfileService.GetProfileAsync(projectNumber, contactEmail);
+            var profile = await _projectProfileService.GetProfileAsync(
+                projectNumber,
+                contactEmail,
+                HttpContext.RequestAborted);
             var contact = profile?.Contacts.FirstOrDefault(c => c.ContactId == SelectedContactId.Value);
 
             if (contact == null)

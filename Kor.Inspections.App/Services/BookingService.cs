@@ -94,7 +94,10 @@ namespace Kor.Inspections.App.Services
             return _db.Bookings.FirstOrDefaultAsync(b => b.CancelToken == token);
         }
 
-        private Task<Inspector?> GetAssignedInspectorAsync(string? assignedTo, bool requireEnabled)
+        private Task<Inspector?> GetAssignedInspectorAsync(
+            string? assignedTo,
+            bool requireEnabled,
+            CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(assignedTo))
                 return Task.FromResult<Inspector?>(null);
@@ -104,7 +107,7 @@ namespace Kor.Inspections.App.Services
             if (requireEnabled)
                 query = query.Where(i => i.Enabled);
 
-            return query.FirstOrDefaultAsync(i => i.Email == assignedTo);
+            return query.FirstOrDefaultAsync(i => i.Email == assignedTo, ct);
         }
 
         private void RecordAction(
@@ -215,10 +218,10 @@ namespace Kor.Inspections.App.Services
         // --------------------------------------------------
         // Booking cancellation (token-based, public Manage page)
         // --------------------------------------------------
-        public async Task<bool> CancelBookingByTokenAsync(Guid token)
+        public async Task<bool> CancelBookingByTokenAsync(Guid token, CancellationToken ct = default)
         {
             // Guard against double-cancel (prevents double email + churn)
-            var booking = await _db.Bookings.FirstOrDefaultAsync(b => b.CancelToken == token);
+            var booking = await _db.Bookings.FirstOrDefaultAsync(b => b.CancelToken == token, ct);
             if (booking == null)
                 return false;
 
@@ -235,7 +238,7 @@ namespace Kor.Inspections.App.Services
                 "client-token");
             try
             {
-                await _db.SaveChangesAsync();
+                await _db.SaveChangesAsync(ct);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -243,7 +246,7 @@ namespace Kor.Inspections.App.Services
 
                 var current = await _db.Bookings
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(b => b.BookingId == booking.BookingId);
+                    .FirstOrDefaultAsync(b => b.BookingId == booking.BookingId, ct);
 
                 _logger.LogInformation(
                     "Concurrent cancellation detected for booking {BookingId}.",

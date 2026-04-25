@@ -28,6 +28,16 @@ internal static class TimeRuleServiceTestFactory
         return new TimeRuleService(options);
     }
 
+    /// <summary>
+    /// Finds a system timezone where the supplied predicate evaluates true
+    /// for the current UTC instant.
+    /// </summary>
+    /// <remarks>
+    /// Beware: predicates that constrain <c>nowLocal.DayOfWeek</c> directly are
+    /// unsatisfiable on weekend afternoons in UTC - no timezone can roll
+    /// the clock back to a weekday. If the test is really asking "tomorrow
+    /// is a business day", check <c>nowLocal.AddDays(1).DayOfWeek</c> instead.
+    /// </remarks>
     public static TimeZoneInfo FindZone(Func<DateTime, bool> predicate)
     {
         foreach (var zone in TimeZoneInfo.GetSystemTimeZones())

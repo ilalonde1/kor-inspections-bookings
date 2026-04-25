@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Kor.Inspections.App.Data;
 using Kor.Inspections.App.Data.Models;
@@ -23,7 +24,8 @@ namespace Kor.Inspections.App.Services
 
         public async Task<ProjectProfileResult> GetProfileAsync(
             string projectNumber,
-            string contactEmail)
+            string contactEmail,
+            CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(contactEmail))
                 return ProjectProfileResult.Empty();
@@ -42,8 +44,7 @@ namespace Kor.Inspections.App.Services
                     c.EmailDomain == domain &&
                     !c.IsDeleted)
                 .OrderBy(c => c.ContactName)
-                .ToListAsync();
-
+                .ToListAsync(ct);
 
             return new ProjectProfileResult
             {
@@ -60,7 +61,8 @@ namespace Kor.Inspections.App.Services
             string name,
             string phone,
             string email,
-            string? address)
+            string? address,
+            CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(email))
                 throw new InvalidContactEmailException("Contact email is required.");
@@ -79,24 +81,24 @@ namespace Kor.Inspections.App.Services
 
             ProjectContact contact;
 
-            // Explicit edit by ID
             if (contactId.HasValue)
             {
                 contact = await _db.ProjectContacts.FirstOrDefaultAsync(c =>
                     c.ContactId == contactId.Value &&
                     c.ProjectNumber == projectNumber &&
                     c.EmailDomain == domain &&
-                    !c.IsDeleted)
+                    !c.IsDeleted,
+                    ct)
                     ?? throw new ContactNotFoundException("Contact not found.");
             }
             else
             {
-                // Email defines uniqueness
                 contact = await _db.ProjectContacts.FirstOrDefaultAsync(c =>
                     c.ProjectNumber == projectNumber &&
                     c.EmailDomain == domain &&
                     c.ContactEmail == email &&
-                    !c.IsDeleted)
+                    !c.IsDeleted,
+                    ct)
                     ?? new ProjectContact
                     {
                         ProjectNumber = projectNumber,
@@ -119,12 +121,11 @@ namespace Kor.Inspections.App.Services
                     ? null
                     : address.Trim();
 
-
             contact.UpdatedUtc = DateTime.UtcNow;
 
             try
             {
-                await _db.SaveChangesAsync();
+                await _db.SaveChangesAsync(ct);
             }
             catch (DbUpdateException ex)
                 when (DbUpdateExceptionClassifier.IsNamedUniqueConstraintViolation(
@@ -141,7 +142,8 @@ namespace Kor.Inspections.App.Services
         public async Task DeleteContactAsync(
             int contactId,
             string projectNumber,
-            string contactEmail)
+            string contactEmail,
+            CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(contactEmail))
                 return;
@@ -158,7 +160,8 @@ namespace Kor.Inspections.App.Services
                 c.ContactId == contactId &&
                 c.ProjectNumber == projectNumber &&
                 c.EmailDomain == domain &&
-                !c.IsDeleted);
+                !c.IsDeleted,
+                ct);
 
             if (contact == null)
                 return;
@@ -166,12 +169,8 @@ namespace Kor.Inspections.App.Services
             contact.IsDeleted = true;
             contact.UpdatedUtc = DateTime.UtcNow;
 
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
         }
-
-        // --------------------------------------------------
-        // Internal helpers
-        // --------------------------------------------------
 
         private static string NormalizeProject(string projectNumber)
         {
@@ -182,10 +181,6 @@ namespace Kor.Inspections.App.Services
                 : base5;
         }
     }
-
-    // --------------------------------------------------
-    // Result DTO returned to booking page
-    // --------------------------------------------------
 
     public class ProjectProfileResult
     {
