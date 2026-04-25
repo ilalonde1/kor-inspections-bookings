@@ -14,8 +14,6 @@ namespace Kor.Inspections.App.Data
         public DbSet<Booking> Bookings => Set<Booking>();
         public DbSet<BookingAction> BookingActions => Set<BookingAction>();
         public DbSet<Inspector> Inspectors => Set<Inspector>();
-        public DbSet<ProjectAccess> ProjectAccessEntries => Set<ProjectAccess>();
-
         // NEW: Domain-scoped project profile data
         public DbSet<ProjectDefault> ProjectDefaults => Set<ProjectDefault>();
         public DbSet<ProjectContact> ProjectContacts => Set<ProjectContact>();
@@ -130,31 +128,6 @@ namespace Kor.Inspections.App.Data
                       .WithMany()
                       .HasForeignKey(a => a.BookingId)
                       .OnDelete(DeleteBehavior.Cascade);
-            });
-
-            // ----------------------------
-            // ProjectAccess (legacy / PIN)
-            // ----------------------------
-            modelBuilder.Entity<ProjectAccess>(entity =>
-            {
-                entity.ToTable("ProjectAccess");
-                entity.HasKey(pa => pa.Id);
-
-                entity.HasIndex(pa => pa.ProjectNumber)
-                      .IsUnique();
-
-                entity.Property(pa => pa.ProjectNumber)
-                      .HasMaxLength(50)
-                      .IsRequired();
-
-                entity.Property(pa => pa.PinHash)
-                      .IsRequired();
-
-                entity.Property(pa => pa.IsEnabled)
-                      .HasDefaultValue(true);
-
-                entity.Property(pa => pa.CreatedUtc)
-                      .HasDefaultValueSql("SYSUTCDATETIME()");
             });
 
             // ==================================================
