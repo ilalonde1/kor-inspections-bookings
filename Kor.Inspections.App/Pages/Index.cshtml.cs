@@ -611,10 +611,20 @@ namespace Kor.Inspections.App.Pages
                     contactEmail,
                     string.IsNullOrWhiteSpace(address) ? null : address);
             }
-            catch (InvalidOperationException)
+            catch (ContactNotFoundException ex)
+            {
+                Response.StatusCode = 404;
+                return new JsonResult(new { error = ex.Message });
+            }
+            catch (InvalidContactEmailException ex)
+            {
+                Response.StatusCode = 400;
+                return new JsonResult(new { error = ex.Message });
+            }
+            catch (ContactAlreadyExistsException ex)
             {
                 Response.StatusCode = 409;
-                return new JsonResult(new { error = "This contact already exists or was updated by another user. Please refresh and try again." });
+                return new JsonResult(new { error = ex.Message });
             }
 
             var dto = new ContactDto
