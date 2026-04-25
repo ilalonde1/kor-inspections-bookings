@@ -175,7 +175,7 @@ namespace Kor.Inspections.App.Pages.Admin
             await OnGetAsync();
 
             var fromMailbox = _notificationOptions.FromMailbox;
-            var toEmail = _notificationOptions.FromMailbox;
+            var toEmail = _notificationOptions.Email;
             var subject = $"Kor Field Reviews - {SummaryDateLocal:yyyy-MM-dd} (Tomorrow)";
             var html = BuildEmailHtml(SummaryDateLocal, Bookings, routeUrl: null);
 
