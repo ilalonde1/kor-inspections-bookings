@@ -267,20 +267,16 @@ namespace Kor.Inspections.App.Pages.Admin
                     BuildGoogleMapsRouteUrl(inspectorBookings),
                     preserveRowOrder: true);
 
-                try
-                {
-                    await _mail.SendHtmlAsync(fromMailbox, inspectorEmail, subject, html);
+                var sent = await TrySendSummaryEmailAsync(
+                    fromMailbox,
+                    inspectorEmail,
+                    subject,
+                    html,
+                    $"inspector summary for {inspectorEmail}");
+                if (sent)
                     sentEmails.Add(inspectorEmail);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(
-                        ex,
-                        "Failed to send inspector summary for {SummaryDate} to {InspectorEmail}.",
-                        SummaryDateLocal,
-                        inspectorEmail);
+                else
                     failedEmails.Add(inspectorEmail);
-                }
             }
 
             if (sentEmails.Count == 0 && failedEmails.Count == 0)
