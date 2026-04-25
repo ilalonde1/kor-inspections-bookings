@@ -123,7 +123,7 @@ public class CancelInspectionConcurrencyTests
             Options.Create(new NotificationOptions
             {
                 FromMailbox = "reviews@example.com",
-                Email = "reviews@example.com",
+                AdminRecipientEmail = "reviews@example.com",
                 DisplayName = "KOR Reviews"
             }),
             NullLogger<BookingService>.Instance,
@@ -157,7 +157,7 @@ public class CancelInspectionConcurrencyTests
                 Options.Create(new NotificationOptions
                 {
                     FromMailbox = "reviews@example.com",
-                    Email = "reviews@example.com",
+                    AdminRecipientEmail = "reviews@example.com",
                     DisplayName = "KOR Reviews"
                 }),
                 db,
