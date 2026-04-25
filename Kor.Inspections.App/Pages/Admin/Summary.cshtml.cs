@@ -68,6 +68,8 @@ namespace Kor.Inspections.App.Pages.Admin
             public string? TimePreference { get; set; }
             public string ProjectNumber { get; set; } = string.Empty;
             public string ProjectAddress { get; set; } = string.Empty;
+            public string? ProjectNumberDisplay { get; set; }
+            public string? ProjectName { get; set; }
 
             public string ContactName { get; set; } = string.Empty;
             public string ContactPhone { get; set; } = string.Empty;
@@ -156,6 +158,8 @@ namespace Kor.Inspections.App.Pages.Admin
                         TimePreference = b.TimePreference,
                         ProjectNumber = b.ProjectNumber,
                         ProjectAddress = b.ProjectAddress ?? string.Empty,
+                        ProjectNumberDisplay = b.ProjectNumberDisplay,
+                        ProjectName = b.ProjectName,
                         ContactName = b.ContactName,
                         ContactPhone = b.ContactPhone,
                         Status = b.Status,
@@ -393,6 +397,16 @@ namespace Kor.Inspections.App.Pages.Admin
             }
         }
 
+        private static string FormatJobLine(SummaryRow row)
+        {
+            var displayNumber = string.IsNullOrWhiteSpace(row.ProjectNumberDisplay)
+                ? row.ProjectNumber
+                : row.ProjectNumberDisplay;
+            return string.IsNullOrWhiteSpace(row.ProjectName)
+                ? displayNumber
+                : $"{displayNumber} {row.ProjectName}";
+        }
+
         private static string BuildEmailHtml(DateTime dateLocal, IList<SummaryRow> rows, string? routeUrl, bool preserveRowOrder = false)
         {
             var sb = new StringBuilder();
@@ -432,11 +446,11 @@ namespace Kor.Inspections.App.Pages.Admin
             foreach (var b in orderedRows)
             {
                 var timeText = $"{b.StartLocal:HH:mm} - {b.EndLocal:HH:mm}";
-                var contactText = $"{b.ContactName} ({b.ContactPhone})";
+                var contactText = $"{b.ContactName} ({PhoneNormalizer.Format(b.ContactPhone)})";
 
                 sb.Append("<tr>")
                   .Append($"<td>{WebUtility.HtmlEncode(timeText)}</td>")
-                  .Append($"<td>{WebUtility.HtmlEncode(b.ProjectNumber)}</td>")
+                  .Append($"<td>{WebUtility.HtmlEncode(FormatJobLine(b))}</td>")
                   .Append($"<td>{WebUtility.HtmlEncode(b.ProjectAddress)}</td>")
                   .Append($"<td>{WebUtility.HtmlEncode(contactText)}</td>")
                   .Append($"<td>{WebUtility.HtmlEncode(b.AssignedTo)}</td>")
