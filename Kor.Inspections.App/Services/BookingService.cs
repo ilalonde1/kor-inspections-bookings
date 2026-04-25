@@ -262,7 +262,7 @@ namespace Kor.Inspections.App.Services
         // --------------------------------------------------
         // ASSIGNMENT EMAILS (CLIENT + INSPECTOR)
         // --------------------------------------------------
-        public async Task SendAssignmentEmailAsync(Booking booking)
+        public async Task SendAssignmentEmailAsync(Booking booking, bool isReassignment = false)
         {
             try
             {
@@ -276,15 +276,17 @@ namespace Kor.Inspections.App.Services
                 // -------------------------
                 // CLIENT EMAIL
                 // -------------------------
-                var clientSubject =
-                    $"Your Field Review Has Been Scheduled – {startLocal:yyyy-MM-dd HH:mm}";
+                var clientSubject = isReassignment
+                    ? $"Your Field Review Inspector Has Changed – {FormatJobLine(booking)} – {startLocal:yyyy-MM-dd HH:mm}"
+                    : $"Your Field Review Has Been Scheduled – {FormatJobLine(booking)} – {startLocal:yyyy-MM-dd HH:mm}";
 
                 var clientBody = BuildAssignmentEmailHtml(
                     booking,
                     startLocal,
                     endLocal,
                     manageUrl,
-                    isInspector: false);
+                    isInspector: false,
+                    isReassignment: isReassignment);
 
                 await _graphMail.SendHtmlAsync(
                     fromMailbox,
@@ -577,12 +579,15 @@ namespace Kor.Inspections.App.Services
             DateTime startLocal,
             DateTime endLocal,
             string? manageUrl,
-            bool isInspector)
+            bool isInspector,
+            bool isReassignment = false)
         {
             var sb = new StringBuilder();
 
             if (isInspector)
                 sb.Append("<p>You have been assigned a field review.</p>");
+            else if (isReassignment)
+                sb.Append("<p>The inspector assigned to your field review has been updated. All other details remain the same.</p>");
             else
                 sb.Append("<p>Your field review request has been scheduled.</p>");
 

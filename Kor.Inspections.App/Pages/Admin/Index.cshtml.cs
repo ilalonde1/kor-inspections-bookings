@@ -434,7 +434,9 @@ namespace Kor.Inspections.App.Pages.Admin
 
             if (assignedToChanged && !string.IsNullOrWhiteSpace(booking.AssignedTo))
             {
-                await _bookingService.SendAssignmentEmailAsync(booking);
+                await _bookingService.SendAssignmentEmailAsync(
+                    booking,
+                    isReassignment: !string.IsNullOrWhiteSpace(oldAssignedTo));
             }
 
             return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
