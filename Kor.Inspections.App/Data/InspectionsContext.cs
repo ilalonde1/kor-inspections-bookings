@@ -85,6 +85,10 @@ namespace Kor.Inspections.App.Data
 
                 entity.Property(b => b.CancelToken)
                       .HasDefaultValueSql("NEWID()");
+
+                entity.HasIndex(b => b.CancelToken)
+                      .IsUnique()
+                      .HasDatabaseName("IX_Bookings_CancelToken_Unique");
             });
 
             // ----------------------------
