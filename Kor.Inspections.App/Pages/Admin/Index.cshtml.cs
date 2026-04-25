@@ -86,7 +86,7 @@ namespace Kor.Inspections.App.Pages.Admin
             public DateTime StartLocal { get; set; }
             public DateTime EndLocal { get; set; }
 
-            // CRITICAL � used for Anytime pills
+            // Used for Anytime AM/PM pill rendering in the booking row.
             public string? TimePreference { get; set; }
 
             public string ProjectNumber { get; set; } = string.Empty;
@@ -778,7 +778,6 @@ namespace Kor.Inspections.App.Pages.Admin
                     StartLocal = startLocal,
                     EndLocal = endLocal,
 
-                    // ? NORMALIZE HERE � THIS FIXES YOUR UI
                     TimePreference = string.IsNullOrWhiteSpace(b.TimePreference)
                         ? null
                         : b.TimePreference.ToUpper(),
