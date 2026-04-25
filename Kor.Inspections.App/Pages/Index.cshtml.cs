@@ -817,7 +817,7 @@ namespace Kor.Inspections.App.Pages
             }
 
             var submittedProjectNumber = projectNumber;
-            var submittedContactEmail = contact.ContactEmail.Trim();
+            var submittedContactEmail = contact.ContactEmail.Trim().ToLowerInvariant();
             var duplicateCutoffUtc = DateTime.UtcNow.AddMinutes(-2);
 
             var duplicateExists = await _db.Bookings

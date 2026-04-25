@@ -200,7 +200,7 @@ namespace Kor.Inspections.App.Pages.Admin
 
             await OnGetAsync();
 
-            var normalizedInspectorEmail = (inspectorEmail ?? string.Empty).Trim().ToLowerInvariant();
+            var normalizedInspectorEmail = inspectorEmail.Trim().ToLowerInvariant();
             var inspector = await _db.Inspectors
                 .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.Email.ToLower() == normalizedInspectorEmail && i.Enabled);
