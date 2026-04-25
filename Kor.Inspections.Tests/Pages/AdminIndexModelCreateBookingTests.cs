@@ -24,7 +24,7 @@ public class AdminIndexModelCreateBookingTests
     [Fact]
     public async Task OnPostCreateAsync_TomorrowAfterCutoffWithoutOverride_ReturnsPageAndDoesNotCreateBooking()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminIndexCreateTests_");
         await using var db = fixture.CreateContext();
         var model = CreateModel(db, out var nowLocal);
 
@@ -43,7 +43,7 @@ public class AdminIndexModelCreateBookingTests
     [Fact]
     public async Task OnPostCreateAsync_TomorrowAfterCutoffWithOverride_CreatesBooking()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminIndexCreateTests_");
         await using var db = fixture.CreateContext();
         var model = CreateModel(db, out var nowLocal);
 
@@ -69,7 +69,7 @@ public class AdminIndexModelCreateBookingTests
         // while Booking.ProjectNumber stays Base5 ("30961"). Deltek lookup
         // uses an empty DSN here so it throws; resolvedProjectName falls back
         // to null, exercising the safe-fallback path.
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminIndexCreateTests_");
         await using var db = fixture.CreateContext();
         var model = CreateModel(db, out var nowLocal);
 
@@ -92,7 +92,7 @@ public class AdminIndexModelCreateBookingTests
         // AddMinutes(60). If InspectionRules.DefaultDurationMinutes is anything
         // else, admin-created bookings would drift from config. This test
         // configures 90 min and verifies the stored endUtc - startUtc matches.
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminIndexCreateTests_");
         await using var db = fixture.CreateContext();
         var model = CreateModel(db, out var nowLocal, defaultDurationMinutes: 90);
 
@@ -184,40 +184,6 @@ public class AdminIndexModelCreateBookingTests
         };
 
         return model;
-    }
-
-    private sealed class SqlServerFixture : IAsyncDisposable
-    {
-        private readonly string _connectionString;
-
-        private SqlServerFixture(string databaseName)
-        {
-            _connectionString = $"Server=(localdb)\\MSSQLLocalDB;Database={databaseName};Trusted_Connection=True;TrustServerCertificate=True;";
-        }
-
-        public static async Task<SqlServerFixture> CreateAsync()
-        {
-            var fixture = new SqlServerFixture("KorAdminIndexCreateTests_" + Guid.NewGuid().ToString("N"));
-            await using var db = fixture.CreateContext();
-            await db.Database.EnsureDeletedAsync();
-            await db.Database.EnsureCreatedAsync();
-            return fixture;
-        }
-
-        public InspectionsContext CreateContext()
-        {
-            var options = new DbContextOptionsBuilder<InspectionsContext>()
-                .UseSqlServer(_connectionString)
-                .Options;
-
-            return new InspectionsContext(options);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await using var db = CreateContext();
-            await db.Database.EnsureDeletedAsync();
-        }
     }
 
     private sealed class ThrowingTokenProvider : IGraphTokenProvider

@@ -25,11 +25,11 @@ public class AdminIndexModelReassignmentTests
         // Regression for Codex finding #3: OnPostAssignAsync only sent mail
         // on Unassigned -> Assigned transitions; reassignments A -> B were
         // silent so neither the client nor the new inspector was notified.
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminReassignTests_");
 
-        var inspectorA = await fixture.SeedInspectorAsync("Inspector A", "a@example.com");
-        var inspectorB = await fixture.SeedInspectorAsync("Inspector B", "b@example.com");
-        var booking = await fixture.SeedAssignedBookingAsync(inspectorA.Email);
+        var inspectorA = await SeedInspectorAsync(fixture, "Inspector A", "a@example.com");
+        var inspectorB = await SeedInspectorAsync(fixture, "Inspector B", "b@example.com");
+        var booking = await SeedAssignedBookingAsync(fixture, inspectorA.Email);
 
         var emailHandler = new CountingHttpMessageHandler();
         await using var db = fixture.CreateContext();
@@ -55,10 +55,10 @@ public class AdminIndexModelReassignmentTests
     {
         // Idempotent guard: if admin clicks Assign with the already-assigned
         // inspector still selected, no change and no duplicate notification.
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminReassignTests_");
 
-        var inspectorA = await fixture.SeedInspectorAsync("Inspector A", "a@example.com");
-        var booking = await fixture.SeedAssignedBookingAsync(inspectorA.Email);
+        var inspectorA = await SeedInspectorAsync(fixture, "Inspector A", "a@example.com");
+        var booking = await SeedAssignedBookingAsync(fixture, inspectorA.Email);
 
         var emailHandler = new CountingHttpMessageHandler();
         await using var db = fixture.CreateContext();
@@ -76,10 +76,10 @@ public class AdminIndexModelReassignmentTests
         // Explicit scope note: unassign (X -> null) does not send a new email
         // here. A dedicated "inspector removed" notification, if desired, is
         // separate scope.
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminReassignTests_");
 
-        var inspectorA = await fixture.SeedInspectorAsync("Inspector A", "a@example.com");
-        var booking = await fixture.SeedAssignedBookingAsync(inspectorA.Email);
+        var inspectorA = await SeedInspectorAsync(fixture, "Inspector A", "a@example.com");
+        var booking = await SeedAssignedBookingAsync(fixture, inspectorA.Email);
 
         var emailHandler = new CountingHttpMessageHandler();
         await using var db = fixture.CreateContext();
@@ -99,9 +99,9 @@ public class AdminIndexModelReassignmentTests
     [Fact]
     public async Task OnPostAssignAsync_InitialAssignmentToInspector_SendsScheduledSubject()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
-        var inspectorA = await fixture.SeedInspectorAsync("Inspector A", "a@example.com");
-        var booking = await fixture.SeedAssignedBookingAsync(assignedToEmail: null);
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminReassignTests_");
+        var inspectorA = await SeedInspectorAsync(fixture, "Inspector A", "a@example.com");
+        var booking = await SeedAssignedBookingAsync(fixture, assignedToEmail: null);
 
         var emailHandler = new CountingHttpMessageHandler();
         await using var db = fixture.CreateContext();
@@ -183,77 +183,43 @@ public class AdminIndexModelReassignmentTests
         return model;
     }
 
-    private sealed class SqlServerFixture : IAsyncDisposable
+    private static async Task<Inspector> SeedInspectorAsync(SqlServerFixture fixture, string displayName, string email)
     {
-        private readonly string _connectionString;
-
-        private SqlServerFixture(string databaseName)
+        var inspector = new Inspector
         {
-            _connectionString = $"Server=(localdb)\\MSSQLLocalDB;Database={databaseName};Trusted_Connection=True;TrustServerCertificate=True;";
-        }
+            DisplayName = displayName,
+            Email = email,
+            Enabled = true
+        };
 
-        public static async Task<SqlServerFixture> CreateAsync()
+        await using var db = fixture.CreateContext();
+        db.Inspectors.Add(inspector);
+        await db.SaveChangesAsync();
+        return inspector;
+    }
+
+    private static async Task<Booking> SeedAssignedBookingAsync(SqlServerFixture fixture, string? assignedToEmail)
+    {
+        var booking = new Booking
         {
-            var fixture = new SqlServerFixture("KorAdminReassignTests_" + Guid.NewGuid().ToString("N"));
-            await using var db = fixture.CreateContext();
-            await db.Database.EnsureDeletedAsync();
-            await db.Database.EnsureCreatedAsync();
-            return fixture;
-        }
+            BookingId = Guid.NewGuid(),
+            CancelToken = Guid.NewGuid(),
+            ProjectNumber = "30844",
+            ProjectAddress = "123 Test St",
+            ContactName = "Jane Doe",
+            ContactPhone = "6045551212",
+            ContactEmail = "jane@example.com",
+            StartUtc = DateTime.UtcNow.AddDays(2),
+            EndUtc = DateTime.UtcNow.AddDays(2).AddHours(1),
+            Status = assignedToEmail is null ? "Unassigned" : "Assigned",
+            AssignedTo = assignedToEmail,
+            CreatedUtc = DateTime.UtcNow
+        };
 
-        public InspectionsContext CreateContext()
-        {
-            var options = new DbContextOptionsBuilder<InspectionsContext>()
-                .UseSqlServer(_connectionString)
-                .Options;
-
-            return new InspectionsContext(options);
-        }
-
-        public async Task<Inspector> SeedInspectorAsync(string displayName, string email)
-        {
-            var inspector = new Inspector
-            {
-                DisplayName = displayName,
-                Email = email,
-                Enabled = true
-            };
-
-            await using var db = CreateContext();
-            db.Inspectors.Add(inspector);
-            await db.SaveChangesAsync();
-            return inspector;
-        }
-
-        public async Task<Booking> SeedAssignedBookingAsync(string? assignedToEmail)
-        {
-            var booking = new Booking
-            {
-                BookingId = Guid.NewGuid(),
-                CancelToken = Guid.NewGuid(),
-                ProjectNumber = "30844",
-                ProjectAddress = "123 Test St",
-                ContactName = "Jane Doe",
-                ContactPhone = "6045551212",
-                ContactEmail = "jane@example.com",
-                StartUtc = DateTime.UtcNow.AddDays(2),
-                EndUtc = DateTime.UtcNow.AddDays(2).AddHours(1),
-                Status = assignedToEmail is null ? "Unassigned" : "Assigned",
-                AssignedTo = assignedToEmail,
-                CreatedUtc = DateTime.UtcNow
-            };
-
-            await using var db = CreateContext();
-            db.Bookings.Add(booking);
-            await db.SaveChangesAsync();
-            return booking;
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await using var db = CreateContext();
-            await db.Database.EnsureDeletedAsync();
-        }
+        await using var db = fixture.CreateContext();
+        db.Bookings.Add(booking);
+        await db.SaveChangesAsync();
+        return booking;
     }
 
     private sealed class FixedTokenProvider : IGraphTokenProvider

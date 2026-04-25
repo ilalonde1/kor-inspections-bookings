@@ -14,7 +14,7 @@ public class BookingUniqueIndexTests
     [Fact]
     public async Task CreateBookingAsync_DuplicateActiveBooking_ThrowsAndLeavesSingleRow()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorInspectTests_");
         var startUtc = DateTime.UtcNow.AddDays(3);
         var endUtc = startUtc.AddHours(1);
 
@@ -46,7 +46,7 @@ public class BookingUniqueIndexTests
     [Fact]
     public async Task SaveChangesAsync_CancelledBooking_DoesNotBlockNewActiveBooking()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorInspectTests_");
         var startUtc = DateTime.UtcNow.AddDays(3);
         var endUtc = startUtc.AddHours(1);
 
@@ -62,7 +62,7 @@ public class BookingUniqueIndexTests
     [Fact]
     public async Task SaveChangesAsync_DifferentContactEmail_AllowsBothBookings()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorInspectTests_");
         var startUtc = DateTime.UtcNow.AddDays(3);
         var endUtc = startUtc.AddHours(1);
 
@@ -82,7 +82,7 @@ public class BookingUniqueIndexTests
         // "${projectNumber} Project Address" when both saved-contact and form
         // address were empty. Now nulls are preserved unchanged so downstream
         // emails and UI render "not provided" state instead of fake garbage.
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorInspectTests_");
         var startUtc = DateTime.UtcNow.AddDays(3);
         var endUtc = startUtc.AddHours(1);
 
@@ -156,40 +156,6 @@ public class BookingUniqueIndexTests
             Status = status,
             CreatedUtc = DateTime.UtcNow
         };
-    }
-
-    private sealed class SqlServerFixture : IAsyncDisposable
-    {
-        private readonly string _connectionString;
-
-        private SqlServerFixture(string databaseName)
-        {
-            _connectionString = $"Server=(localdb)\\MSSQLLocalDB;Database={databaseName};Trusted_Connection=True;TrustServerCertificate=True;";
-        }
-
-        public static async Task<SqlServerFixture> CreateAsync()
-        {
-            var fixture = new SqlServerFixture("KorInspectTests_" + Guid.NewGuid().ToString("N"));
-            await using var db = fixture.CreateContext();
-            await db.Database.EnsureDeletedAsync();
-            await db.Database.EnsureCreatedAsync();
-            return fixture;
-        }
-
-        public InspectionsContext CreateContext()
-        {
-            var options = new DbContextOptionsBuilder<InspectionsContext>()
-                .UseSqlServer(_connectionString)
-                .Options;
-
-            return new InspectionsContext(options);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await using var db = CreateContext();
-            await db.Database.EnsureDeletedAsync();
-        }
     }
 
     private sealed class ThrowingTokenProvider : IGraphTokenProvider

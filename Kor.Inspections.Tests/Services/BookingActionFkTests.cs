@@ -1,5 +1,6 @@
 using Kor.Inspections.App.Data;
 using Kor.Inspections.App.Data.Models;
+using Kor.Inspections.Tests.Helpers;
 using Microsoft.EntityFrameworkCore;
 
 namespace Kor.Inspections.Tests.Services;
@@ -9,7 +10,7 @@ public class BookingActionFkTests
     [Fact]
     public async Task SaveChangesAsync_BookingActionWithInvalidBookingId_ThrowsDbUpdateException()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorBookingActionFkTests_");
         await using var db = fixture.CreateContext();
 
         db.BookingActions.Add(new BookingAction
@@ -26,7 +27,7 @@ public class BookingActionFkTests
     [Fact]
     public async Task SaveChangesAsync_DeleteBooking_CascadesDeleteToBookingActions()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorBookingActionFkTests_");
         Guid bookingId;
 
         await using (var db = fixture.CreateContext())
@@ -72,37 +73,4 @@ public class BookingActionFkTests
         }
     }
 
-    private sealed class SqlServerFixture : IAsyncDisposable
-    {
-        private readonly string _connectionString;
-
-        private SqlServerFixture(string databaseName)
-        {
-            _connectionString = $"Server=(localdb)\\MSSQLLocalDB;Database={databaseName};Trusted_Connection=True;TrustServerCertificate=True;";
-        }
-
-        public static async Task<SqlServerFixture> CreateAsync()
-        {
-            var fixture = new SqlServerFixture("KorBookingActionFkTests_" + Guid.NewGuid().ToString("N"));
-            await using var db = fixture.CreateContext();
-            await db.Database.EnsureDeletedAsync();
-            await db.Database.EnsureCreatedAsync();
-            return fixture;
-        }
-
-        public InspectionsContext CreateContext()
-        {
-            var options = new DbContextOptionsBuilder<InspectionsContext>()
-                .UseSqlServer(_connectionString)
-                .Options;
-
-            return new InspectionsContext(options);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await using var db = CreateContext();
-            await db.Database.EnsureDeletedAsync();
-        }
-    }
 }

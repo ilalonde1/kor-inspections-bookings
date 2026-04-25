@@ -22,11 +22,12 @@ public class AdminIndexModelEditBookingTests
     [Fact]
     public async Task OnPostEditAsync_NewDateTime_UpdatesBookingAndRecordsAuditRow()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminEditTests_");
         var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
         var sameAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
         // Seed booking at day+2 local 12:00 as "PM".
-        var seededBooking = await fixture.SeedBookingAsync(
+        var seededBooking = await SeedBookingAsync(
+            fixture,
             status: "Unassigned",
             startUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
             endUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 16, 0),
@@ -60,10 +61,11 @@ public class AdminIndexModelEditBookingTests
     [Fact]
     public async Task OnPostEditAsync_CancelledBooking_BlocksWithoutModifyingRow()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminEditTests_");
         var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
         var sameAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
-        var seededBooking = await fixture.SeedBookingAsync(
+        var seededBooking = await SeedBookingAsync(
+            fixture,
             status: "Cancelled",
             startUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
             endUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 13, 0),
@@ -91,10 +93,11 @@ public class AdminIndexModelEditBookingTests
     [Fact]
     public async Task OnPostEditAsync_NoChange_SetsNoChangesStatusMessageAndDoesNotWriteAudit()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminEditTests_");
         var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
         var sameAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
-        var seededBooking = await fixture.SeedBookingAsync(
+        var seededBooking = await SeedBookingAsync(
+            fixture,
             status: "Unassigned",
             startUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 8, 0),
             endUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
@@ -118,11 +121,12 @@ public class AdminIndexModelEditBookingTests
     [Fact]
     public async Task OnPostEditAsync_DateChange_NullsOutRouteOrder()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminEditTests_");
         var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
         var initialAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
         var nextAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 1);
-        var seededBooking = await fixture.SeedBookingAsync(
+        var seededBooking = await SeedBookingAsync(
+            fixture,
             status: "Assigned",
             startUtc: ToUtc(timeZone, initialAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
             endUtc: ToUtc(timeZone, initialAllowedDate.ToDateTime(TimeOnly.MinValue), 16, 0),
@@ -149,10 +153,11 @@ public class AdminIndexModelEditBookingTests
     [Fact]
     public async Task OnPostEditAsync_TimeOnlySameDayChange_PreservesRouteOrder()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminEditTests_");
         var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
         var sameAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
-        var seededBooking = await fixture.SeedBookingAsync(
+        var seededBooking = await SeedBookingAsync(
+            fixture,
             status: "Assigned",
             startUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
             endUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 16, 0),
@@ -179,7 +184,7 @@ public class AdminIndexModelEditBookingTests
     [Fact]
     public async Task OnPostEditAsync_TargetSlotAtCapacity_BlocksRescheduleWithFriendlyMessage()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminEditTests_");
         var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
 
         // Fill day+3 AM (MaxBookingsPerSlot = 3 in the test factory) with 3
@@ -188,7 +193,8 @@ public class AdminIndexModelEditBookingTests
         var targetDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 1);
         for (int i = 0; i < 3; i++)
         {
-            await fixture.SeedBookingAsync(
+            await SeedBookingAsync(
+                fixture,
                 status: "Unassigned",
                 startUtc: ToUtc(timeZone, targetDate.ToDateTime(TimeOnly.MinValue), 8, 0),
                 endUtc: ToUtc(timeZone, targetDate.ToDateTime(TimeOnly.MinValue), 12, 0),
@@ -198,7 +204,8 @@ public class AdminIndexModelEditBookingTests
 
         // Booking to edit lives on a different day so it doesn't count toward
         // day+3's AM overlap when it's being moved in.
-        var editingBooking = await fixture.SeedBookingAsync(
+        var editingBooking = await SeedBookingAsync(
+            fixture,
             status: "Assigned",
             startUtc: ToUtc(timeZone, initialAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
             endUtc: ToUtc(timeZone, initialAllowedDate.ToDateTime(TimeOnly.MinValue), 16, 0),
@@ -229,10 +236,11 @@ public class AdminIndexModelEditBookingTests
     [Fact]
     public async Task OnPostEditAsync_ConcurrentModification_SetsConcurrencyStatusMessage()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminEditTests_");
         var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
         var sameAllowedDate = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
-        var seededBooking = await fixture.SeedBookingAsync(
+        var seededBooking = await SeedBookingAsync(
+            fixture,
             status: "Unassigned",
             startUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 12, 0),
             endUtc: ToUtc(timeZone, sameAllowedDate.ToDateTime(TimeOnly.MinValue), 16, 0),
@@ -350,69 +358,36 @@ public class AdminIndexModelEditBookingTests
         return model;
     }
 
-    private sealed class SqlServerFixture : IAsyncDisposable
+    private static async Task<Booking> SeedBookingAsync(
+        SqlServerFixture fixture,
+        string status,
+        DateTime startUtc,
+        DateTime endUtc,
+        string? timePreference,
+        int? routeOrder = null,
+        string contactEmail = "jane@example.com")
     {
-        private readonly string _connectionString;
-
-        private SqlServerFixture(string databaseName)
+        var booking = new Booking
         {
-            _connectionString = $"Server=(localdb)\\MSSQLLocalDB;Database={databaseName};Trusted_Connection=True;TrustServerCertificate=True;";
-        }
+            BookingId = Guid.NewGuid(),
+            CancelToken = Guid.NewGuid(),
+            ProjectNumber = "30844",
+            ProjectAddress = "123 Test St",
+            ContactName = "Jane Doe",
+            ContactPhone = "6045551212",
+            ContactEmail = contactEmail,
+            StartUtc = startUtc,
+            EndUtc = endUtc,
+            TimePreference = timePreference,
+            RouteOrder = routeOrder,
+            Status = status,
+            CreatedUtc = DateTime.UtcNow
+        };
 
-        public static async Task<SqlServerFixture> CreateAsync()
-        {
-            var fixture = new SqlServerFixture("KorAdminEditTests_" + Guid.NewGuid().ToString("N"));
-            await using var db = fixture.CreateContext();
-            await db.Database.EnsureDeletedAsync();
-            await db.Database.EnsureCreatedAsync();
-            return fixture;
-        }
-
-        public InspectionsContext CreateContext()
-        {
-            var options = new DbContextOptionsBuilder<InspectionsContext>()
-                .UseSqlServer(_connectionString)
-                .Options;
-
-            return new InspectionsContext(options);
-        }
-
-        public async Task<Booking> SeedBookingAsync(
-            string status,
-            DateTime startUtc,
-            DateTime endUtc,
-            string? timePreference,
-            int? routeOrder = null,
-            string contactEmail = "jane@example.com")
-        {
-            var booking = new Booking
-            {
-                BookingId = Guid.NewGuid(),
-                CancelToken = Guid.NewGuid(),
-                ProjectNumber = "30844",
-                ProjectAddress = "123 Test St",
-                ContactName = "Jane Doe",
-                ContactPhone = "6045551212",
-                ContactEmail = contactEmail,
-                StartUtc = startUtc,
-                EndUtc = endUtc,
-                TimePreference = timePreference,
-                RouteOrder = routeOrder,
-                Status = status,
-                CreatedUtc = DateTime.UtcNow
-            };
-
-            await using var db = CreateContext();
-            db.Bookings.Add(booking);
-            await db.SaveChangesAsync();
-            return booking;
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await using var db = CreateContext();
-            await db.Database.EnsureDeletedAsync();
-        }
+        await using var db = fixture.CreateContext();
+        db.Bookings.Add(booking);
+        await db.SaveChangesAsync();
+        return booking;
     }
 
     private sealed class ThrowingTokenProvider : IGraphTokenProvider

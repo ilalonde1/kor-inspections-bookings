@@ -20,9 +20,9 @@ public class AdminIndexModelConcurrencyTests
     [Fact]
     public async Task OnPostAssignAsync_ConcurrentModification_SetsConcurrencyStatusMessage()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
-        var booking = await fixture.SeedBookingAsync("Unassigned");
-        var inspector = await fixture.SeedInspectorAsync("Inspector One", "inspector@example.com");
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminIndexTests_");
+        var booking = await SeedBookingAsync(fixture, "Unassigned");
+        var inspector = await SeedInspectorAsync(fixture, "Inspector One", "inspector@example.com");
 
         await using var staleContext = fixture.CreateContext();
         _ = await staleContext.Bookings.SingleAsync(b => b.BookingId == booking.BookingId);
@@ -47,8 +47,8 @@ public class AdminIndexModelConcurrencyTests
     [Fact]
     public async Task OnPostCancelAsync_ConcurrentModification_SetsConcurrencyStatusMessage()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
-        var booking = await fixture.SeedBookingAsync("Unassigned");
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminIndexTests_");
+        var booking = await SeedBookingAsync(fixture, "Unassigned");
 
         await using var staleContext = fixture.CreateContext();
         _ = await staleContext.Bookings.SingleAsync(b => b.BookingId == booking.BookingId);
@@ -72,8 +72,8 @@ public class AdminIndexModelConcurrencyTests
     [Fact]
     public async Task OnPostCancelAsync_UnmodifiedBooking_CancelsSuccessfully()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
-        var booking = await fixture.SeedBookingAsync("Unassigned");
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminIndexTests_");
+        var booking = await SeedBookingAsync(fixture, "Unassigned");
 
         await using var db = fixture.CreateContext();
         var model = CreateModel(db);
@@ -149,76 +149,42 @@ public class AdminIndexModelConcurrencyTests
         return model;
     }
 
-    private sealed class SqlServerFixture : IAsyncDisposable
+    private static async Task<Booking> SeedBookingAsync(SqlServerFixture fixture, string status)
     {
-        private readonly string _connectionString;
-
-        private SqlServerFixture(string databaseName)
+        var booking = new Booking
         {
-            _connectionString = $"Server=(localdb)\\MSSQLLocalDB;Database={databaseName};Trusted_Connection=True;TrustServerCertificate=True;";
-        }
+            BookingId = Guid.NewGuid(),
+            CancelToken = Guid.NewGuid(),
+            ProjectNumber = "30844",
+            ProjectAddress = "123 Test St",
+            ContactName = "Jane Doe",
+            ContactPhone = "6045551212",
+            ContactEmail = "jane@example.com",
+            StartUtc = DateTime.UtcNow.AddDays(2),
+            EndUtc = DateTime.UtcNow.AddDays(2).AddHours(1),
+            Status = status,
+            CreatedUtc = DateTime.UtcNow
+        };
 
-        public static async Task<SqlServerFixture> CreateAsync()
+        await using var db = fixture.CreateContext();
+        db.Bookings.Add(booking);
+        await db.SaveChangesAsync();
+        return booking;
+    }
+
+    private static async Task<Inspector> SeedInspectorAsync(SqlServerFixture fixture, string displayName, string email)
+    {
+        var inspector = new Inspector
         {
-            var fixture = new SqlServerFixture("KorAdminIndexTests_" + Guid.NewGuid().ToString("N"));
-            await using var db = fixture.CreateContext();
-            await db.Database.EnsureDeletedAsync();
-            await db.Database.EnsureCreatedAsync();
-            return fixture;
-        }
+            DisplayName = displayName,
+            Email = email,
+            Enabled = true
+        };
 
-        public InspectionsContext CreateContext()
-        {
-            var options = new DbContextOptionsBuilder<InspectionsContext>()
-                .UseSqlServer(_connectionString)
-                .Options;
-
-            return new InspectionsContext(options);
-        }
-
-        public async Task<Booking> SeedBookingAsync(string status)
-        {
-            var booking = new Booking
-            {
-                BookingId = Guid.NewGuid(),
-                CancelToken = Guid.NewGuid(),
-                ProjectNumber = "30844",
-                ProjectAddress = "123 Test St",
-                ContactName = "Jane Doe",
-                ContactPhone = "6045551212",
-                ContactEmail = "jane@example.com",
-                StartUtc = DateTime.UtcNow.AddDays(2),
-                EndUtc = DateTime.UtcNow.AddDays(2).AddHours(1),
-                Status = status,
-                CreatedUtc = DateTime.UtcNow
-            };
-
-            await using var db = CreateContext();
-            db.Bookings.Add(booking);
-            await db.SaveChangesAsync();
-            return booking;
-        }
-
-        public async Task<Inspector> SeedInspectorAsync(string displayName, string email)
-        {
-            var inspector = new Inspector
-            {
-                DisplayName = displayName,
-                Email = email,
-                Enabled = true
-            };
-
-            await using var db = CreateContext();
-            db.Inspectors.Add(inspector);
-            await db.SaveChangesAsync();
-            return inspector;
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await using var db = CreateContext();
-            await db.Database.EnsureDeletedAsync();
-        }
+        await using var db = fixture.CreateContext();
+        db.Inspectors.Add(inspector);
+        await db.SaveChangesAsync();
+        return inspector;
     }
 
     private sealed class ThrowingTokenProvider : IGraphTokenProvider

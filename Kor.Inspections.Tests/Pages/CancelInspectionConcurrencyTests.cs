@@ -21,9 +21,9 @@ public class CancelInspectionConcurrencyTests
     [Fact]
     public async Task OnPostCancelInspectionAsync_ConcurrentModification_WonByCancel_ReturnsOk()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
-        var booking = await fixture.SeedBookingAsync("Unassigned", "30844", "jane@acme.com");
-        await fixture.SeedProjectDefaultAsync("30844", "acme.com");
+        await using var fixture = await SqlServerFixture.CreateAsync("KorCancelInspectionTests_");
+        var booking = await SeedBookingAsync(fixture, "Unassigned", "30844", "jane@acme.com");
+        await SeedProjectDefaultAsync(fixture, "30844", "acme.com");
 
         var cache = new MemoryCache(new MemoryCacheOptions());
 
@@ -52,9 +52,9 @@ public class CancelInspectionConcurrencyTests
     [Fact]
     public async Task OnPostCancelInspectionAsync_ConcurrentModification_WonByOtherChange_Returns409()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
-        var booking = await fixture.SeedBookingAsync("Unassigned", "30844", "jane@acme.com");
-        await fixture.SeedProjectDefaultAsync("30844", "acme.com");
+        await using var fixture = await SqlServerFixture.CreateAsync("KorCancelInspectionTests_");
+        var booking = await SeedBookingAsync(fixture, "Unassigned", "30844", "jane@acme.com");
+        await SeedProjectDefaultAsync(fixture, "30844", "acme.com");
 
         var cache = new MemoryCache(new MemoryCacheOptions());
 
@@ -83,9 +83,9 @@ public class CancelInspectionConcurrencyTests
     [Fact]
     public async Task OnPostCancelInspectionAsync_HappyPath_CancelsAndWritesAuditRecord()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
-        var booking = await fixture.SeedBookingAsync("Unassigned", "30844", "jane@acme.com");
-        await fixture.SeedProjectDefaultAsync("30844", "acme.com");
+        await using var fixture = await SqlServerFixture.CreateAsync("KorCancelInspectionTests_");
+        var booking = await SeedBookingAsync(fixture, "Unassigned", "30844", "jane@acme.com");
+        await SeedProjectDefaultAsync(fixture, "30844", "acme.com");
 
         var cache = new MemoryCache(new MemoryCacheOptions());
 
@@ -189,73 +189,39 @@ public class CancelInspectionConcurrencyTests
         return model;
     }
 
-    private sealed class SqlServerFixture : IAsyncDisposable
+    private static async Task<Booking> SeedBookingAsync(SqlServerFixture fixture, string status, string projectNumber, string contactEmail)
     {
-        private readonly string _connectionString;
-
-        private SqlServerFixture(string databaseName)
+        var booking = new Booking
         {
-            _connectionString = $"Server=(localdb)\\MSSQLLocalDB;Database={databaseName};Trusted_Connection=True;TrustServerCertificate=True;";
-        }
+            BookingId = Guid.NewGuid(),
+            CancelToken = Guid.NewGuid(),
+            ProjectNumber = projectNumber,
+            ProjectAddress = "123 Test St",
+            ContactName = "Jane Doe",
+            ContactPhone = "6045551212",
+            ContactEmail = contactEmail,
+            StartUtc = DateTime.UtcNow.AddDays(2),
+            EndUtc = DateTime.UtcNow.AddDays(2).AddHours(1),
+            Status = status,
+            CreatedUtc = DateTime.UtcNow
+        };
 
-        public static async Task<SqlServerFixture> CreateAsync()
+        await using var db = fixture.CreateContext();
+        db.Bookings.Add(booking);
+        await db.SaveChangesAsync();
+        return booking;
+    }
+
+    private static async Task SeedProjectDefaultAsync(SqlServerFixture fixture, string projectNumber, string domain)
+    {
+        await using var db = fixture.CreateContext();
+        db.ProjectDefaults.Add(new ProjectDefault
         {
-            var fixture = new SqlServerFixture("KorCancelInspectionTests_" + Guid.NewGuid().ToString("N"));
-            await using var db = fixture.CreateContext();
-            await db.Database.EnsureDeletedAsync();
-            await db.Database.EnsureCreatedAsync();
-            return fixture;
-        }
-
-        public InspectionsContext CreateContext()
-        {
-            var options = new DbContextOptionsBuilder<InspectionsContext>()
-                .UseSqlServer(_connectionString)
-                .Options;
-
-            return new InspectionsContext(options);
-        }
-
-        public async Task<Booking> SeedBookingAsync(string status, string projectNumber, string contactEmail)
-        {
-            var booking = new Booking
-            {
-                BookingId = Guid.NewGuid(),
-                CancelToken = Guid.NewGuid(),
-                ProjectNumber = projectNumber,
-                ProjectAddress = "123 Test St",
-                ContactName = "Jane Doe",
-                ContactPhone = "6045551212",
-                ContactEmail = contactEmail,
-                StartUtc = DateTime.UtcNow.AddDays(2),
-                EndUtc = DateTime.UtcNow.AddDays(2).AddHours(1),
-                Status = status,
-                CreatedUtc = DateTime.UtcNow
-            };
-
-            await using var db = CreateContext();
-            db.Bookings.Add(booking);
-            await db.SaveChangesAsync();
-            return booking;
-        }
-
-        public async Task SeedProjectDefaultAsync(string projectNumber, string domain)
-        {
-            await using var db = CreateContext();
-            db.ProjectDefaults.Add(new ProjectDefault
-            {
-                ProjectNumber = projectNumber,
-                EmailDomain = domain,
-                UpdatedUtc = DateTime.UtcNow
-            });
-            await db.SaveChangesAsync();
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await using var db = CreateContext();
-            await db.Database.EnsureDeletedAsync();
-        }
+            ProjectNumber = projectNumber,
+            EmailDomain = domain,
+            UpdatedUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
     }
 
     private sealed class ThrowingTokenProvider : IGraphTokenProvider
