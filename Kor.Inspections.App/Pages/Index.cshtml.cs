@@ -809,7 +809,7 @@ namespace Kor.Inspections.App.Pages
                     return Page();
                 }
 
-                var existingForDate = await GetExistingBookingsForLocalDateAsync(requestDateOnly);
+                var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestDateOnly);
 
                 var availableSlots = _timeRules
                     .GetAvailableSlotsForDate(requestDateOnly, existingForDate)
@@ -906,25 +906,11 @@ namespace Kor.Inspections.App.Pages
                 return;
 
             var dateOnly = DateOnly.FromDateTime(RequestedDate.Value);
-            var existingForDate = await GetExistingBookingsForLocalDateAsync(dateOnly);
+            var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, dateOnly);
 
             var slots = _timeRules.GetAvailableSlotsForDate(dateOnly, existingForDate);
 
             AvailableTimes = slots.Select(t => t.ToString("HH:mm")).ToList();
-        }
-
-        private async Task<List<Booking>> GetExistingBookingsForLocalDateAsync(DateOnly localDate)
-        {
-            var localStart = localDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-            var localEnd = localDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-
-            var utcStart = TimeZoneInfo.ConvertTimeToUtc(localStart, _timeRules.TimeZone);
-            var utcEnd = TimeZoneInfo.ConvertTimeToUtc(localEnd, _timeRules.TimeZone);
-
-            return await _db.Bookings
-                .Where(b => b.Status != "Cancelled")
-                .Where(b => b.StartUtc >= utcStart && b.StartUtc < utcEnd)
-                .ToListAsync();
         }
 
         private static bool TryParseTime(string input, out TimeOnly time)
