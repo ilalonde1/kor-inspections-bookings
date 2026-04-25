@@ -1,4 +1,3 @@
-// CODEX TEST  verified update
 using System;
 using System.Linq;
 using System.Data;
@@ -601,7 +600,6 @@ namespace Kor.Inspections.App.Services
 
             sb.Append($"<li><strong>Address:</strong> {WebUtility.HtmlEncode(booking.ProjectAddress)}</li>");
 
-            // ADD THIS BLOCK
             if (!string.IsNullOrWhiteSpace(booking.Comments))
             {
                 sb.Append($"<li><strong>Details:</strong> {WebUtility.HtmlEncode(booking.Comments)}</li>");
@@ -648,7 +646,6 @@ namespace Kor.Inspections.App.Services
 
             sb.Append($"<li><strong>Address:</strong> {WebUtility.HtmlEncode(booking.ProjectAddress)}</li>");
 
-            // ✅ ADD THIS
             if (!string.IsNullOrWhiteSpace(booking.Comments))
             {
                 sb.Append($"<li><strong>Details:</strong> {WebUtility.HtmlEncode(booking.Comments)}</li>");
