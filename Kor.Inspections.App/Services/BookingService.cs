@@ -425,8 +425,7 @@ namespace Kor.Inspections.App.Services
                 // -------------------------
                 if (!string.IsNullOrWhiteSpace(booking.AssignedTo))
                 {
-                    // Note: do NOT require Enabled here; if they were assigned, they should be notified.
-                    var inspector = await GetAssignedInspectorAsync(booking.AssignedTo, requireEnabled: false);
+                    var inspector = await GetAssignedInspectorAsync(booking.AssignedTo, requireEnabled: true);
 
                     if (inspector != null && !string.IsNullOrWhiteSpace(inspector.Email))
                     {
@@ -503,8 +502,7 @@ namespace Kor.Inspections.App.Services
                 // -------------------------
                 if (!string.IsNullOrWhiteSpace(booking.AssignedTo))
                 {
-                    // If they were assigned, notify regardless of current Enabled state.
-                    var inspector = await GetAssignedInspectorAsync(booking.AssignedTo, requireEnabled: false);
+                    var inspector = await GetAssignedInspectorAsync(booking.AssignedTo, requireEnabled: true);
 
                     if (inspector != null && !string.IsNullOrWhiteSpace(inspector.Email))
                     {
