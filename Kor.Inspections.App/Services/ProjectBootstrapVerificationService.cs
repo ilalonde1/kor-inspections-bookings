@@ -142,8 +142,10 @@ namespace Kor.Inspections.App.Services
                 await _db.SaveChangesAsync(ct);
             }
             catch (DbUpdateException ex)
-                when (ex.InnerException?.Message.Contains("IX_ProjectVerifications_ProjectEmail") == true ||
-                      ex.InnerException?.Message.Contains("UNIQUE constraint failed: ProjectVerifications.ProjectNumber") == true)
+                when (DbUpdateExceptionClassifier.IsNamedUniqueConstraintViolation(
+                    ex,
+                    "IX_ProjectVerifications_ProjectEmail",
+                    "UNIQUE constraint failed: ProjectVerifications.ProjectNumber"))
             {
                 // Concurrent SendCodeAsync inserted first. Detach our pending Add,
                 // refresh the winner's row's expiry, and skip the email send - the

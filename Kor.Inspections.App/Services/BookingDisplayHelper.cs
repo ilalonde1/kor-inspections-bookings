@@ -15,6 +15,19 @@
                 : $"{displayNumber} {projectName}";
         }
 
+        public static string? ResolveAssignedToDisplay(
+            string? assignedTo,
+            IReadOnlyDictionary<string, string> inspectorsByEmail,
+            string? unassignedDisplay = "Unassigned")
+        {
+            if (string.IsNullOrWhiteSpace(assignedTo))
+                return unassignedDisplay;
+
+            return inspectorsByEmail.TryGetValue(assignedTo, out var displayName)
+                ? displayName
+                : assignedTo;
+        }
+
         public static string GetTimeDisplay(
             string? timePreference,
             DateTime startLocal,

@@ -163,7 +163,7 @@ namespace Kor.Inspections.App.Pages.Admin
                         ContactName = b.ContactName,
                         ContactPhone = b.ContactPhone,
                         Status = b.Status,
-                        AssignedTo = ResolveAssignedToDisplay(b.AssignedTo, inspectorsByEmail),
+                        AssignedTo = BookingDisplayHelper.ResolveAssignedToDisplay(b.AssignedTo, inspectorsByEmail) ?? "Unassigned",
                         AssignedToValue = b.AssignedTo,
                         Comments = b.Comments ?? string.Empty
                     };
@@ -200,14 +200,17 @@ namespace Kor.Inspections.App.Pages.Admin
 
             await OnGetAsync();
 
-            var normalizedInspectorEmail = inspectorEmail.Trim().ToLowerInvariant();
-            var inspector = await _db.Inspectors
-                .AsNoTracking()
-                .FirstOrDefaultAsync(i => i.Email.ToLower() == normalizedInspectorEmail && i.Enabled);
+            var normalizedInspectorEmail = inspectorEmail.Trim();
+            var inspector = Inspectors.FirstOrDefault(i =>
+                i.Enabled &&
+                string.Equals(i.Email, normalizedInspectorEmail, StringComparison.OrdinalIgnoreCase));
+            if (inspector == null || string.IsNullOrWhiteSpace(inspector.Email))
+            {
+                StatusMessage = "Inspector not found.";
+                return RedirectToPage();
+            }
 
-            var inspectorBookings = inspector is null
-                ? new List<SummaryRow>()
-                : GetOrderedInspectorBookings(inspector.Email).ToList();
+            var inspectorBookings = GetOrderedInspectorBookings(inspector.Email).ToList();
 
             if (!inspectorBookings.Any())
             {
@@ -223,10 +226,15 @@ namespace Kor.Inspections.App.Pages.Admin
                 BuildGoogleMapsRouteUrl(inspectorBookings),
                 preserveRowOrder: true);
 
-            if (!await TrySendSummaryEmailAsync(fromMailbox, inspectorEmail, subject, html, $"inspector summary for {inspectorEmail}"))
+            if (!await TrySendSummaryEmailAsync(
+                    fromMailbox,
+                    inspector.Email,
+                    subject,
+                    html,
+                    $"inspector summary for {inspector.Email}"))
                 return RedirectToPage();
 
-            StatusMessage = $"Inspector summary sent to {inspectorEmail}.";
+            StatusMessage = $"Inspector summary sent to {inspector.Email}.";
             return RedirectToPage();
         }
 
@@ -326,10 +334,10 @@ namespace Kor.Inspections.App.Pages.Admin
             // Refresh Bookings so the email uses the persisted route order.
             await OnGetAsync();
 
-            var normalizedInspectorEmail = (request.InspectorEmail ?? string.Empty).Trim().ToLowerInvariant();
-            var inspector = await _db.Inspectors
-                .AsNoTracking()
-                .FirstOrDefaultAsync(i => i.Email.ToLower() == normalizedInspectorEmail && i.Enabled);
+            var normalizedInspectorEmail = (request.InspectorEmail ?? string.Empty).Trim();
+            var inspector = Inspectors.FirstOrDefault(i =>
+                i.Enabled &&
+                string.Equals(i.Email, normalizedInspectorEmail, StringComparison.OrdinalIgnoreCase));
 
             if (inspector == null)
             {
@@ -513,7 +521,7 @@ namespace Kor.Inspections.App.Pages.Admin
             if (string.IsNullOrWhiteSpace(request.InspectorEmail))
                 return Array.Empty<Guid>();
 
-            var normalizedInspectorEmailRoute = (request.InspectorEmail ?? string.Empty).Trim().ToLowerInvariant();
+            var normalizedInspectorEmailRoute = request.InspectorEmail.Trim();
             var orderedIds = ParseOrderedBookingIds(request.OrderedBookingIds);
             if (orderedIds.Count == 0)
                 return Array.Empty<Guid>();
@@ -527,7 +535,7 @@ namespace Kor.Inspections.App.Pages.Admin
                     b.StartUtc < endUtc &&
                     b.Status != "Cancelled" &&
                     b.AssignedTo != null &&
-                    b.AssignedTo.ToLower() == normalizedInspectorEmailRoute &&
+                    b.AssignedTo == normalizedInspectorEmailRoute &&
                     orderedIds.Contains(b.BookingId))
                 .ToListAsync();
 
@@ -566,17 +574,6 @@ namespace Kor.Inspections.App.Pages.Admin
             return "asc";
         }
 
-        private static string ResolveAssignedToDisplay(
-            string? assignedTo,
-            IReadOnlyDictionary<string, string> inspectorsByEmail)
-        {
-            if (string.IsNullOrWhiteSpace(assignedTo))
-                return "Unassigned";
-
-            return inspectorsByEmail.TryGetValue(assignedTo, out var displayName)
-                ? displayName
-                : assignedTo;
-        }
     }
 }
 

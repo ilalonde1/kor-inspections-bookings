@@ -21,35 +21,6 @@ namespace Kor.Inspections.App.Services
         // Public API
         // --------------------------------------------------
 
-        public async Task<bool> HasAnyActiveContactsForProjectAsync(string projectNumber)
-        {
-            projectNumber = NormalizeProject(projectNumber);
-            if (string.IsNullOrWhiteSpace(projectNumber))
-                return false;
-
-            return await _db.ProjectContacts
-                .AsNoTracking()
-                .AnyAsync(c => c.ProjectNumber == projectNumber && !c.IsDeleted);
-        }
-
-        public async Task<bool> HasActiveContactForProjectEmailAsync(string projectNumber, string email)
-        {
-            projectNumber = NormalizeProject(projectNumber);
-            if (string.IsNullOrWhiteSpace(projectNumber))
-                return false;
-
-            email = (email ?? "").Trim().ToLowerInvariant();
-            if (string.IsNullOrWhiteSpace(email))
-                return false;
-
-            return await _db.ProjectContacts
-                .AsNoTracking()
-                .AnyAsync(c =>
-                    c.ProjectNumber == projectNumber &&
-                    c.ContactEmail == email &&
-                    !c.IsDeleted);
-        }
-
         public async Task<ProjectProfileResult> GetProfileAsync(
             string projectNumber,
             string contactEmail)
@@ -64,13 +35,6 @@ namespace Kor.Inspections.App.Services
                 return ProjectProfileResult.Empty();
 
             projectNumber = NormalizeProject(projectNumber);
-
-            ProjectDefault? defaults = await _db.ProjectDefaults
-                .AsNoTracking()
-                .FirstOrDefaultAsync(d =>
-                    d.ProjectNumber == projectNumber &&
-                    d.EmailDomain == domain);
-
             List<ProjectContact> contacts = await _db.ProjectContacts
                 .AsNoTracking()
                 .Where(c =>
@@ -85,37 +49,8 @@ namespace Kor.Inspections.App.Services
             {
                 ProjectNumber = projectNumber,
                 EmailDomain = domain,
-                DefaultAddress = defaults?.DefaultAddress,
                 Contacts = contacts
             };
-        }
-
-        // Legacy compatibility — safe to keep
-        public async Task SaveDefaultAddressAsync(
-            string projectNumber,
-            string contactEmail,
-            string address)
-        {
-            if (string.IsNullOrWhiteSpace(contactEmail))
-                return;
-
-            contactEmail = contactEmail.Trim().ToLowerInvariant();
-            var domain = GetEmailDomain(contactEmail);
-
-            if (string.IsNullOrWhiteSpace(domain))
-                return;
-
-            projectNumber = NormalizeProject(projectNumber);
-
-            ProjectDefault row = await GetOrCreateDefaultsAsync(projectNumber, domain);
-
-            row.DefaultAddress = string.IsNullOrWhiteSpace(address)
-                ? null
-                : address.Trim();
-
-            row.UpdatedUtc = DateTime.UtcNow;
-
-            await _db.SaveChangesAsync();
         }
 
         public async Task<ProjectContact> AddOrUpdateContactAsync(
@@ -192,7 +127,9 @@ namespace Kor.Inspections.App.Services
                 await _db.SaveChangesAsync();
             }
             catch (DbUpdateException ex)
-                when (ex.InnerException?.Message.Contains("IX_ProjectContacts") == true)
+                when (DbUpdateExceptionClassifier.IsNamedUniqueConstraintViolation(
+                    ex,
+                    "IX_ProjectContacts"))
             {
                 throw new ContactAlreadyExistsException(
                     "A contact with this email already exists for this project.");
@@ -236,30 +173,6 @@ namespace Kor.Inspections.App.Services
         // Internal helpers
         // --------------------------------------------------
 
-        private async Task<ProjectDefault> GetOrCreateDefaultsAsync(
-            string projectNumber,
-            string domain)
-        {
-            ProjectDefault? row = await _db.ProjectDefaults.FirstOrDefaultAsync(d =>
-                d.ProjectNumber == projectNumber &&
-                d.EmailDomain == domain);
-
-            if (row != null)
-                return row;
-
-            row = new ProjectDefault
-            {
-                ProjectNumber = projectNumber,
-                EmailDomain = domain,
-                UpdatedUtc = DateTime.UtcNow
-            };
-
-            _db.ProjectDefaults.Add(row);
-            await _db.SaveChangesAsync();
-
-            return row;
-        }
-
         private static string GetEmailDomain(string email)
         {
             var at = email.LastIndexOf('@');
@@ -287,7 +200,6 @@ namespace Kor.Inspections.App.Services
     {
         public string ProjectNumber { get; set; } = "";
         public string EmailDomain { get; set; } = "";
-        public string? DefaultAddress { get; set; }
         public List<ProjectContact> Contacts { get; set; } = new();
 
         public static ProjectProfileResult Empty() => new();

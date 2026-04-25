@@ -8,6 +8,29 @@ window.escapeHtml = function escapeHtml(str) {
         .replace(/'/g, '&#39;');
 };
 
+window.formatKorPhoneInput = function formatKorPhoneInput(str, options) {
+    const preserveTrailingSeparator = options && options.preserveTrailingSeparator === true;
+    const digits = String(str || "").replace(/\D/g, "").slice(0, 10);
+
+    if (digits.length >= 7) {
+        return `(${digits.slice(0, 3)})-${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+
+    if (digits.length >= 4) {
+        return `(${digits.slice(0, 3)})-${digits.slice(3)}`;
+    }
+
+    if (digits.length === 3 && preserveTrailingSeparator) {
+        return `(${digits})-`;
+    }
+
+    if (digits.length > 0) {
+        return `(${digits}`;
+    }
+
+    return "";
+};
+
 window.KorPostbackFocus = (function () {
     const key = `kor:focus:${window.location.pathname}`;
 
@@ -176,14 +199,9 @@ window.KorPostbackFocus = (function () {
             if (!e.target.name || !e.target.name.includes("ContactPhone"))
                 return;
 
-            let digits = e.target.value.replace(/\D/g, "").substring(0, 10);
-
-            if (digits.length >= 6)
-                e.target.value = `(${digits.slice(0, 3)})-${digits.slice(3, 6)}-${digits.slice(6)}`;
-            else if (digits.length >= 3)
-                e.target.value = `(${digits.slice(0, 3)})-${digits.slice(3)}`;
-            else
-                e.target.value = digits;
+            e.target.value = window.formatKorPhoneInput(e.target.value, {
+                preserveTrailingSeparator: true
+            });
         });
 
 

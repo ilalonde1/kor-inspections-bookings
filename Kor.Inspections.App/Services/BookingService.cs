@@ -196,7 +196,10 @@ namespace Kor.Inspections.App.Services
                 await _db.SaveChangesAsync();
                 await tx.CommitAsync();
             }
-            catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_Bookings_NoDuplicateActiveSlot", StringComparison.Ordinal) == true)
+            catch (DbUpdateException ex) when (
+                DbUpdateExceptionClassifier.IsNamedUniqueConstraintViolation(
+                    ex,
+                    "IX_Bookings_NoDuplicateActiveSlot"))
             {
                 _db.ChangeTracker.Clear();
                 throw new BookingSlotUnavailableException(
@@ -561,15 +564,11 @@ namespace Kor.Inspections.App.Services
         // --------------------------------------------------
         // EMAIL BUILDERS
         // --------------------------------------------------
-        private static string FormatJobLine(Booking booking)
-        {
-            var displayNumber = string.IsNullOrWhiteSpace(booking.ProjectNumberDisplay)
-                ? booking.ProjectNumber
-                : booking.ProjectNumberDisplay;
-            return string.IsNullOrWhiteSpace(booking.ProjectName)
-                ? displayNumber
-                : $"{displayNumber} {booking.ProjectName}";
-        }
+        private static string FormatJobLine(Booking booking) =>
+            BookingDisplayHelper.FormatJobLine(
+                booking.ProjectNumberDisplay,
+                booking.ProjectName,
+                booking.ProjectNumber);
 
         private static string BuildAssignmentEmailHtml(
             Booking booking,

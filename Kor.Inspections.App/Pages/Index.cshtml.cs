@@ -370,7 +370,10 @@ namespace Kor.Inspections.App.Pages
                     StartUtc = DateTime.SpecifyKind(b.StartUtc, DateTimeKind.Utc),
                     EndUtc = DateTime.SpecifyKind(b.EndUtc, DateTimeKind.Utc),
                     Status = b.Status,
-                    AssignedTo = ResolveAssignedToDisplay(b.AssignedTo, inspectorsByEmail),
+                    AssignedTo = BookingDisplayHelper.ResolveAssignedToDisplay(
+                        b.AssignedTo,
+                        inspectorsByEmail,
+                        unassignedDisplay: b.AssignedTo),
                     ContactName = b.ContactName,
                     ContactEmail = b.ContactEmail,
                     Address = b.ProjectAddress,
@@ -475,18 +478,6 @@ namespace Kor.Inspections.App.Pages
             await _bookingService.SendCancellationEmailsAsync(booking);
 
             return new JsonResult(new { ok = true });
-        }
-
-        private static string? ResolveAssignedToDisplay(
-            string? assignedTo,
-            IReadOnlyDictionary<string, string> inspectorsByEmail)
-        {
-            if (string.IsNullOrWhiteSpace(assignedTo))
-                return assignedTo;
-
-            return inspectorsByEmail.TryGetValue(assignedTo, out var displayName)
-                ? displayName
-                : assignedTo;
         }
 
         [EnableRateLimiting("verification")]
