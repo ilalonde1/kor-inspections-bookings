@@ -280,7 +280,7 @@ namespace Kor.Inspections.App.Services
             string normalizedEmail,
             CancellationToken ct)
         {
-            var domain = GetEmailDomain(normalizedEmail);
+            var domain = EmailHelper.GetDomain(normalizedEmail);
             if (string.IsNullOrWhiteSpace(domain))
                 return false;
 
@@ -316,14 +316,6 @@ namespace Kor.Inspections.App.Services
         internal static DateTime GetExplicitDomainApprovalExpirationUtc(DateTime approvedUtc)
         {
             return approvedUtc.Add(ExplicitDomainTrustTtl);
-        }
-
-        private static string GetEmailDomain(string email)
-        {
-            var at = email.LastIndexOf('@');
-            return (at > 0 && at < email.Length - 1)
-                ? email[(at + 1)..].Trim().ToLowerInvariant()
-                : string.Empty;
         }
 
         private static string NormalizeProject(string projectNumber)

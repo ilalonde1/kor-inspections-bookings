@@ -115,7 +115,7 @@ namespace Kor.Inspections.App.Pages.Admin
                 .Where(b =>
                     b.StartUtc >= startUtc &&
                     b.StartUtc < endUtc &&
-                    b.Status != "Cancelled");
+                    b.Status != BookingStatus.Cancelled);
 
             query = (Sort?.ToLower(), Dir?.ToLower()) switch
             {
@@ -163,7 +163,7 @@ namespace Kor.Inspections.App.Pages.Admin
                         ContactName = b.ContactName,
                         ContactPhone = b.ContactPhone,
                         Status = b.Status,
-                        AssignedTo = BookingDisplayHelper.ResolveAssignedToDisplay(b.AssignedTo, inspectorsByEmail) ?? "Unassigned",
+                        AssignedTo = BookingDisplayHelper.ResolveAssignedToDisplay(b.AssignedTo, inspectorsByEmail) ?? BookingStatus.Unassigned,
                         AssignedToValue = b.AssignedTo,
                         Comments = b.Comments ?? string.Empty
                     };
@@ -254,7 +254,7 @@ namespace Kor.Inspections.App.Pages.Admin
             var groups = Bookings
                 .Where(b =>
                     !string.IsNullOrWhiteSpace(b.AssignedToValue) &&
-                    !string.Equals(b.AssignedTo, "Unassigned", StringComparison.OrdinalIgnoreCase))
+                    !string.Equals(b.AssignedTo, BookingStatus.Unassigned, StringComparison.OrdinalIgnoreCase))
                 .GroupBy(b => b.AssignedToValue!, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -504,7 +504,7 @@ namespace Kor.Inspections.App.Pages.Admin
             return OrderForRoute(
                 Bookings.Where(b =>
                         string.Equals(b.AssignedToValue, inspectorEmail, StringComparison.OrdinalIgnoreCase) &&
-                        !string.Equals(b.AssignedTo, "Unassigned", StringComparison.OrdinalIgnoreCase))
+                        !string.Equals(b.AssignedTo, BookingStatus.Unassigned, StringComparison.OrdinalIgnoreCase))
                     .ToList());
         }
 
@@ -533,7 +533,7 @@ namespace Kor.Inspections.App.Pages.Admin
                 .Where(b =>
                     b.StartUtc >= startUtc &&
                     b.StartUtc < endUtc &&
-                    b.Status != "Cancelled" &&
+                    b.Status != BookingStatus.Cancelled &&
                     b.AssignedTo != null &&
                     b.AssignedTo == normalizedInspectorEmailRoute &&
                     orderedIds.Contains(b.BookingId))

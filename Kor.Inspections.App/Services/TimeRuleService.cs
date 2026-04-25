@@ -39,7 +39,7 @@ namespace Kor.Inspections.App.Services
             var utcEnd = TimeZoneInfo.ConvertTimeToUtc(localEnd, _tz);
 
             return await db.Bookings
-                .Where(b => b.Status != "Cancelled")
+                .Where(b => b.Status != BookingStatus.Cancelled)
                 .Where(b => b.StartUtc >= utcStart && b.StartUtc < utcEnd)
                 .ToListAsync();
         }
@@ -106,7 +106,7 @@ namespace Kor.Inspections.App.Services
             var padding = TimeSpan.FromMinutes(_options.TravelPaddingMinutes);
 
             var bookingsLocal = existingBookingsUtc
-                .Where(b => b.Status != "Cancelled")
+                .Where(b => b.Status != BookingStatus.Cancelled)
                 .Select(b => new
                 {
                     StartLocal = TimeZoneInfo.ConvertTimeFromUtc(b.StartUtc, _tz),
@@ -191,7 +191,7 @@ namespace Kor.Inspections.App.Services
                 _tz);
 
             var bookings = await db.Bookings
-                .Where(b => b.Status != "Cancelled")
+                .Where(b => b.Status != BookingStatus.Cancelled)
                 .Where(b => b.StartUtc >= minStartUtc && b.StartUtc < maxEndUtc)
                 .ToListAsync();
 

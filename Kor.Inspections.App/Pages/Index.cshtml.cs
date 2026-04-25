@@ -434,10 +434,10 @@ namespace Kor.Inspections.App.Pages
                 return new JsonResult(new { error = "Inspection not found." });
             }
 
-            if (string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(booking.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase))
                 return new JsonResult(new { ok = true });
 
-            if (string.Equals(booking.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(booking.Status, BookingStatus.Completed, StringComparison.OrdinalIgnoreCase))
             {
                 Response.StatusCode = 400;
                 return new JsonResult(new { error = "Completed inspections cannot be cancelled." });
@@ -449,11 +449,11 @@ namespace Kor.Inspections.App.Pages
                 return new JsonResult(new { error = "Cancellation window has closed for this inspection." });
             }
 
-            booking.Status = "Cancelled";
+            booking.Status = BookingStatus.Cancelled;
             _db.BookingActions.Add(new BookingAction
             {
                 BookingId = booking.BookingId,
-                ActionType = "Cancelled",
+                ActionType = BookingActionType.Cancelled,
                 PerformedBy = emailRaw,
                 ActionUtc = DateTime.UtcNow
             });
@@ -469,7 +469,7 @@ namespace Kor.Inspections.App.Pages
                     .AsNoTracking()
                     .FirstOrDefaultAsync(b => b.BookingId == bookingId);
 
-                if (string.Equals(current?.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(current?.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase))
                     return new JsonResult(new { ok = true });
 
                 Response.StatusCode = 409;
@@ -827,7 +827,7 @@ namespace Kor.Inspections.App.Pages
                     b.ProjectNumber == submittedProjectNumber &&
                     b.ContactEmail == submittedContactEmail &&
                     b.StartUtc == startUtc &&
-                    b.Status != "Cancelled" &&
+                    b.Status != BookingStatus.Cancelled &&
                     b.CreatedUtc >= duplicateCutoffUtc);
 
             if (duplicateExists)

@@ -77,7 +77,7 @@ namespace Kor.Inspections.App.Services
             var checkEndUtc = TimeZoneInfo.ConvertTimeToUtc(checkEndLocal, tz);
 
             var query = _db.Bookings
-                .Where(b => b.Status != "Cancelled" &&
+                .Where(b => b.Status != BookingStatus.Cancelled &&
                             b.StartUtc < checkEndUtc &&
                             b.EndUtc > checkStartUtc);
 
@@ -155,7 +155,7 @@ namespace Kor.Inspections.App.Services
 
             var overlapCount = await _db.Bookings
                 .Where(b =>
-                    b.Status != "Cancelled" &&
+                    b.Status != BookingStatus.Cancelled &&
                     b.StartUtc < checkEndUtc &&
                     b.EndUtc > checkStartUtc)
                 .CountAsync();
@@ -180,14 +180,14 @@ namespace Kor.Inspections.App.Services
                 StartUtc = startUtc,
                 EndUtc = endUtc,
                 TimePreference = timePreference,
-                Status = "Unassigned",
+                Status = BookingStatus.Unassigned,
                 CreatedUtc = DateTime.UtcNow
             };
 
             _db.Bookings.Add(booking);
             RecordAction(
                 booking.BookingId,
-                "Created",
+                BookingActionType.Created,
                 booking.ContactEmail);
             try
             {
@@ -222,16 +222,16 @@ namespace Kor.Inspections.App.Services
             if (booking == null)
                 return false;
 
-            if (string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(booking.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase))
                 return true;
 
-            if (string.Equals(booking.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(booking.Status, BookingStatus.Completed, StringComparison.OrdinalIgnoreCase))
                 return false;
 
-            booking.Status = "Cancelled";
+            booking.Status = BookingStatus.Cancelled;
             RecordAction(
                 booking.BookingId,
-                "Cancelled",
+                BookingActionType.Cancelled,
                 "client-token");
             try
             {
@@ -249,7 +249,7 @@ namespace Kor.Inspections.App.Services
                     "Concurrent cancellation detected for booking {BookingId}.",
                     booking.BookingId);
 
-                return string.Equals(current?.Status, "Cancelled", StringComparison.OrdinalIgnoreCase);
+                return string.Equals(current?.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase);
             }
 
             _logger.LogInformation("Booking {BookingId} cancelled via token.", booking.BookingId);

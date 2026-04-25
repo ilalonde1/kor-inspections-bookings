@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Kor.Inspections.App.Data;
+using Kor.Inspections.App.Data.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -61,14 +62,14 @@ namespace Kor.Inspections.App.Pages
                 return Page();
             }
 
-            if (string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(booking.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase))
             {
                 AlreadyCancelled = true;
                 await LoadAsync(booking);
                 return Page();
             }
 
-            if (string.Equals(booking.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(booking.Status, BookingStatus.Completed, StringComparison.OrdinalIgnoreCase))
             {
                 await LoadAsync(booking);
                 return Page();
@@ -103,7 +104,7 @@ namespace Kor.Inspections.App.Pages
             }
 
             AlreadyCancelled = string.Equals(
-                booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase);
+                booking.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase);
 
             var tz = _timeRules.TimeZone;
             var localStart = TimeZoneInfo.ConvertTimeFromUtc(booking.StartUtc, tz);
@@ -118,10 +119,10 @@ namespace Kor.Inspections.App.Pages
                 localStart,
                 localEnd);
             StatusText = booking.Status;
-            AssignedTo = await ResolveAssignedToDisplayAsync(booking.AssignedTo);
+            AssignedTo = await BookingDisplayHelper.ResolveAssignedToDisplayAsync(booking.AssignedTo, _db);
 
-            var isTerminal = (string.Equals(booking.Status, "Completed", StringComparison.OrdinalIgnoreCase) ||
-                              string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase)) &&
+            var isTerminal = (string.Equals(booking.Status, BookingStatus.Completed, StringComparison.OrdinalIgnoreCase) ||
+                              string.Equals(booking.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase)) &&
                              !_timeRules.IsCancellationAllowed(booking.StartUtc);
             if (isTerminal)
             {
@@ -130,19 +131,6 @@ namespace Kor.Inspections.App.Pages
             }
 
             CanCancel = !AlreadyCancelled && _timeRules.IsCancellationAllowed(booking.StartUtc);
-        }
-
-        private async Task<string?> ResolveAssignedToDisplayAsync(string? assignedTo)
-        {
-            if (string.IsNullOrWhiteSpace(assignedTo))
-                return assignedTo;
-
-            var displayName = await _db.Inspectors
-                .Where(i => i.Email == assignedTo)
-                .Select(i => i.DisplayName)
-                .FirstOrDefaultAsync();
-
-            return string.IsNullOrWhiteSpace(displayName) ? assignedTo : displayName;
         }
     }
 }
