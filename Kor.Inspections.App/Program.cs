@@ -29,22 +29,11 @@ builder.Host.UseSerilog((context, services, loggerConfiguration) =>
 builder.Services
     .AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
     .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
-builder.Services
-    .AddAuthentication()
-    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, HealthProbeAuthenticationHandler>(
-        HealthProbeAuthenticationHandler.SchemeName, _ => { });
 
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("HealthzAccess", policy =>
-    {
-        // /healthz is for monitoring probes only. OIDC's challenge writes a
-        // full 302 redirect and starts the response, which prevents any
-        // later scheme from sending 401. Restrict to HealthProbe so probes
-        // get a clean 401 on bad/missing keys instead of an HTML login page.
-        policy.AuthenticationSchemes.Add(HealthProbeAuthenticationHandler.SchemeName);
-        policy.RequireAuthenticatedUser();
-    });
+        policy.RequireAuthenticatedUser());
 });
 builder.Services.AddMemoryCache();
 
@@ -70,10 +59,7 @@ builder.Services.AddRazorPages(options =>
 builder.Services.AddDbContext<InspectionsContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("Sql")));
 builder.Services.AddHealthChecks()
-    .AddSqlServer(
-        builder.Configuration.GetConnectionString("Sql")!,
-        healthQuery: "SELECT 1;",
-        name: "sql-server");
+    .AddDbContextCheck<InspectionsContext>();
 
 // --------------------
 // Configuration options
@@ -173,7 +159,6 @@ if (app.Environment.IsProduction())
     ValidateRequiredSecret(builder.Configuration, "Graph:ClientSecret");
     ValidateRequiredSecret(builder.Configuration, "AzureAd:ClientSecret");
     ValidateRequiredSecret(builder.Configuration, "Deltek:OdbcDsn");
-    ValidateRequiredSecret(builder.Configuration, "Health:ProbeKey");
     ValidateRequiredConfiguration(builder.Configuration, "Notification:FromMailbox");
     ValidateRequiredConfiguration(builder.Configuration, "App:PublicBaseUrl");
 }
@@ -207,11 +192,7 @@ app.UseRateLimiter();
 
 app.MapRazorPages();
 app.MapHealthChecks("/healthz")
-    .RequireAuthorization(new Microsoft.AspNetCore.Authorization.AuthorizeAttribute
-    {
-        Policy = "HealthzAccess",
-        AuthenticationSchemes = HealthProbeAuthenticationHandler.SchemeName
-    });
+    .RequireAuthorization("HealthzAccess");
 
 app.Run();
 
