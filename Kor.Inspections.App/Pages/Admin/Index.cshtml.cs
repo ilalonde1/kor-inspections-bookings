@@ -215,7 +215,7 @@ namespace Kor.Inspections.App.Pages.Admin
                 return Page();
             }
 
-            var existingForDate = await GetExistingBookingsForLocalDateAsync(requestedDate);
+            var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
             var projectNumber = ProjectNumberHelper.Base5(ManualBooking.ProjectNumber.Trim());
             var submittedProjectNumberDisplay = ManualBooking.ProjectNumber.Trim();
             string? resolvedProjectName = null;
@@ -567,7 +567,7 @@ namespace Kor.Inspections.App.Pages.Admin
                 }
 
                 // Slot availability — EXCLUDE the booking being edited so it doesn't conflict with itself.
-                var existingForDate = await GetExistingBookingsForLocalDateAsync(requestedDate);
+                var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
                 var existingExcludingSelf = existingForDate.Where(b => b.BookingId != id).ToList();
                 var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate).ToList();
 
@@ -868,20 +868,6 @@ namespace Kor.Inspections.App.Pages.Admin
             return tomorrow < minDate ? tomorrow : minDate;
         }
 
-        private async Task<List<Booking>> GetExistingBookingsForLocalDateAsync(DateOnly localDate)
-        {
-            var localStart = localDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-            var localEnd = localDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-
-            var utcStart = TimeZoneInfo.ConvertTimeToUtc(localStart, _timeRules.TimeZone);
-            var utcEnd = TimeZoneInfo.ConvertTimeToUtc(localEnd, _timeRules.TimeZone);
-
-            return await _db.Bookings
-                .Where(b => b.Status != "Cancelled")
-                .Where(b => b.StartUtc >= utcStart && b.StartUtc < utcEnd)
-                .ToListAsync();
-        }
-
         private async Task LoadManualBookingTimesAsync()
         {
             AvailableManualTimes = new();
@@ -891,7 +877,7 @@ namespace Kor.Inspections.App.Pages.Admin
 
             var requestedDate = DateOnly.FromDateTime(ManualBooking.RequestedDate.Value);
             var minDate = GetMinimumManualBookingDate(ManualBooking.OverrideCutoff);
-            var existingForDate = await GetExistingBookingsForLocalDateAsync(requestedDate);
+            var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
             AvailableManualTimes = _timeRules
                 .GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate)
                 .Select(t => t.ToString("HH:mm"))

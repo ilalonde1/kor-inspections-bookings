@@ -28,6 +28,22 @@ namespace Kor.Inspections.App.Services
         public TimeZoneInfo TimeZone => _tz;
         public int DefaultDurationMinutes => _options.DefaultDurationMinutes;
 
+        public async Task<List<Booking>> GetExistingBookingsForLocalDateAsync(
+            InspectionsContext db,
+            DateOnly localDate)
+        {
+            var localStart = localDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+            var localEnd = localDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+
+            var utcStart = TimeZoneInfo.ConvertTimeToUtc(localStart, _tz);
+            var utcEnd = TimeZoneInfo.ConvertTimeToUtc(localEnd, _tz);
+
+            return await db.Bookings
+                .Where(b => b.Status != "Cancelled")
+                .Where(b => b.StartUtc >= utcStart && b.StartUtc < utcEnd)
+                .ToListAsync();
+        }
+
         // --------------------------------------------------
         // Allowed Booking Window
         // --------------------------------------------------
