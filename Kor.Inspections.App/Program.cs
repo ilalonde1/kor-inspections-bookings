@@ -65,26 +65,40 @@ builder.Services.AddHealthChecks()
 // Configuration options
 // --------------------
 
-builder.Services.Configure<InspectionRulesOptions>(
-    builder.Configuration.GetSection("InspectionRules"));
+builder.Services.AddOptions<InspectionRulesOptions>()
+    .Bind(builder.Configuration.GetSection("InspectionRules"))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
-builder.Services.Configure<NotificationOptions>(
-    builder.Configuration.GetSection("Notification"));
+builder.Services.AddOptions<NotificationOptions>()
+    .Bind(builder.Configuration.GetSection("Notification"))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
-builder.Services.Configure<AppOptions>(
-    builder.Configuration.GetSection("App"));
+builder.Services.AddOptions<AppOptions>()
+    .Bind(builder.Configuration.GetSection("App"))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
-builder.Services.Configure<SupportOptions>(
-    builder.Configuration.GetSection("Support"));
+builder.Services.AddOptions<SupportOptions>()
+    .Bind(builder.Configuration.GetSection("Support"))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
-builder.Services.Configure<DeltekProjectOptions>(
-    builder.Configuration.GetSection("Deltek"));
+builder.Services.AddOptions<DeltekProjectOptions>()
+    .Bind(builder.Configuration.GetSection("Deltek"))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 // --------------------
 // HTTP + core services
 // --------------------
 
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("GraphMail", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 
 builder.Services.AddSingleton<IGraphAccessTokenSource, MsalGraphAccessTokenSource>();
 builder.Services.AddSingleton<IGraphTokenProvider, GraphTokenProvider>();
@@ -174,7 +188,15 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        const int sevenDaysSeconds = 7 * 24 * 60 * 60;
+        ctx.Context.Response.Headers["Cache-Control"] =
+            $"public, max-age={sevenDaysSeconds}";
+    }
+});
 
 app.UseRouting();
 app.UseSerilogRequestLogging();

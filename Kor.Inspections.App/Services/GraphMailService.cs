@@ -145,7 +145,7 @@ namespace Kor.Inspections.App.Services
 
             var json = JsonSerializer.Serialize(payload);
 
-            var client = _httpClientFactory.CreateClient();
+            var client = _httpClientFactory.CreateClient("GraphMail");
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             var url = $"https://graph.microsoft.com/v1.0/users/{Uri.EscapeDataString(fromUserPrincipalName)}/sendMail";
