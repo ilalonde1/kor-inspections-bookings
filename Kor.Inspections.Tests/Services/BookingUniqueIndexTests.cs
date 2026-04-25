@@ -108,7 +108,7 @@ public class BookingUniqueIndexTests
     private static BookingService CreateBookingService(InspectionsContext db)
     {
         var timeZone = TimeRuleServiceTestFactory.FindZone(nowLocal =>
-            nowLocal.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
+            nowLocal.AddDays(1).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
             nowLocal.Hour <= 22);
         var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
         var timeRules = TimeRuleServiceTestFactory.Create(timeZone, nowLocal.Hour + 1, maxBookingsPerSlot: 10);

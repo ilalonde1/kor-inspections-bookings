@@ -126,11 +126,14 @@ public class AdminIndexModelCreateBookingTests
     private static IndexModel CreateModel(InspectionsContext db, out DateTime nowLocal, int defaultDurationMinutes = 60)
     {
         var timeZone = TimeRuleServiceTestFactory.FindZone(localNow =>
-            localNow.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
-            localNow.Hour >= 15 &&
+            localNow.AddDays(1).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
             localNow.Hour <= 22);
         nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
-        var timeRules = TimeRuleServiceTestFactory.Create(timeZone, cutoffHourLocal: 14, defaultDurationMinutes: defaultDurationMinutes);
+        var cutoffHourLocal = Math.Max(0, nowLocal.Hour - 1);
+        var timeRules = TimeRuleServiceTestFactory.Create(
+            timeZone,
+            cutoffHourLocal: cutoffHourLocal,
+            defaultDurationMinutes: defaultDurationMinutes);
 
         var bookingService = new BookingService(
             db,
@@ -145,7 +148,7 @@ public class AdminIndexModelCreateBookingTests
             new GraphMailService(new ThrowingTokenProvider(), new NoOpHttpClientFactory()),
             Options.Create(new InspectionRulesOptions
             {
-                CutoffHourLocal = 14,
+                CutoffHourLocal = cutoffHourLocal,
                 BookingWindowDays = 7,
                 SlotMinutes = 30,
                 DefaultDurationMinutes = 60,

@@ -276,7 +276,7 @@ public class AdminIndexModelEditBookingTests
     private static (TimeZoneInfo Zone, DateTime NowLocal) PickWeekdayAfternoonZone()
     {
         var zone = TimeRuleServiceTestFactory.FindZone(local =>
-            local.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
+            local.AddDays(1).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
             local.Hour <= 22);
         var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zone);
         return (zone, nowLocal);
