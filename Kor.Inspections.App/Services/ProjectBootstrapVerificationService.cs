@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using System.Threading;
@@ -136,7 +137,49 @@ namespace Kor.Inspections.App.Services
                 }
             }
 
-            await _db.SaveChangesAsync(ct);
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex)
+                when (ex.InnerException?.Message.Contains("IX_ProjectVerifications_ProjectEmail") == true ||
+                      ex.InnerException?.Message.Contains("UNIQUE constraint failed: ProjectVerifications.ProjectNumber") == true)
+            {
+                // Concurrent SendCodeAsync inserted first. Detach our pending Add,
+                // refresh the winner's row's expiry, and skip the email send - the
+                // winning call already triggered one with the persisted code.
+                foreach (var entry in _db.ChangeTracker.Entries<ProjectVerification>()
+                    .Where(e => e.State == EntityState.Added).ToList())
+                {
+                    entry.State = EntityState.Detached;
+                }
+
+                var raceWinner = await _db.ProjectVerifications.FirstOrDefaultAsync(
+                    v => v.ProjectNumber == normalizedProject && v.Email == normalizedEmail,
+                    ct);
+
+                if (raceWinner == null)
+                {
+                    _logger.LogError(
+                        "Race recovery: unique-index conflict but no row found for project {ProjectNumber}, email {Email}.",
+                        normalizedProject,
+                        normalizedEmail);
+                    return false;
+                }
+
+                raceWinner.ExpiresUtc = now + PendingTtl;
+                raceWinner.UpdatedUtc = now;
+                try
+                {
+                    await _db.SaveChangesAsync(ct);
+                }
+                catch (DbUpdateException)
+                {
+                    // Concurrent expiry refresh; non-fatal - winner's email is already in flight.
+                }
+
+                return true;
+            }
 
             try
             {

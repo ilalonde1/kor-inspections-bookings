@@ -3,6 +3,7 @@ using Kor.Inspections.App.Data.Models;
 using Kor.Inspections.App.Options;
 using Kor.Inspections.App.Services;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -129,6 +130,54 @@ public class ProjectBootstrapVerificationServiceTests
         Assert.Equal(code, row.Code);
     }
 
+    [Fact]
+    public async Task SendCodeAsync_TwoConcurrentCallsForSameProjectEmail_BothSucceedAndOnlyOneRowPersists()
+    {
+        // Sqlite in-memory enforces unique indexes; EF InMemory does not.
+        var connection = new Microsoft.Data.Sqlite.SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        try
+        {
+            var options = new DbContextOptionsBuilder<InspectionsContext>()
+                .UseSqlite(connection)
+                .Options;
+
+            await using (var schemaDb = new InspectionsContext(options))
+            {
+                await schemaDb.Database.EnsureCreatedAsync();
+            }
+
+            // Two separate DbContexts (and services) so they don't share a change tracker -
+            // mirrors two concurrent HTTP requests in production.
+            await using var dbA = new InspectionsContext(options);
+            await using var dbB = new InspectionsContext(options);
+
+            var serviceA = CreateService(dbA);
+            var serviceB = CreateService(dbB);
+
+            // Run both calls concurrently; neither should throw.
+            var taskA = serviceA.SendCodeAsync(ProjectNumber, Email);
+            var taskB = serviceB.SendCodeAsync(ProjectNumber, Email);
+
+            await Task.WhenAll(taskA, taskB);
+
+            Assert.True(taskA.Result);
+            Assert.True(taskB.Result);
+
+            // Assert exactly one row persisted.
+            await using var verifyDb = new InspectionsContext(options);
+            var rows = await verifyDb.ProjectVerifications
+                .Where(v => v.ProjectNumber == ProjectNumber && v.Email == Email)
+                .ToListAsync();
+            Assert.Single(rows);
+        }
+        finally
+        {
+            await connection.DisposeAsync();
+        }
+    }
+
     // --------------------------------------------------
     // HELPERS
     // --------------------------------------------------
@@ -144,7 +193,7 @@ public class ProjectBootstrapVerificationServiceTests
     private static ProjectBootstrapVerificationService CreateService(InspectionsContext db)
     {
         return new ProjectBootstrapVerificationService(
-            new GraphMailService(new ThrowingTokenProvider(), new NoOpHttpClientFactory()),
+            new GraphMailService(new SuccessTokenProvider(), new SuccessHttpClientFactory()),
             Options.Create(new NotificationOptions
             {
                 FromMailbox = "reviews@example.com",
@@ -155,16 +204,23 @@ public class ProjectBootstrapVerificationServiceTests
             NullLogger<ProjectBootstrapVerificationService>.Instance);
     }
 
-    private sealed class ThrowingTokenProvider : IGraphTokenProvider
+    private sealed class SuccessTokenProvider : IGraphTokenProvider
     {
-        public Task<string> GetTokenAsync()
-        {
-            throw new InvalidOperationException("Missing Graph configuration.");
-        }
+        public Task<string> GetTokenAsync() => Task.FromResult("test-token");
     }
 
-    private sealed class NoOpHttpClientFactory : IHttpClientFactory
+    private sealed class SuccessHttpClientFactory : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name) => new();
+        public HttpClient CreateClient(string name) => new(new SuccessHandler());
+    }
+
+    private sealed class SuccessHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Accepted));
+        }
     }
 }
