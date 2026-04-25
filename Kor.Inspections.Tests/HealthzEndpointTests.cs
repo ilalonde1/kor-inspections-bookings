@@ -22,7 +22,7 @@ public class HealthzEndpointTests
         await using var factory = new HealthzWebApplicationFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("http://example.com"),
+            BaseAddress = new Uri("http://localhost"),
             AllowAutoRedirect = false
         });
 
