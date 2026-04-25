@@ -2,6 +2,19 @@
 {
     public static class BookingDisplayHelper
     {
+        public static string FormatJobLine(
+            string? projectNumberDisplay,
+            string? projectName,
+            string fallbackProjectNumber)
+        {
+            var displayNumber = string.IsNullOrWhiteSpace(projectNumberDisplay)
+                ? (fallbackProjectNumber ?? string.Empty)
+                : projectNumberDisplay;
+            return string.IsNullOrWhiteSpace(projectName)
+                ? displayNumber
+                : $"{displayNumber} {projectName}";
+        }
+
         public static string GetTimeDisplay(
             string? timePreference,
             DateTime startLocal,

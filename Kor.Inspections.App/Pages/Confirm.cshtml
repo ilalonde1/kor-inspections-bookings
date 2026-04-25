@@ -22,7 +22,7 @@
             @displayNumber@(string.IsNullOrWhiteSpace(Model.Booking.ProjectName) ? "" : " " + Model.Booking.ProjectName)
         </li>
         <li>Address: @Model.Booking.ProjectAddress</li>
-        <li>Contact: @Model.Booking.ContactName (@Model.Booking.ContactPhone)</li>
+        <li>Contact: @Model.Booking.ContactName (@PhoneNormalizer.Format(Model.Booking.ContactPhone))</li>
         <li>
             Date and time (local):
             @{

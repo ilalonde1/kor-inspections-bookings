@@ -91,6 +91,8 @@ namespace Kor.Inspections.App.Pages.Admin
 
             public string ProjectNumber { get; set; } = string.Empty;
             public string ProjectAddress { get; set; } = string.Empty;
+            public string? ProjectNumberDisplay { get; set; }
+            public string? ProjectName { get; set; }
 
             public string ContactName { get; set; } = string.Empty;
             public string ContactPhone { get; set; } = string.Empty;
@@ -784,6 +786,8 @@ namespace Kor.Inspections.App.Pages.Admin
 
                     ProjectNumber = b.ProjectNumber,
                     ProjectAddress = b.ProjectAddress ?? "",
+                    ProjectNumberDisplay = b.ProjectNumberDisplay,
+                    ProjectName = b.ProjectName,
                     ContactName = b.ContactName,
                     ContactPhone = b.ContactPhone,
                     ContactEmail = b.ContactEmail ?? "",

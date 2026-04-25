@@ -17,7 +17,7 @@ else
     {
         <p>This booking is no longer active.</p>
         <p>
-            <strong>Project:</strong> @Model.ProjectNumber<br />
+            <strong>Project:</strong> @Kor.Inspections.App.Services.BookingDisplayHelper.FormatJobLine(Model.ProjectNumberDisplay, Model.ProjectName, Model.ProjectNumber)<br />
             <strong>Date:</strong> @Model.LocalDateText<br />
             <strong>Time:</strong> @Model.LocalTimeText<br />
             <strong>Status:</strong> @Model.StatusText
@@ -37,7 +37,7 @@ else
     else
     {
         <p>
-            <strong>Project:</strong> @Model.ProjectNumber<br />
+            <strong>Project:</strong> @Kor.Inspections.App.Services.BookingDisplayHelper.FormatJobLine(Model.ProjectNumberDisplay, Model.ProjectName, Model.ProjectNumber)<br />
             <strong>Date:</strong> @Model.LocalDateText<br />
             <strong>Time:</strong> @Model.LocalTimeText
         </p>

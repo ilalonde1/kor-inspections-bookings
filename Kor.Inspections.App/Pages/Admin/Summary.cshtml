@@ -118,9 +118,9 @@
                                         b.StartLocal,
                                         b.EndLocal)
                     </td>
-                            <td>@b.ProjectNumber</td>
+                            <td>@BookingDisplayHelper.FormatJobLine(b.ProjectNumberDisplay, b.ProjectName, b.ProjectNumber)</td>
                             <td>@b.ProjectAddress</td>
-                            <td>@b.ContactName (@b.ContactPhone)</td>
+                            <td>@b.ContactName (@PhoneNormalizer.Format(b.ContactPhone))</td>
                             <td>@b.AssignedTo</td>
                             <td>@b.Status</td>
                             <td>@b.Comments</td>
@@ -188,7 +188,7 @@
                                             b.StartLocal,
                                             b.EndLocal)
                                     </span>
-                                    <span class="summary-route-job">@b.ProjectNumber</span>
+                                    <span class="summary-route-job">@BookingDisplayHelper.FormatJobLine(b.ProjectNumberDisplay, b.ProjectName, b.ProjectNumber)</span>
                                     <span class="summary-route-address">@b.ProjectAddress</span>
                                 </li>
                             }
