@@ -128,14 +128,17 @@ namespace Kor.Inspections.App.Services
             string? address)
         {
             if (string.IsNullOrWhiteSpace(email))
-                throw new ArgumentException("Contact email is required.", nameof(email));
+                throw new InvalidContactEmailException("Contact email is required.");
 
             email = email.Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(GetEmailDomain(email)))
+                throw new InvalidContactEmailException("Invalid contact email.");
+
             contactEmail = (contactEmail ?? string.Empty).Trim().ToLowerInvariant();
             var domain = GetEmailDomain(contactEmail);
 
             if (string.IsNullOrWhiteSpace(domain))
-                throw new ArgumentException("Invalid contact email.", nameof(email));
+                throw new InvalidContactEmailException("Invalid contact email.");
 
             projectNumber = NormalizeProject(projectNumber);
 
@@ -149,7 +152,7 @@ namespace Kor.Inspections.App.Services
                     c.ProjectNumber == projectNumber &&
                     c.EmailDomain == domain &&
                     !c.IsDeleted)
-                    ?? throw new InvalidOperationException("Contact not found.");
+                    ?? throw new ContactNotFoundException("Contact not found.");
             }
             else
             {
@@ -191,7 +194,7 @@ namespace Kor.Inspections.App.Services
             catch (DbUpdateException ex)
                 when (ex.InnerException?.Message.Contains("IX_ProjectContacts") == true)
             {
-                throw new InvalidOperationException(
+                throw new ContactAlreadyExistsException(
                     "A contact with this email already exists for this project.");
             }
 
@@ -288,5 +291,20 @@ namespace Kor.Inspections.App.Services
         public List<ProjectContact> Contacts { get; set; } = new();
 
         public static ProjectProfileResult Empty() => new();
+    }
+
+    public class ContactNotFoundException : Exception
+    {
+        public ContactNotFoundException(string message) : base(message) { }
+    }
+
+    public class InvalidContactEmailException : Exception
+    {
+        public InvalidContactEmailException(string message) : base(message) { }
+    }
+
+    public class ContactAlreadyExistsException : Exception
+    {
+        public ContactAlreadyExistsException(string message) : base(message) { }
     }
 }
