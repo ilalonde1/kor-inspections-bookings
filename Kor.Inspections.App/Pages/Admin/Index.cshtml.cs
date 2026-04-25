@@ -305,11 +305,9 @@ namespace Kor.Inspections.App.Pages.Admin
                     submittedProjectNumberDisplay,
                     resolvedProjectName);
             }
-            catch (BookingSlotUnavailableException)
+            catch (BookingSlotUnavailableException ex)
             {
-                ModelState.AddModelError(
-                    "ManualBooking.RequestedTime",
-                    "Selected time is no longer available. Please choose another time.");
+                ModelState.AddModelError("ManualBooking.RequestedTime", ex.Message);
                 await LoadDataAsync();
                 await LoadManualBookingTimesAsync();
                 return Page();

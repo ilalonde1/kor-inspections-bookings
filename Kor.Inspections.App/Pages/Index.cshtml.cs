@@ -865,11 +865,10 @@ namespace Kor.Inspections.App.Pages
                     submittedProjectNumberDisplay,
                     resolvedProjectName);
             }
-            catch (BookingSlotUnavailableException)
+            catch (BookingSlotUnavailableException ex)
             {
                 await LoadAllowedDatesAndTimesAsync();
-                ModelState.AddModelError(string.Empty,
-                    "Selected time is no longer available. Please choose another time.");
+                ModelState.AddModelError(string.Empty, ex.Message);
                 return Page();
             }
 
