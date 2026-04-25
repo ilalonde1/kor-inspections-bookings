@@ -48,6 +48,11 @@ namespace Kor.Inspections.App.Pages
         public async Task OnGetAsync()
         {
             ViewData["Title"] = "Manage Booking";
+            if (Token == Guid.Empty)
+            {
+                BookingNotFound = true;
+                return;
+            }
             await LoadAsync();
         }
 

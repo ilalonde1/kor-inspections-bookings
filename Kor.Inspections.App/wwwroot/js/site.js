@@ -141,6 +141,18 @@ window.KorPostbackFocus = (function () {
     };
 })();
 
+// Generic confirm-on-click for buttons/forms with data-confirm.
+// Replaces inline onclick="return confirm(...)" patterns so we stay CSP-friendly.
+document.addEventListener("click", function (e) {
+    const target = e.target?.closest?.("[data-confirm]");
+    if (!target) return;
+    const message = target.getAttribute("data-confirm");
+    if (message && !window.confirm(message)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+    }
+}, true);
+
 (function () {
 
     document.addEventListener("DOMContentLoaded", function () {

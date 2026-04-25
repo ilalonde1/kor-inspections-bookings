@@ -50,13 +50,13 @@
     let modalBackdropPointerDown = false;
 
     document.getElementById("openContactModalBtn")
-        .addEventListener("click", e => {
+        ?.addEventListener("click", e => {
             lastModalTrigger = e.currentTarget;
             openModal();
         });
 
     document.getElementById("closeModalBtn")
-        .addEventListener("click", closeModal);
+        ?.addEventListener("click", closeModal);
 
     cancelEditBtn
         .addEventListener("click", resetContactForm);
@@ -684,7 +684,7 @@
     });
     modal.addEventListener("keydown", handleModalKeydown);
     document.querySelector(".kor-modal-content")
-        .addEventListener("click", e => e.stopPropagation());
+        ?.addEventListener("click", e => e.stopPropagation());
 
     function resetContactForm() {
         editIdInput.value = "";
@@ -915,7 +915,7 @@
     }
 
     document.getElementById("saveContactBtn")
-        .addEventListener("click", () => {
+        ?.addEventListener("click", () => {
 
             const saveBtn = document.getElementById("saveContactBtn");
             const originalSaveText = saveBtn.textContent;

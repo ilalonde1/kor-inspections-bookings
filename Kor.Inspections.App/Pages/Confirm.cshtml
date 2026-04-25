@@ -29,7 +29,7 @@
                 // IMPORTANT: use the same timezone source as the rest of the app
                 var tz = Model.TimeZone;
                 var localStart = TimeZoneInfo.ConvertTimeFromUtc(Model.Booking.StartUtc, tz);
-                var localEnd = TimeZoneInfo.ConvertTimeFromUtc(Model.Booking.EndUtc, tz); // THIS WAS MISSING
+                var localEnd = TimeZoneInfo.ConvertTimeFromUtc(Model.Booking.EndUtc, tz);
             }
             @localStart.ToString("yyyy-MM-dd")
             @BookingDisplayHelper.GetTimeDisplay(
