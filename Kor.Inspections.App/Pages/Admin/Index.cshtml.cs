@@ -368,9 +368,7 @@ namespace Kor.Inspections.App.Pages.Admin
             {
                 var assignedToTrimmed = assignedTo.Trim();
                 inspector = await _db.Inspectors
-                    .FirstOrDefaultAsync(i =>
-                        i.Enabled &&
-                        (i.Email == assignedToTrimmed || i.DisplayName == assignedToTrimmed));
+                    .FirstOrDefaultAsync(i => i.Enabled && i.Email == assignedToTrimmed);
 
                 if (inspector == null)
                 {
@@ -397,12 +395,15 @@ namespace Kor.Inspections.App.Pages.Admin
                 StatusMessage = $"Booking assigned to {assignedInspectorLabel}.";
             }
 
+            var isUnassign = booking.AssignedTo is null;
             _db.BookingActions.Add(new BookingAction
             {
                 BookingId = booking.BookingId,
-                ActionType = BookingActionType.Assigned,
+                ActionType = isUnassign ? BookingActionType.Unassigned : BookingActionType.Assigned,
                 PerformedBy = User.Identity?.Name,
-                Notes = $"Assigned to {assignedInspectorLabel}",
+                Notes = isUnassign
+                    ? $"Unassigned (was: {oldAssignedTo ?? "none"})"
+                    : $"Assigned to {assignedInspectorLabel}",
                 ActionUtc = DateTime.UtcNow
             });
 

@@ -19,6 +19,8 @@ namespace Kor.Inspections.App.Data.Models
     {
         public const string Created = "Created";
         public const string Assigned = "Assigned";
+        // Used by admin unassign audit rows as BookingActionType.Unassigned.
+        public const string Unassigned = "Unassigned";
         public const string Edited = "Edited";
         public const string Cancelled = "Cancelled";
     }

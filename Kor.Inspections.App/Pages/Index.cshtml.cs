@@ -290,6 +290,7 @@ namespace Kor.Inspections.App.Pages
             return new JsonResult(list);
         }
 
+        [EnableRateLimiting("contactMutation")]
         public async Task<JsonResult> OnPostLookupContactsAsync([FromBody] LookupContactsRequest req)
         {
             var project = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
@@ -327,6 +328,7 @@ namespace Kor.Inspections.App.Pages
         // Lookup inspections by project
         // ---------------------------------------------------------
 
+        [EnableRateLimiting("contactMutation")]
         public async Task<JsonResult> OnPostLookupInspectionsAsync([FromBody] LookupContactsRequest req)
         {
             var projectRaw = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
@@ -384,6 +386,7 @@ namespace Kor.Inspections.App.Pages
             return new JsonResult(list);
         }
 
+        [EnableRateLimiting("booking")]
         public async Task<JsonResult> OnPostCancelInspectionAsync([FromBody] CancelInspectionRequest req)
         {
             var projectRaw = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
@@ -715,7 +718,13 @@ namespace Kor.Inspections.App.Pages
         public async Task<IActionResult> OnPostBookAsync()
         {
             if (!string.IsNullOrWhiteSpace(CompanyFax))
-                return RedirectToPage("Confirm");
+            {
+                _logger.LogWarning(
+                    "Honeypot field 'CompanyFax' was filled. RemoteIp={RemoteIp}",
+                    HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+                await LoadAllowedDatesAndTimesAsync();
+                return Page();
+            }
 
             await LoadAllowedDatesAndTimesAsync();
 

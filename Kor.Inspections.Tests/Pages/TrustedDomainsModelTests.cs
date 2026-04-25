@@ -16,7 +16,7 @@ public class TrustedDomainsModelTests
     public async Task OnGetAsync_NoRows_ReturnsEmptyList()
     {
         await using var db = CreateContext();
-        var model = new TrustedDomainsModel(db);
+        var model = new TrustedDomainsModel(db, NullLogger<TrustedDomainsModel>.Instance);
 
         await model.OnGetAsync();
 
@@ -33,7 +33,7 @@ public class TrustedDomainsModelTests
             new ProjectDefault { ProjectNumber = "30844", EmailDomain = "alpha.com", UpdatedUtc = DateTime.UtcNow });
         await db.SaveChangesAsync();
 
-        var model = new TrustedDomainsModel(db);
+        var model = new TrustedDomainsModel(db, NullLogger<TrustedDomainsModel>.Instance);
 
         await model.OnGetAsync();
 
@@ -70,7 +70,7 @@ public class TrustedDomainsModelTests
         db.ProjectDefaults.Add(row);
         await db.SaveChangesAsync();
 
-        var model = new TrustedDomainsModel(db);
+        var model = new TrustedDomainsModel(db, NullLogger<TrustedDomainsModel>.Instance);
 
         var result = await model.OnPostRevokeAsync(row.Id);
 
@@ -83,7 +83,7 @@ public class TrustedDomainsModelTests
     public async Task OnPostRevokeAsync_MissingId_SetsNotFoundStatusMessage()
     {
         await using var db = CreateContext();
-        var model = new TrustedDomainsModel(db);
+        var model = new TrustedDomainsModel(db, NullLogger<TrustedDomainsModel>.Instance);
 
         var result = await model.OnPostRevokeAsync(999);
 
@@ -104,7 +104,7 @@ public class TrustedDomainsModelTests
         db.ProjectDefaults.Add(row);
         await db.SaveChangesAsync();
 
-        var model = new TrustedDomainsModel(db);
+        var model = new TrustedDomainsModel(db, NullLogger<TrustedDomainsModel>.Instance);
         await model.OnPostRevokeAsync(row.Id);
 
         var service = CreateVerificationService(db);
@@ -126,7 +126,7 @@ public class TrustedDomainsModelTests
         });
         await db.SaveChangesAsync();
 
-        var model = new TrustedDomainsModel(db);
+        var model = new TrustedDomainsModel(db, NullLogger<TrustedDomainsModel>.Instance);
 
         await model.OnGetAsync();
 
