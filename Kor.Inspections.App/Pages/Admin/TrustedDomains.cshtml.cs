@@ -33,20 +33,28 @@ namespace Kor.Inspections.App.Pages.Admin
 
         public async Task OnGetAsync()
         {
-            TrustedDomains = await _db.ProjectDefaults
+            var raw = await _db.ProjectDefaults
                 .AsNoTracking()
                 .OrderBy(x => x.ProjectNumber)
                 .ThenBy(x => x.EmailDomain)
-                .Select(x => new TrustedDomainRow
-                {
-                    Id = x.Id,
-                    ProjectNumber = x.ProjectNumber,
-                    EmailDomain = x.EmailDomain,
-                    ApprovedUtc = x.UpdatedUtc,
-                    ExpiresUtc = ProjectBootstrapVerificationService.GetExplicitDomainApprovalExpirationUtc(x.UpdatedUtc),
-                    IsExpired = ProjectBootstrapVerificationService.GetExplicitDomainApprovalExpirationUtc(x.UpdatedUtc) < DateTime.UtcNow
-                })
                 .ToListAsync();
+
+            var nowUtc = DateTime.UtcNow;
+            TrustedDomains = raw
+                .Select(x =>
+                {
+                    var expiresUtc = ProjectBootstrapVerificationService.GetExplicitDomainApprovalExpirationUtc(x.UpdatedUtc);
+                    return new TrustedDomainRow
+                    {
+                        Id = x.Id,
+                        ProjectNumber = x.ProjectNumber,
+                        EmailDomain = x.EmailDomain,
+                        ApprovedUtc = x.UpdatedUtc,
+                        ExpiresUtc = expiresUtc,
+                        IsExpired = expiresUtc < nowUtc
+                    };
+                })
+                .ToList();
         }
 
         public async Task<IActionResult> OnPostRevokeAsync(int id)

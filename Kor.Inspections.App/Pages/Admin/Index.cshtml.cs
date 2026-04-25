@@ -638,7 +638,10 @@ namespace Kor.Inspections.App.Pages.Admin
                 StatusMessage = "This booking was just modified by another user. Please refresh and try again.";
                 return RedirectToPage(redirectArgs);
             }
-            catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_Bookings_NoDuplicateActiveSlot", StringComparison.Ordinal) == true)
+            catch (DbUpdateException ex) when (
+                DbUpdateExceptionClassifier.IsNamedUniqueConstraintViolation(
+                    ex,
+                    "IX_Bookings_NoDuplicateActiveSlot"))
             {
                 _db.ChangeTracker.Clear();
                 StatusMessage = "Cannot reschedule: another active booking already exists for this contact at the selected time.";
@@ -793,25 +796,13 @@ namespace Kor.Inspections.App.Pages.Admin
                     ContactEmail = b.ContactEmail ?? "",
                     Status = b.Status,
                     AssignedToValue = b.AssignedTo,
-                    AssignedTo = ResolveAssignedToDisplay(b.AssignedTo, inspectorsByEmail),
+                    AssignedTo = BookingDisplayHelper.ResolveAssignedToDisplay(b.AssignedTo, inspectorsByEmail) ?? "Unassigned",
                     Comments = b.Comments
                 };
             }).ToList();
         }
 
         // --------------------------------------------------
-
-        private static string ResolveAssignedToDisplay(
-            string? assignedTo,
-            IReadOnlyDictionary<string, string> inspectorsByEmail)
-        {
-            if (string.IsNullOrWhiteSpace(assignedTo))
-                return "Unassigned";
-
-            return inspectorsByEmail.TryGetValue(assignedTo, out var displayName)
-                ? displayName
-                : assignedTo;
-        }
 
         public string ToggleDir(string column)
         {

@@ -992,16 +992,6 @@
         });
 
     contactPhoneInput.addEventListener("input", () => {
-        let digits = (contactPhoneInput.value || "").replace(/\D/g, "").slice(0, 10);
-
-        if (digits.length >= 7) {
-            contactPhoneInput.value = `(${digits.slice(0, 3)})-${digits.slice(3, 6)}-${digits.slice(6)}`;
-        } else if (digits.length >= 4) {
-            contactPhoneInput.value = `(${digits.slice(0, 3)})-${digits.slice(3)}`;
-        } else if (digits.length > 0) {
-            contactPhoneInput.value = `(${digits}`;
-        } else {
-            contactPhoneInput.value = "";
-        }
+        contactPhoneInput.value = window.formatKorPhoneInput(contactPhoneInput.value);
     });
 
