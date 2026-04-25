@@ -10,6 +10,7 @@ namespace Kor.Inspections.App.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // NOTE: superseded by the subsequent 20260212123000_MakeTimePreferenceNullable migration, which re-applies the same AlterColumn. Both are recorded in __EFMigrationsHistory; the later one is a no-op against the already-nullable column.
             migrationBuilder.AlterColumn<string>(
                 name: "TimePreference",
                 table: "Bookings",

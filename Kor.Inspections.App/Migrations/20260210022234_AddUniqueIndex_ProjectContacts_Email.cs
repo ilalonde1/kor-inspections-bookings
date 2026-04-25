@@ -10,7 +10,7 @@ namespace Kor.Inspections.App.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-
+            // Intentionally empty. Migration generated to bump the model snapshot; the corresponding schema change was already present in the DB.
         }
 
         /// <inheritdoc />
