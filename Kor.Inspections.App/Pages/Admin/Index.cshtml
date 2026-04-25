@@ -312,7 +312,7 @@
                                           asp-page-handler="Cancel"
                                           class="admin-cancel-form">
                                         <input type="hidden" name="id" value="@b.BookingId" />
-                                        <button class="admin-btn admin-btn-cancel admin-action-full">Cancel Booking</button>
+                                        <button type="submit" class="admin-btn admin-btn-cancel admin-action-full">Cancel Booking</button>
                                     </form>
 
                                     <details class="admin-edit-panel" style="margin-top:6px;">
@@ -355,7 +355,7 @@
     {
         <div class="mobile-today-panel" id="adminMobileTodayPanel" hidden>
             <h3>Today's Inspections</h3>
-            <button id="mobileRouteBtn" class="btn btn-success"> Navigate Today's Route </button>
+            <button type="button" id="mobileRouteBtn" class="btn btn-success"> Navigate Today's Route </button>
             <div id="mobileTodayList"></div>
         </div>
 
