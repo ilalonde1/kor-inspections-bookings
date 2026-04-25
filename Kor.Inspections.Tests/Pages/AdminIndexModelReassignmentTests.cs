@@ -45,6 +45,9 @@ public class AdminIndexModelReassignmentTests
 
         // Two recipients go through the send pipeline: client + new inspector.
         Assert.Equal(2, emailHandler.RequestCount);
+        Assert.Contains(
+            emailHandler.CapturedBodies,
+            body => body.Contains("Inspector Has Changed", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -91,6 +94,27 @@ public class AdminIndexModelReassignmentTests
         Assert.Null(updated.AssignedTo);
         Assert.Equal("Unassigned", updated.Status);
         Assert.Equal(0, emailHandler.RequestCount);
+    }
+
+    [Fact]
+    public async Task OnPostAssignAsync_InitialAssignmentToInspector_SendsScheduledSubject()
+    {
+        await using var fixture = await SqlServerFixture.CreateAsync();
+        var inspectorA = await fixture.SeedInspectorAsync("Inspector A", "a@example.com");
+        var booking = await fixture.SeedAssignedBookingAsync(assignedToEmail: null);
+
+        var emailHandler = new CountingHttpMessageHandler();
+        await using var db = fixture.CreateContext();
+        var model = CreateModel(db, emailHandler);
+
+        var result = await model.OnPostAssignAsync(booking.BookingId, inspectorA.Email);
+
+        Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal(2, emailHandler.RequestCount);
+        Assert.Contains(
+            emailHandler.CapturedBodies,
+            body => body.Contains("Has Been Scheduled", StringComparison.Ordinal) &&
+                    !body.Contains("Inspector Has Changed", StringComparison.Ordinal));
     }
 
     // --------------------------------------------------
@@ -201,7 +225,7 @@ public class AdminIndexModelReassignmentTests
             return inspector;
         }
 
-        public async Task<Booking> SeedAssignedBookingAsync(string assignedToEmail)
+        public async Task<Booking> SeedAssignedBookingAsync(string? assignedToEmail)
         {
             var booking = new Booking
             {
@@ -214,7 +238,7 @@ public class AdminIndexModelReassignmentTests
                 ContactEmail = "jane@example.com",
                 StartUtc = DateTime.UtcNow.AddDays(2),
                 EndUtc = DateTime.UtcNow.AddDays(2).AddHours(1),
-                Status = "Assigned",
+                Status = assignedToEmail is null ? "Unassigned" : "Assigned",
                 AssignedTo = assignedToEmail,
                 CreatedUtc = DateTime.UtcNow
             };
@@ -254,11 +278,16 @@ public class AdminIndexModelReassignmentTests
         private int _requestCount;
 
         public int RequestCount => _requestCount;
+        public List<string> CapturedBodies { get; } = new();
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref _requestCount);
-            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Accepted));
+            var body = request.Content is null
+                ? string.Empty
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+            CapturedBodies.Add(body);
+            return new HttpResponseMessage(System.Net.HttpStatusCode.Accepted);
         }
     }
 }
