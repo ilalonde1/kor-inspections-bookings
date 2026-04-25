@@ -72,7 +72,7 @@ namespace Kor.Inspections.App.Data
 
                 entity.Property(b => b.Status)
                       .HasMaxLength(30)
-                      .HasDefaultValue("Unassigned");
+                      .HasDefaultValue(BookingStatus.Unassigned);
 
                 entity.Property(b => b.CreatedUtc)
                       .HasDefaultValueSql("SYSUTCDATETIME()");

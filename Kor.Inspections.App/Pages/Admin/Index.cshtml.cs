@@ -279,7 +279,7 @@ namespace Kor.Inspections.App.Pages.Admin
                     b.ProjectNumber == projectNumber &&
                     b.ContactEmail == submittedContactEmail &&
                     b.StartUtc == startUtc &&
-                    b.Status != "Cancelled" &&
+                    b.Status != BookingStatus.Cancelled &&
                     b.CreatedUtc >= duplicateCutoffUtc);
 
             if (duplicateExists)
@@ -346,7 +346,7 @@ namespace Kor.Inspections.App.Pages.Admin
         {
             var booking = await _db.Bookings.FirstOrDefaultAsync(b => b.BookingId == id);
             Inspector? inspector = null;
-            var assignedInspectorLabel = "Unassigned";
+            var assignedInspectorLabel = BookingStatus.Unassigned;
 
             if (booking == null)
             {
@@ -354,8 +354,8 @@ namespace Kor.Inspections.App.Pages.Admin
                 return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
             }
 
-            if (string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(booking.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(booking.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(booking.Status, BookingStatus.Completed, StringComparison.OrdinalIgnoreCase))
             {
                 StatusMessage = "Booking cannot be modified.";
                 return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
@@ -364,7 +364,7 @@ namespace Kor.Inspections.App.Pages.Admin
             var oldAssignedTo = booking.AssignedTo;
 
             if (!string.IsNullOrWhiteSpace(assignedTo) &&
-                !assignedTo.Equals("Unassigned", StringComparison.OrdinalIgnoreCase))
+                !assignedTo.Equals(BookingStatus.Unassigned, StringComparison.OrdinalIgnoreCase))
             {
                 var assignedToTrimmed = assignedTo.Trim();
                 inspector = await _db.Inspectors
@@ -380,10 +380,10 @@ namespace Kor.Inspections.App.Pages.Admin
             }
 
             if (string.IsNullOrWhiteSpace(assignedTo) ||
-                assignedTo.Equals("Unassigned", StringComparison.OrdinalIgnoreCase))
+                assignedTo.Equals(BookingStatus.Unassigned, StringComparison.OrdinalIgnoreCase))
             {
                 booking.AssignedTo = null;
-                booking.Status = "Unassigned";
+                booking.Status = BookingStatus.Unassigned;
                 StatusMessage = "Booking marked unassigned.";
             }
             else
@@ -391,8 +391,8 @@ namespace Kor.Inspections.App.Pages.Admin
                 booking.AssignedTo = inspector!.Email;
                 assignedInspectorLabel = inspector.DisplayName;
 
-                if (booking.Status.Equals("Unassigned", StringComparison.OrdinalIgnoreCase))
-                    booking.Status = "Assigned";
+                if (booking.Status.Equals(BookingStatus.Unassigned, StringComparison.OrdinalIgnoreCase))
+                    booking.Status = BookingStatus.Assigned;
 
                 StatusMessage = $"Booking assigned to {assignedInspectorLabel}.";
             }
@@ -400,7 +400,7 @@ namespace Kor.Inspections.App.Pages.Admin
             _db.BookingActions.Add(new BookingAction
             {
                 BookingId = booking.BookingId,
-                ActionType = "Assigned",
+                ActionType = BookingActionType.Assigned,
                 PerformedBy = User.Identity?.Name,
                 Notes = $"Assigned to {assignedInspectorLabel}",
                 ActionUtc = DateTime.UtcNow
@@ -455,17 +455,17 @@ namespace Kor.Inspections.App.Pages.Admin
                 return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
             }
 
-            if (string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(booking.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase))
             {
                 StatusMessage = "Booking cancelled.";
                 return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
             }
 
-            booking.Status = "Cancelled";
+            booking.Status = BookingStatus.Cancelled;
             _db.BookingActions.Add(new BookingAction
             {
                 BookingId = booking.BookingId,
-                ActionType = "Cancelled",
+                ActionType = BookingActionType.Cancelled,
                 PerformedBy = User.Identity?.Name,
                 ActionUtc = DateTime.UtcNow
             });
@@ -518,8 +518,8 @@ namespace Kor.Inspections.App.Pages.Admin
                 return RedirectToPage(redirectArgs);
             }
 
-            if (string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(booking.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(booking.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(booking.Status, BookingStatus.Completed, StringComparison.OrdinalIgnoreCase))
             {
                 StatusMessage = "Booking cannot be modified.";
                 return RedirectToPage(redirectArgs);
@@ -622,7 +622,7 @@ namespace Kor.Inspections.App.Pages.Admin
             _db.BookingActions.Add(new BookingAction
             {
                 BookingId = booking.BookingId,
-                ActionType = "Edited",
+                ActionType = BookingActionType.Edited,
                 PerformedBy = User.Identity?.Name,
                 Notes = $"From {oldStartUtc:yyyy-MM-dd HH:mm}Z to {newStartUtc:yyyy-MM-dd HH:mm}Z",
                 ActionUtc = DateTime.UtcNow
@@ -715,7 +715,7 @@ namespace Kor.Inspections.App.Pages.Admin
 
             if (!string.Equals(View, "all", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(b => b.Status != "Completed" && b.Status != "Cancelled");
+                query = query.Where(b => b.Status != BookingStatus.Completed && b.Status != BookingStatus.Cancelled);
             }
 
             if (!string.IsNullOrWhiteSpace(Project))
@@ -796,7 +796,7 @@ namespace Kor.Inspections.App.Pages.Admin
                     ContactEmail = b.ContactEmail ?? "",
                     Status = b.Status,
                     AssignedToValue = b.AssignedTo,
-                    AssignedTo = BookingDisplayHelper.ResolveAssignedToDisplay(b.AssignedTo, inspectorsByEmail) ?? "Unassigned",
+                    AssignedTo = BookingDisplayHelper.ResolveAssignedToDisplay(b.AssignedTo, inspectorsByEmail) ?? BookingStatus.Unassigned,
                     Comments = b.Comments
                 };
             }).ToList();

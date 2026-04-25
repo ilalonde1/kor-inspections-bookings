@@ -30,7 +30,7 @@ namespace Kor.Inspections.App.Data.Models
 
 
         // Lifecycle / workflow
-        public string Status { get; set; } = "Unassigned";
+        public string Status { get; set; } = BookingStatus.Unassigned;
         public string? AssignedTo { get; set; }
 
         // Audit

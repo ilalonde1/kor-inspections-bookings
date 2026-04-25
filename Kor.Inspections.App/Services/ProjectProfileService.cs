@@ -29,7 +29,7 @@ namespace Kor.Inspections.App.Services
                 return ProjectProfileResult.Empty();
 
             contactEmail = contactEmail.Trim().ToLowerInvariant();
-            var domain = GetEmailDomain(contactEmail);
+            var domain = EmailHelper.GetDomain(contactEmail);
 
             if (string.IsNullOrWhiteSpace(domain))
                 return ProjectProfileResult.Empty();
@@ -66,11 +66,11 @@ namespace Kor.Inspections.App.Services
                 throw new InvalidContactEmailException("Contact email is required.");
 
             email = email.Trim().ToLowerInvariant();
-            if (string.IsNullOrWhiteSpace(GetEmailDomain(email)))
+            if (string.IsNullOrWhiteSpace(EmailHelper.GetDomain(email)))
                 throw new InvalidContactEmailException("Invalid contact email.");
 
             contactEmail = (contactEmail ?? string.Empty).Trim().ToLowerInvariant();
-            var domain = GetEmailDomain(contactEmail);
+            var domain = EmailHelper.GetDomain(contactEmail);
 
             if (string.IsNullOrWhiteSpace(domain))
                 throw new InvalidContactEmailException("Invalid contact email.");
@@ -147,7 +147,7 @@ namespace Kor.Inspections.App.Services
                 return;
 
             contactEmail = contactEmail.Trim().ToLowerInvariant();
-            var domain = GetEmailDomain(contactEmail);
+            var domain = EmailHelper.GetDomain(contactEmail);
 
             if (string.IsNullOrWhiteSpace(domain))
                 return;
@@ -172,15 +172,6 @@ namespace Kor.Inspections.App.Services
         // --------------------------------------------------
         // Internal helpers
         // --------------------------------------------------
-
-        private static string GetEmailDomain(string email)
-        {
-            var at = email.LastIndexOf('@');
-
-            return (at > 0 && at < email.Length - 1)
-                ? email[(at + 1)..]
-                : "";
-        }
 
         private static string NormalizeProject(string projectNumber)
         {
