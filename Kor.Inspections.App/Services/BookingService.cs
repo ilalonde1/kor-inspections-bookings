@@ -374,12 +374,12 @@ namespace Kor.Inspections.App.Services
                     endLocal,
                     displayName,
                     manageUrl,
-                    BuildProjectInspectionsUrl(booking.ProjectNumber, _notificationOptions.Email),
+                    BuildProjectInspectionsUrl(booking.ProjectNumber, _notificationOptions.AdminRecipientEmail),
                     isAdmin: true);
 
                 await _graphMail.SendHtmlAsync(
                     fromMailbox,
-                    _notificationOptions.Email,
+                    _notificationOptions.AdminRecipientEmail,
                     adminSubject,
                     adminBody);
             }
