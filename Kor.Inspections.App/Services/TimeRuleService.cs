@@ -15,11 +15,13 @@ namespace Kor.Inspections.App.Services
     {
         private readonly InspectionRulesOptions _options;
         private readonly TimeZoneInfo _tz;
+        private readonly int _maxBookingsPerSlot;
 
         public TimeRuleService(IOptions<InspectionRulesOptions> options)
         {
             _options = options.Value;
-            _options.MaxBookingsPerSlot = Math.Max(1, _options.MaxBookingsPerSlot);
+            var maxBookingsPerSlot = options.Value.MaxBookingsPerSlot;
+            _maxBookingsPerSlot = Math.Max(1, maxBookingsPerSlot);
             _tz = TimeZoneInfo.FindSystemTimeZoneById(_options.TimeZoneId);
         }
 
@@ -112,7 +114,7 @@ namespace Kor.Inspections.App.Services
                 var overlapCount = bookingsLocal.Count(b =>
                     b.StartLocal < checkEnd && b.EndLocal > checkStart);
 
-                if (overlapCount < _options.MaxBookingsPerSlot)
+                if (overlapCount < _maxBookingsPerSlot)
                     slotList.Add(TimeOnly.FromDateTime(slotStartLocal));
 
                 dateTimeLocal = dateTimeLocal.AddMinutes(slotMinutes);
