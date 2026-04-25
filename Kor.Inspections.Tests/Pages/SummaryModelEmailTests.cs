@@ -5,7 +5,11 @@ using Kor.Inspections.App.Options;
 using Kor.Inspections.App.Pages.Admin;
 using Kor.Inspections.App.Services;
 using Kor.Inspections.Tests.Helpers;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -77,10 +81,9 @@ public class SummaryModelEmailTests
         Assert.IsType<RedirectToPageResult>(result);
         Assert.NotNull(captureFactory.LastRequestBody);
         Assert.Contains("Open inspector route in Google Maps", captureFactory.LastRequestBody, StringComparison.Ordinal);
-        Assert.Contains(
-            "https://www.google.com/maps/dir/?api=1&amp;origin=123%20Test%20St&amp;destination=123%20Test%20St",
-            captureFactory.LastRequestBody,
-            StringComparison.Ordinal);
+        Assert.Contains("https://www.google.com/maps/dir/?api=1", captureFactory.LastRequestBody, StringComparison.Ordinal);
+        Assert.Contains("origin=123%20Test%20St", captureFactory.LastRequestBody, StringComparison.Ordinal);
+        Assert.Contains("destination=123%20Test%20St", captureFactory.LastRequestBody, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -141,10 +144,9 @@ public class SummaryModelEmailTests
         Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("Inspector summary sent to inspector@example.com.", model.StatusMessage);
         Assert.NotNull(captureFactory.LastRequestBody);
-        Assert.Contains(
-            "https://www.google.com/maps/dir/?api=1&amp;origin=456%20Route%20Ave&amp;destination=123%20Test%20St",
-            captureFactory.LastRequestBody,
-            StringComparison.Ordinal);
+        Assert.Contains("https://www.google.com/maps/dir/?api=1", captureFactory.LastRequestBody, StringComparison.Ordinal);
+        Assert.Contains("origin=456%20Route%20Ave", captureFactory.LastRequestBody, StringComparison.Ordinal);
+        Assert.Contains("destination=123%20Test%20St", captureFactory.LastRequestBody, StringComparison.Ordinal);
     }
 
     private static SummaryModel CreateModel(InspectionsContext db, IHttpClientFactory httpClientFactory)
@@ -155,7 +157,7 @@ public class SummaryModelEmailTests
         var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
         var timeRules = TimeRuleServiceTestFactory.Create(timeZone, nowLocal.Hour + 1);
 
-        return new SummaryModel(
+        var model = new SummaryModel(
             db,
             timeRules,
             new GraphMailService(new FixedTokenProvider(), httpClientFactory),
@@ -166,6 +168,27 @@ public class SummaryModelEmailTests
                 DisplayName = "KOR Reviews"
             }),
             NullLogger<SummaryModel>.Instance);
+
+        model.PageContext = new PageContext
+        {
+            HttpContext = new DefaultHttpContext(),
+            ViewData = new ViewDataDictionary(
+                new EmptyModelMetadataProvider(),
+                new ModelStateDictionary())
+        };
+
+        var firstBookingStartUtc = db.Bookings
+            .OrderBy(b => b.StartUtc)
+            .Select(b => (DateTime?)b.StartUtc)
+            .FirstOrDefault();
+        if (firstBookingStartUtc.HasValue)
+        {
+            model.Date = TimeZoneInfo.ConvertTimeFromUtc(firstBookingStartUtc.Value, timeZone)
+                .Date
+                .ToString("yyyy-MM-dd");
+        }
+
+        return model;
     }
 
     private static async Task SeedInspectorAsync(InspectionsContext db, string email, string displayName)

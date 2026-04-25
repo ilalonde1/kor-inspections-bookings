@@ -323,6 +323,9 @@ namespace Kor.Inspections.App.Pages.Admin
                 return RedirectToPage(new { date = Date });
             }
 
+            // Refresh Bookings so the email uses the persisted route order.
+            await OnGetAsync();
+
             var normalizedInspectorEmail = (request.InspectorEmail ?? string.Empty).Trim().ToLowerInvariant();
             var inspector = await _db.Inspectors
                 .AsNoTracking()
