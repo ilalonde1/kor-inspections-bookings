@@ -15,13 +15,13 @@ public class BookingCancellationConcurrencyTests
     [Fact]
     public async Task CancelBookingByTokenAsync_ConcurrentCalls_WriteOneAuditRecordAndSendOneEmail()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
-        var booking = await fixture.SeedBookingAsync("Unassigned");
+        await using var fixture = await SqlServerFixture.CreateAsync("KorCancelTests_");
+        var booking = await SeedBookingAsync(fixture, "Unassigned");
         var gate = new SaveGate(2);
         var emailHandler = new CountingHttpMessageHandler();
 
-        await using var db1 = fixture.CreateCoordinatedContext(gate);
-        await using var db2 = fixture.CreateCoordinatedContext(gate);
+        await using var db1 = CreateCoordinatedContext(fixture, gate);
+        await using var db2 = CreateCoordinatedContext(fixture, gate);
         var service1 = CreateBookingService(db1, emailHandler);
         var service2 = CreateBookingService(db2, emailHandler);
 
@@ -44,8 +44,8 @@ public class BookingCancellationConcurrencyTests
     [Fact]
     public async Task CancelBookingByTokenAsync_UnassignedBooking_ReturnsTrueAndCancels()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
-        var booking = await fixture.SeedBookingAsync("Unassigned");
+        await using var fixture = await SqlServerFixture.CreateAsync("KorCancelTests_");
+        var booking = await SeedBookingAsync(fixture, "Unassigned");
         var emailHandler = new CountingHttpMessageHandler();
 
         await using var db = fixture.CreateContext();
@@ -62,8 +62,8 @@ public class BookingCancellationConcurrencyTests
     [Fact]
     public async Task CancelBookingByTokenAsync_AlreadyCancelled_ReturnsTrueAndDoesNotWriteAction()
     {
-        await using var fixture = await SqlServerFixture.CreateAsync();
-        var booking = await fixture.SeedBookingAsync("Cancelled");
+        await using var fixture = await SqlServerFixture.CreateAsync("KorCancelTests_");
+        var booking = await SeedBookingAsync(fixture, "Cancelled");
         var emailHandler = new CountingHttpMessageHandler();
 
         await using var db = fixture.CreateContext();
@@ -111,70 +111,37 @@ public class BookingCancellationConcurrencyTests
             Options.Create(new AppOptions()));
     }
 
-    private sealed class SqlServerFixture : IAsyncDisposable
+    private static CoordinatedInspectionsContext CreateCoordinatedContext(SqlServerFixture fixture, SaveGate gate)
     {
-        private readonly string _connectionString;
+        var connectionString = fixture.CreateContext().Database.GetConnectionString()!;
+        var options = new DbContextOptionsBuilder<InspectionsContext>()
+            .UseSqlServer(connectionString)
+            .Options;
 
-        private SqlServerFixture(string databaseName)
+        return new CoordinatedInspectionsContext(options, gate);
+    }
+
+    private static async Task<Booking> SeedBookingAsync(SqlServerFixture fixture, string status)
+    {
+        var booking = new Booking
         {
-            _connectionString = $"Server=(localdb)\\MSSQLLocalDB;Database={databaseName};Trusted_Connection=True;TrustServerCertificate=True;";
-        }
+            BookingId = Guid.NewGuid(),
+            CancelToken = Guid.NewGuid(),
+            ProjectNumber = "30844",
+            ProjectAddress = "123 Test St",
+            ContactName = "Jane Doe",
+            ContactPhone = "6045551212",
+            ContactEmail = "jane@example.com",
+            StartUtc = DateTime.UtcNow.AddDays(2),
+            EndUtc = DateTime.UtcNow.AddDays(2).AddHours(1),
+            Status = status,
+            CreatedUtc = DateTime.UtcNow
+        };
 
-        public static async Task<SqlServerFixture> CreateAsync()
-        {
-            var fixture = new SqlServerFixture("KorCancelTests_" + Guid.NewGuid().ToString("N"));
-            await using var db = fixture.CreateContext();
-            await db.Database.EnsureDeletedAsync();
-            await db.Database.EnsureCreatedAsync();
-            return fixture;
-        }
-
-        public InspectionsContext CreateContext()
-        {
-            var options = new DbContextOptionsBuilder<InspectionsContext>()
-                .UseSqlServer(_connectionString)
-                .Options;
-
-            return new InspectionsContext(options);
-        }
-
-        public CoordinatedInspectionsContext CreateCoordinatedContext(SaveGate gate)
-        {
-            var options = new DbContextOptionsBuilder<InspectionsContext>()
-                .UseSqlServer(_connectionString)
-                .Options;
-
-            return new CoordinatedInspectionsContext(options, gate);
-        }
-
-        public async Task<Booking> SeedBookingAsync(string status)
-        {
-            var booking = new Booking
-            {
-                BookingId = Guid.NewGuid(),
-                CancelToken = Guid.NewGuid(),
-                ProjectNumber = "30844",
-                ProjectAddress = "123 Test St",
-                ContactName = "Jane Doe",
-                ContactPhone = "6045551212",
-                ContactEmail = "jane@example.com",
-                StartUtc = DateTime.UtcNow.AddDays(2),
-                EndUtc = DateTime.UtcNow.AddDays(2).AddHours(1),
-                Status = status,
-                CreatedUtc = DateTime.UtcNow
-            };
-
-            await using var db = CreateContext();
-            db.Bookings.Add(booking);
-            await db.SaveChangesAsync();
-            return booking;
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await using var db = CreateContext();
-            await db.Database.EnsureDeletedAsync();
-        }
+        await using var db = fixture.CreateContext();
+        db.Bookings.Add(booking);
+        await db.SaveChangesAsync();
+        return booking;
     }
 
     private sealed class CoordinatedInspectionsContext : InspectionsContext
