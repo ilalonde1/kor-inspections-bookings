@@ -13,16 +13,16 @@
            asp-route-date="@Model.SelectedDate.AddDays(-1).ToString("yyyy-MM-dd")"
            asp-route-sort="@Model.Sort"
            asp-route-dir="@Model.Dir"
-           class="btn-smooth">Prev Day</a>
-        <span><strong>@Model.SelectedDate.ToString("yyyy-MM-dd")</strong></span>
+           class="btn-smooth summary-day-nav">Prev Day</a>
+        <span class="summary-date-label"><strong>@Model.SelectedDate.ToString("yyyy-MM-dd")</strong></span>
         <a asp-page="./Summary"
            asp-route-date="@Model.SelectedDate.AddDays(1).ToString("yyyy-MM-dd")"
            asp-route-sort="@Model.Sort"
            asp-route-dir="@Model.Dir"
-           class="btn-smooth">Next Day</a>
-        <form method="post" asp-page-handler="Email" class="u-margin-0">
+           class="btn-smooth summary-day-nav">Next Day</a>
+        <form method="post" asp-page-handler="Email" class="u-margin-0 summary-email-form-inline">
             <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
-            <button type="submit" class="btn-primary">
+            <button type="submit" class="btn-primary summary-email-btn">
                 Email Tomorrow's Summary
             </button>
         </form>

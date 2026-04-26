@@ -1820,10 +1820,34 @@ display:none !important;
 }
 
 .summary-tools-row {
+    display: flex;
     align-items: center;
+    gap: 10px;
     margin-bottom: 14px;
     flex-direction: row;
     flex-wrap: wrap;
+}
+
+.summary-day-nav {
+    padding: 5px 12px;
+    font-size: .86rem;
+    line-height: 1.2;
+}
+
+.summary-date-label {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+}
+
+.summary-email-form-inline {
+    margin-left: auto;
+}
+
+.summary-email-btn {
+    min-height: 38px;
+    padding: 8px 18px;
+    white-space: nowrap;
 }
 
 .manage-status-success {
