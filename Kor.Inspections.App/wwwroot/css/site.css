@@ -45,8 +45,8 @@ body {
 
 .admin-page-container {
     max-width: 1600px;
-    margin: 24px auto;
-    padding: 0 24px;
+    margin: 18px auto 28px;
+    padding: 0 20px;
     box-sizing: border-box;
 }
 
@@ -277,15 +277,15 @@ ADMIN TABLE PROFESSIONAL DISPATCH STYLE
 
 .admin-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0 8px;
     table-layout: fixed;
-    font-size: .85rem;
+    font-size: .78rem;
 }
 
     .admin-table th,
     .admin-table td {
-        padding: 11px 10px;
-        border-bottom: 1px solid #e5e5e5;
+        padding: 8px 12px;
         vertical-align: top;
     }
 
@@ -294,57 +294,50 @@ ADMIN TABLE PROFESSIONAL DISPATCH STYLE
         background-color: #3F5364;
         color: white;
         font-weight: 600;
+        font-size: .76rem;
+        letter-spacing: 0.02em;
         position: sticky;
         top: 0;
         z-index: 10;
     }
 
     /* zebra */
-    .admin-table tbody tr:nth-child(even) {
-        background: #fcfcfc;
-    }
-
-    /* hover */
-    .admin-table tbody tr:hover {
-        background-color: #eef4ff;
+    .admin-table tbody tr:hover td {
+        background-color: #f7fbff;
     }
 
 /* ===== COLUMN WIDTHS ===== */
 
 .col-date {
-    width: 90px;
+    width: 98px;
 }
 
 .col-time {
-    width: 110px;
+    width: 128px;
 }
 
 .col-job {
-    width: 85px;
-}
-
-.col-status {
-    width: 95px;
+    width: 104px;
 }
 
 .col-assigned {
-    width: 120px;
+    width: 132px;
 }
 
 .col-address {
-    width: 220px;
+    width: 206px;
 }
 
 .col-contact {
-    width: 180px;
+    width: 196px;
 }
 
 .col-comments {
-    width: 260px;
+    width: 224px;
 }
 
 .col-actions {
-    width: 210px;
+    width: 298px;
 }
 
 /* phone */
@@ -366,36 +359,20 @@ STATUS COLORS
 ========================================================= */
 
 .admin-table tr[data-status="Unassigned"] td {
-    background-color: #fff6f4 !important;
+    background-color: #fff !important;
 }
 
 .admin-table tr[data-status="Assigned"] td {
-    background-color: #f2f7ff !important;
+    background-color: #fff !important;
 }
 
 .admin-table tr[data-status="Completed"] td {
-    background-color: #f3fbf5 !important;
+    background-color: #fff !important;
 }
 
 .admin-table tr[data-status="Cancelled"] td {
-    background-color: #fafafa !important;
+    background-color: #fff !important;
     color: #777;
-}
-
-tr.status-unassigned {
-    border-left: 4px solid #c00;
-}
-
-tr.status-assigned {
-    border-left: 4px solid #0063b1;
-}
-
-tr.status-completed {
-    border-left: 4px solid #107c10;
-}
-
-tr.status-cancelled {
-    border-left: 4px solid #767676;
 }
 
 /* =========================================================
@@ -459,58 +436,79 @@ ASSIGN + ACTION BUTTONS
 ========================================================= */
 
 .assign-inline {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 92px;
+    gap: 6px;
     align-items: stretch;
-    gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .admin-actions-cell {
-    min-width: 200px;
+    min-width: 276px;
 }
 
 .admin-assign-select {
     width: 100%;
-    min-height: 38px;
+    min-height: 32px;
+    font-size: .73rem;
+    padding: 4px 10px;
+    border-radius: 9px;
+    border: 1px solid #cfd7e3;
+    background: #fff;
 }
 
 .action-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+    align-items: start;
 }
 
 .admin-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 30px;
-    font-size: .75rem;
+    min-height: 32px;
+    font-size: .72rem;
     font-weight: 600;
-    padding: 6px 10px;
-    border-radius: 6px;
-    border: none;
+    padding: 5px 10px;
+    border-radius: 9px;
+    border: 1px solid transparent;
     cursor: pointer;
     text-decoration: none;
     white-space: nowrap;
+    transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease, border-color .12s ease;
 }
 
 .admin-btn-set {
-    background: #0078d4;
+    background: linear-gradient(180deg, #4d86d7 0%, #3f73c4 100%);
     color: white;
+    box-shadow: 0 1px 2px rgba(27, 61, 115, 0.10);
 }
 
 .admin-btn-cancel {
-    background: #d83b01;
+    background: linear-gradient(180deg, #d85a25 0%, #c84715 100%);
     color: white;
+    box-shadow: 0 1px 2px rgba(101, 36, 12, 0.10);
 }
 
 .admin-btn-secondary {
-    background: #eef2f7;
-    color: #2d4154;
-    border: 1px solid #cfd7e3;
+    background: linear-gradient(180deg, #f8fafc 0%, #edf2f7 100%);
+    color: #31475c;
+    border-color: #d5dde7;
+    box-shadow: 0 1px 2px rgba(31, 45, 58, 0.05);
+}
+
+.admin-btn:hover,
+.admin-btn:focus-visible {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 12px rgba(31, 45, 58, 0.10);
+}
+
+.admin-btn-secondary:hover,
+.admin-btn-secondary:focus-visible {
+    background: #eef3f8;
+    border-color: #c4cfdb;
 }
 
 .admin-confirm-controls {
@@ -574,7 +572,7 @@ ASSIGN + ACTION BUTTONS
     background: #e4e7eb;
     border: 1px solid #cfd6dd;
     color: #2c3e50;
-    padding: 7px 16px;
+    padding: 8px 14px;
     border-radius: 6px;
     font-weight: 600;
     cursor: pointer;
@@ -588,7 +586,7 @@ ASSIGN + ACTION BUTTONS
 
 .admin-filter-form input[type="text"],
 .admin-filter-form input[type="date"] {
-    min-height: 40px;
+    min-height: 38px;
     box-sizing: border-box;
     padding: 8px 10px;
     border-radius: 4px;
@@ -940,6 +938,324 @@ ASSIGN + ACTION BUTTONS
 
 .admin-table-container {
     width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(180deg, #f8fafc 0%, #f2f6fa 100%);
+    box-shadow: 0 10px 26px rgba(31, 45, 58, 0.06);
+    padding: 10px;
+}
+
+.admin-dashboard {
+    display: grid;
+    gap: 16px;
+}
+
+.admin-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.admin-page-title {
+    margin: 0;
+    font-size: 2rem;
+    line-height: 1.1;
+}
+
+.admin-status-banner {
+    margin-bottom: 0;
+    border: 1px solid #c9d7e7;
+    background: #eef5fc;
+    color: #28425b;
+    padding: 10px 12px;
+    border-radius: 10px;
+}
+
+.admin-panel {
+    margin-bottom: 0;
+    border-color: #d8e0ea;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: 0 6px 20px rgba(31, 45, 58, 0.04);
+}
+
+.admin-panel-summary {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.admin-panel-summary::-webkit-details-marker {
+    display: none;
+}
+
+.admin-panel-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #1f2d3a;
+}
+
+.admin-panel-toggle {
+    margin-top: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.admin-panel-body {
+    margin-top: 14px;
+}
+
+.admin-panel-validation {
+    margin-bottom: 12px;
+}
+
+.admin-manual-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px 18px;
+    align-items: start;
+}
+
+.admin-form-full {
+    grid-column: 1 / -1;
+}
+
+.admin-form-checkrow {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 0;
+}
+
+.admin-inline-label {
+    margin: 0;
+}
+
+.admin-form-actions {
+    display: flex;
+    align-items: center;
+}
+
+.admin-toolbar {
+    display: grid;
+    gap: 12px;
+}
+
+.admin-view-toggle,
+.admin-shortcuts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.admin-chip.is-active,
+.admin-shortcut-link:hover,
+.admin-filter-apply:hover {
+    background: #dbe7f3;
+    border-color: #b9c7d8;
+}
+
+.admin-chip.is-active {
+    color: #1d334a;
+}
+
+.admin-filter-shell {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.1fr) minmax(180px, 1.1fr) minmax(150px, .8fr) minmax(150px, .8fr) auto;
+    gap: 8px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid #d8e0ea;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 4px 16px rgba(31, 45, 58, 0.04);
+}
+
+.admin-filter-apply {
+    min-height: 38px;
+}
+
+.admin-filter-hint {
+    margin-top: -4px;
+}
+
+.admin-empty-state {
+    margin: 0;
+    padding: 22px;
+    border: 1px solid #d8e0ea;
+    border-radius: 12px;
+    background: #fff;
+    color: #516274;
+}
+
+.admin-bookings-table {
+    text-align: left;
+    background: transparent;
+}
+
+.admin-bookings-table td {
+    line-height: 1.35;
+    background: #fff;
+    border-top: 1px solid #e3eaf2;
+    border-bottom: 1px solid #e3eaf2;
+}
+
+.admin-bookings-table td:first-child {
+    border-left: 1px solid #e3eaf2;
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+    box-shadow: inset 3px 0 0 transparent;
+}
+
+.admin-bookings-table td:last-child {
+    border-right: 1px solid #e3eaf2;
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.admin-bookings-table tr.status-unassigned td:first-child {
+    box-shadow: inset 3px 0 0 #d83b01;
+}
+
+.admin-bookings-table tr.status-assigned td:first-child {
+    box-shadow: inset 3px 0 0 #0078d4;
+}
+
+.admin-bookings-table tr.status-completed td:first-child {
+    box-shadow: inset 3px 0 0 #107c10;
+}
+
+.admin-bookings-table tr.status-cancelled td:first-child {
+    box-shadow: inset 3px 0 0 #767676;
+}
+
+.admin-bookings-table .booking-date,
+.admin-bookings-table .booking-time {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.admin-bookings-table .booking-job {
+    font-weight: 700;
+    color: #22384d;
+    line-height: 1.4;
+}
+
+.admin-bookings-table .booking-address,
+.admin-bookings-table .booking-details {
+    color: #415466;
+}
+
+.admin-bookings-table .booking-address,
+.admin-bookings-table .booking-contact,
+.admin-bookings-table .booking-details {
+    font-size: .76rem;
+}
+
+.admin-bookings-table .booking-contact strong {
+    display: inline-block;
+    margin-bottom: 2px;
+    color: #1f2d3a;
+}
+
+.admin-bookings-table .booking-status,
+.admin-bookings-table .booking-assigned {
+    white-space: nowrap;
+}
+
+.admin-bookings-table .booking-assigned {
+    color: #425466;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-align: left;
+}
+
+.admin-bookings-table .project-address,
+.admin-bookings-table .comments {
+    color: #36485a;
+}
+
+.admin-bookings-table .contact-phone,
+.admin-bookings-table .phone {
+    color: #647589;
+}
+
+.admin-edit-panel {
+    margin-top: 0;
+    min-width: 0;
+}
+
+.admin-edit-summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 32px;
+    padding: 5px 10px;
+    box-sizing: border-box;
+    list-style: none;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    user-select: none;
+    text-align: center;
+}
+
+.admin-edit-summary::-webkit-details-marker {
+    display: none;
+}
+
+.admin-edit-summary::marker {
+    content: "";
+}
+
+.admin-edit-form {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid #dde5ee;
+    border-radius: 8px;
+    background: #f8fafc;
+}
+
+.admin-edit-cutoff {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: .77rem;
+    color: #44586b;
+}
+
+.admin-bookings-table .admin-actions-cell {
+    background: linear-gradient(180deg, #fbfdff 0%, #f5f8fc 100%);
+    padding: 8px;
+}
+
+.admin-bookings-table .assign-inline,
+.admin-bookings-table .action-stack {
+    gap: 6px;
+}
+
+.admin-bookings-table .admin-btn {
+    width: 100%;
+}
+
+.admin-bookings-table .assign-inline .admin-btn {
+    min-width: 0;
+}
+
+.admin-bookings-table .admin-edit-summary {
+    width: 100%;
+}
+
+.admin-bookings-table .admin-edit-panel[open] {
+    grid-column: 1 / -1;
 }
 
 .summary-unassigned-note {
@@ -1112,6 +1428,28 @@ ASSIGN + ACTION BUTTONS
 }
 
 @media (max-width: 720px) {
+    .admin-page-title {
+        font-size: 1.6rem;
+    }
+
+    .admin-filter-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-form-actions,
+    .admin-view-toggle,
+    .admin-shortcuts {
+        width: 100%;
+    }
+
+    .admin-view-toggle .btn-smooth,
+    .admin-shortcuts .btn-smooth,
+    .admin-form-actions .btn,
+    .admin-filter-apply {
+        width: 100%;
+        text-align: center;
+    }
+
     .project-search-row {
         flex-direction: column;
         align-items: stretch;
@@ -1215,7 +1553,7 @@ ASSIGN + ACTION BUTTONS
     -webkit-overflow-scrolling: touch;
 }
 
-table {
+.table-responsive-mobile > table {
     min-width: 600px;
 }
 
