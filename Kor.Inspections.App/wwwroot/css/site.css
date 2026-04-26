@@ -1801,3 +1801,50 @@ display:none !important;
 #inspectionsTable thead tr {
     border-bottom: 2px solid #adb5bd;
 }
+
+/* =================================================================
+   Inline-style extraction utilities (kept here so razor markup
+   stays semantic). Do not reuse for new code without thinking -
+   prefer a real component class.
+   ================================================================= */
+
+.u-text-left { text-align: left; }
+.u-margin-0 { margin: 0; }
+.u-display-inline { display: inline; }
+.u-margin-top-20 { margin-top: 20px; }
+.u-margin-left-8 { margin-left: 8px; }
+
+.summary-sort-link {
+    text-align: left;
+    display: inline-block;
+}
+
+.summary-tools-row {
+    align-items: center;
+    margin-bottom: 14px;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.manage-status-success {
+    color: green;
+    font-weight: bold;
+}
+
+.manage-status-cancelled {
+    font-style: italic;
+}
+
+.manage-status-error {
+    color: darkred;
+}
+
+.btn-cancel-booking-link {
+    display: inline-block;
+    padding: 10px 18px;
+    background-color: #dc3545;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+}

@@ -8,7 +8,7 @@
         based on Kor's local time.
     </p>
 
-    <div class="assign-inline" style="align-items:center; margin-bottom:14px; flex-direction:row; flex-wrap:wrap;">
+    <div class="assign-inline summary-tools-row">
         <a asp-page="./Summary"
            asp-route-date="@Model.SelectedDate.AddDays(-1).ToString("yyyy-MM-dd")"
            asp-route-sort="@Model.Sort"
@@ -20,7 +20,7 @@
            asp-route-sort="@Model.Sort"
            asp-route-dir="@Model.Dir"
            class="btn-smooth">Next Day</a>
-        <form method="post" asp-page-handler="Email" style="margin:0;">
+        <form method="post" asp-page-handler="Email" class="u-margin-0">
             <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
             <button type="submit" class="btn-primary">
                 Email Tomorrow's Summary
@@ -53,15 +53,14 @@
 
         <div class="admin-table-container">
             <div class="table-responsive-mobile">
-            <table class="admin-table" style="text-align:left;">
+            <table class="admin-table u-text-left">
                 <thead>
                     <tr>
                         <th class="col-time">
                             <a asp-page="./Summary"
                                asp-route-sort="time"
                                asp-route-dir="@Model.ToggleDir("time")"
-                               class="sort-link"
-                               style="text-align:left; display:inline-block;">
+                               class="sort-link summary-sort-link">
                                 Time ⇅
                             </a>
                         </th>
@@ -69,8 +68,7 @@
                             <a asp-page="./Summary"
                                asp-route-sort="job"
                                asp-route-dir="@Model.ToggleDir("job")"
-                               class="sort-link"
-                               style="text-align:left; display:inline-block;">
+                               class="sort-link summary-sort-link">
                                 Job # ⇅
                             </a>
                         </th>
@@ -78,8 +76,7 @@
                             <a asp-page="./Summary"
                                asp-route-sort="address"
                                asp-route-dir="@Model.ToggleDir("address")"
-                               class="sort-link"
-                               style="text-align:left; display:inline-block;">
+                               class="sort-link summary-sort-link">
                                 Site Address ⇅
                             </a>
                         </th>
@@ -88,8 +85,7 @@
                             <a asp-page="./Summary"
                                asp-route-sort="assigned"
                                asp-route-dir="@Model.ToggleDir("assigned")"
-                               class="sort-link"
-                               style="text-align:left; display:inline-block;">
+                               class="sort-link summary-sort-link">
                                 Assigned To ⇅
                             </a>
                         </th>
@@ -97,8 +93,7 @@
                             <a asp-page="./Summary"
                                asp-route-sort="status"
                                asp-route-dir="@Model.ToggleDir("status")"
-                               class="sort-link"
-                               style="text-align:left; display:inline-block;">
+                               class="sort-link summary-sort-link">
                                 Status ⇅
                             </a>
                         </th>
@@ -159,13 +154,13 @@
                         <div class="summary-route-head">
                             <h4>@inspectorLabel</h4>
                             <div class="summary-route-actions">
-                                <form method="post" asp-page-handler="SaveRouteOrder" class="summary-route-order-form" style="display:inline;">
+                                <form method="post" asp-page-handler="SaveRouteOrder" class="summary-route-order-form u-display-inline">
                                     <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
                                     <input type="hidden" name="request.InspectorEmail" value="@inspectorEmail" />
                                     <input type="hidden" name="request.OrderedBookingIds" value="" />
                                     <button type="submit" class="btn-smooth summary-save-route-btn">Save Route Order</button>
                                 </form>
-                                <form method="post" asp-page-handler="EmailRoute" class="summary-route-email-form" style="display:inline;">
+                                <form method="post" asp-page-handler="EmailRoute" class="summary-route-email-form u-display-inline">
                                     <input type="hidden" name="Date" value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
                                     <input type="hidden" name="request.InspectorEmail" value="@inspectorEmail" />
                                     <input type="hidden" name="request.OrderedBookingIds" value="" />
@@ -203,7 +198,7 @@
         <a asp-page="/Admin/Index" class="btn-smooth">
             Back to Admin Dashboard
         </a>
-        <a asp-page="/Admin/TrustedDomains" class="btn-smooth" style="margin-left:8px;">
+        <a asp-page="/Admin/TrustedDomains" class="btn-smooth u-margin-left-8">
             Manage Trusted Domains
         </a>
 
