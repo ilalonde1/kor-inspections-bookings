@@ -1,4 +1,5 @@
 @page "/admin"
+@using Kor.Inspections.App.Data.Models
 @using Kor.Inspections.App.Services
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @model Kor.Inspections.App.Pages.Admin.IndexModel
@@ -10,29 +11,32 @@
             StringComparison.OrdinalIgnoreCase);
     ViewData["InspectorMode"] = inspectorMobileToolsEnabled ? "true" : "false";
 }
-<h2>Field Reviews</h2>
+<div class="admin-dashboard">
+    <div class="admin-heading">
+        <h2 class="admin-page-title">Field Reviews</h2>
+    </div>
 
     @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
     {
-        <div class="alert alert-info" style="margin-bottom:12px;">
+        <div class="alert alert-info admin-status-banner">
             @Model.StatusMessage
         </div>
     }
 
-    <details id="manualBookingPanel" class="phase-box" style="margin-bottom:20px;" @(ViewContext.ModelState.ErrorCount > 0 ? "open" : null)>
-        <summary style="cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-            <span style="font-size:1.5rem; font-weight:600;">Create Booking On Behalf Of Client</span>
-            <span id="manualBookingPanelToggleText" class="helper-text-muted">
+    <details id="manualBookingPanel" class="phase-box admin-panel admin-manual-panel" @(ViewContext.ModelState.ErrorCount > 0 ? "open" : null)>
+        <summary class="admin-panel-summary">
+            <span class="admin-panel-title">Create Booking On Behalf Of Client</span>
+            <span id="manualBookingPanelToggleText" class="helper-text-muted admin-panel-toggle">
                 @(ViewContext.ModelState.ErrorCount > 0 ? "Collapse" : "Expand")
             </span>
         </summary>
 
-        <div style="margin-top:16px;">
+        <div class="admin-panel-body">
             <div class="step-helper">Creates a booking from the admin backend and sends the normal booking emails. Use the cutoff override only when you need to allow a next-day booking after 2:00 p.m.</div>
 
-            <div asp-validation-summary="All" class="text-danger" style="margin-bottom:12px;"></div>
+            <div asp-validation-summary="All" class="text-danger admin-panel-validation"></div>
 
-            <form method="post" asp-page-handler="Create" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px 20px; align-items:start;">
+            <form method="post" asp-page-handler="Create" class="admin-manual-form">
                 <div class="form-group">
                     <label asp-for="ManualBooking.ProjectNumber"></label>
                     <input asp-for="ManualBooking.ProjectNumber" class="form-control" />
@@ -87,23 +91,24 @@
                     </select>
                     <span asp-validation-for="ManualBooking.RequestedTime" class="text-danger"></span>
                 </div>
-                <div class="form-group" style="grid-column:1 / -1;">
+                <div class="form-group admin-form-full">
                     <label asp-for="ManualBooking.Comments"></label>
                     <textarea asp-for="ManualBooking.Comments" class="form-control comments-textarea" placeholder="Specify floor and element details"></textarea>
                     <span asp-validation-for="ManualBooking.Comments" class="text-danger"></span>
                 </div>
-                <div class="form-group" style="grid-column:1 / -1; display:flex; gap:8px; align-items:center; margin-bottom:0;">
+                <div class="form-group admin-form-checkrow">
                     <input asp-for="ManualBooking.OverrideCutoff" />
-                    <label asp-for="ManualBooking.OverrideCutoff" style="margin:0;"></label>
+                    <label asp-for="ManualBooking.OverrideCutoff" class="admin-inline-label"></label>
                 </div>
-                <div>
+                <div class="admin-form-actions">
                     <button type="submit" class="btn btn-primary">Create Booking</button>
                 </div>
             </form>
         </div>
     </details>
 
-    <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center;">
+    <div class="admin-toolbar">
+        <div class="admin-view-toggle">
         <a asp-page="./Index"
            asp-route-view="active"
            asp-route-sort="@Model.Sort"
@@ -112,8 +117,7 @@
            asp-route-inspector="@Model.Inspector"
            asp-route-dateFrom="@Model.DateFrom"
            asp-route-dateTo="@Model.DateTo"
-           class="btn-smooth"
-           style="display:inline-block;@(string.Equals(Model.View, "all", StringComparison.OrdinalIgnoreCase) ? "" : "font-weight:600;")">
+           class="btn-smooth admin-chip @(string.Equals(Model.View, "all", StringComparison.OrdinalIgnoreCase) ? string.Empty : "is-active")">
             Active
         </a>
         <a asp-page="./Index"
@@ -124,47 +128,45 @@
            asp-route-inspector="@Model.Inspector"
            asp-route-dateFrom="@Model.DateFrom"
            asp-route-dateTo="@Model.DateTo"
-           class="btn-smooth"
-           style="display:inline-block;@(string.Equals(Model.View, "all", StringComparison.OrdinalIgnoreCase) ? "font-weight:600;" : "")">
+           class="btn-smooth admin-chip @(string.Equals(Model.View, "all", StringComparison.OrdinalIgnoreCase) ? "is-active" : string.Empty)">
             All
         </a>
     </div>
 
-    <form method="get" class="admin-filter-form" style="margin-bottom:15px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+    <form method="get" class="admin-filter-form admin-filter-shell">
         <input type="hidden" name="view" value="@Model.View" />
         <input type="hidden" name="sort" value="@Model.Sort" />
         <input type="hidden" name="dir" value="@Model.Dir" />
-        <input type="text" name="project" value="@Model.Project" placeholder="Filter by project" class="form-control" style="width:220px;" />
-        <input type="text" name="inspector" value="@Model.Inspector" placeholder="Filter by inspector" class="form-control" style="width:220px;" />
-        <input type="date" name="dateFrom" value="@Model.DateFrom" class="form-control" style="width:180px;" />
-        <input type="date" name="dateTo" value="@Model.DateTo" class="form-control" style="width:180px;" />
-        <button type="submit" class="btn-smooth">Apply</button>
+        <input type="text" name="project" value="@Model.Project" placeholder="Filter by project" class="form-control" />
+        <input type="text" name="inspector" value="@Model.Inspector" placeholder="Filter by inspector" class="form-control" />
+        <input type="date" name="dateFrom" value="@Model.DateFrom" class="form-control" />
+        <input type="date" name="dateTo" value="@Model.DateTo" class="form-control" />
+        <button type="submit" class="btn-smooth admin-filter-apply">Apply</button>
     </form>
-    <div class="helper-text-muted" style="margin-bottom:12px;">Default range starts today and ends in 7 days unless you set custom dates.</div>
+    <div class="helper-text-muted admin-filter-hint">Default range starts today and ends in 7 days unless you set custom dates.</div>
 
-    <div style="margin-bottom:15px;">
+    <div class="admin-shortcuts">
         <a asp-page="/Admin/Summary"
            asp-route-date="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")"
-           class="btn-smooth"
-           style="display:inline-block;">
+           class="btn-smooth admin-shortcut-link">
             View Tomorrow's Summary
         </a>
         <a asp-page="/Admin/TrustedDomains"
-           class="btn-smooth"
-           style="display:inline-block; margin-left:8px;">
+           class="btn-smooth admin-shortcut-link">
             Manage Trusted Domains
         </a>
+    </div>
     </div>
 
     @if (!Model.Bookings.Any())
     {
-        <p>No bookings found for the selected filters.</p>
+        <p class="admin-empty-state">No bookings found for the selected filters.</p>
     }
     else
     {
         <div class="admin-table-container">
             <div class="table-responsive-mobile">
-            <table class="admin-table" style="text-align:left;">
+            <table class="admin-table admin-bookings-table">
                 <thead>
                     <tr>
 
@@ -202,20 +204,6 @@
                         <th class="col-contact">Contact</th>
                         <th class="col-comments">Details</th>
 
-                        <th class="col-status">
-                            <a asp-page="./Index"
-                               asp-route-sort="status"
-                               asp-route-dir="@Model.ToggleDir("status")"
-                               asp-route-view="@Model.View"
-                               asp-route-project="@Model.Project"
-                               asp-route-inspector="@Model.Inspector"
-                               asp-route-dateFrom="@Model.DateFrom"
-                               asp-route-dateTo="@Model.DateTo"
-                               class="sort-link">
-                                Status ⇅
-                            </a>
-                        </th>
-
                         <th class="col-assigned">
                             <a asp-page="./Index"
                                asp-route-sort="assigned"
@@ -240,9 +228,9 @@
                     {
                         <tr class="booking-row status-@((b.Status ?? string.Empty).ToLowerInvariant())" data-status="@b.Status" data-booking-id="@b.BookingId">
 
-                            <td>@b.StartLocal.ToString("yyyy-MM-dd")</td>
+                            <td class="booking-date">@b.StartLocal.ToString("yyyy-MM-dd")</td>
 
-                            <td>
+                            <td class="booking-time">
                                 @{
                                     var timeDisplay = BookingDisplayHelper.GetTimeDisplay(
                                     b.TimePreference,
@@ -264,25 +252,25 @@
                                 }
                             </td>
 
-                            <td>@Kor.Inspections.App.Services.BookingDisplayHelper.FormatJobLine(b.ProjectNumberDisplay, b.ProjectName, b.ProjectNumber)</td>
+                            <td class="booking-job">@Kor.Inspections.App.Services.BookingDisplayHelper.FormatJobLine(b.ProjectNumberDisplay, b.ProjectName, b.ProjectNumber)</td>
 
-                            <td class="project-address">@b.ProjectAddress</td>
+                            <td class="project-address booking-address">@b.ProjectAddress</td>
 
-                            <td>
+                            <td class="booking-contact">
                                 <strong>@b.ContactName</strong><br />
                                 <span class="phone contact-phone">@Model.FormatPhone(b.ContactPhone)</span><br />
                                 <span class="phone">@b.ContactEmail</span>
                             </td>
 
-                            <td class="comments">
+                            <td class="comments booking-details">
                                 @(string.IsNullOrWhiteSpace(b.Comments) ? "-" : b.Comments)
                             </td>
 
-                            <td>
-                                <span class="pill pill-@b.Status">@b.Status</span>
+                            <td class="booking-assigned">
+                                @(string.Equals(b.AssignedTo, BookingStatus.Unassigned, StringComparison.OrdinalIgnoreCase)
+                                    ? "-"
+                                    : b.AssignedTo)
                             </td>
-
-                            <td>@b.AssignedTo</td>
 
                             <td class="admin-actions-cell">
 
@@ -315,9 +303,9 @@
                                         <button type="submit" class="admin-btn admin-btn-cancel admin-action-full">Cancel Booking</button>
                                     </form>
 
-                                    <details class="admin-edit-panel" style="margin-top:6px;">
-                                        <summary class="admin-btn admin-action-full" style="cursor:pointer; list-style:none;">Edit Booking</summary>
-                                        <form method="post" asp-page-handler="Edit" class="admin-edit-form" style="margin-top:6px; display:flex; flex-direction:column; gap:6px;">
+                                    <details class="admin-edit-panel">
+                                        <summary class="admin-btn admin-btn-secondary admin-action-full admin-edit-summary">Edit Booking</summary>
+                                        <form method="post" asp-page-handler="Edit" class="admin-edit-form">
                                             <input type="hidden" name="id" value="@b.BookingId" />
                                             <input type="date"
                                                    name="edit.RequestedDate"
@@ -331,7 +319,7 @@
                                                     <option value="@t" selected="@(b.TimePreference == null && b.StartLocal.ToString("HH:mm") == t)">@t</option>
                                                 }
                                             </select>
-                                            <label style="display:flex; gap:6px; align-items:center; font-size:0.85rem;">
+                                            <label class="admin-edit-cutoff">
                                                 <input type="checkbox" name="edit.OverrideCutoff" value="true" />
                                                 Override 2 p.m. cutoff
                                             </label>
@@ -350,6 +338,7 @@
             </div>
         </div>
     }
+    </div>
 
     @if (inspectorMobileToolsEnabled)
     {

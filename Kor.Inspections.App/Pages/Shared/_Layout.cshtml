@@ -5,7 +5,7 @@
     <title>@(ViewData["Title"] != null ? ViewData["Title"] + "  " : "")Kor Field Review Booking</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/x-icon" href="~/Assets/logo.ico" />
-    <link rel="stylesheet" href="~/css/site.css?v=mobilefix1" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     @RenderSection("Styles", required: false)
 </head>
 @{
@@ -55,32 +55,5 @@
     </footer>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @RenderSection("Scripts", required: false)
-    <script>
-    (function () {
-
-        function updateModes() {
-
-            const isMobile = window.matchMedia("(max-width: 1000px)").matches;
-
-            if (isMobile) {
-                document.body.classList.add("mobile-mode");
-            } else {
-                document.body.classList.remove("mobile-mode");
-            }
-
-            const inspectorFlag = document.body.dataset.inspector === "true";
-
-            if (isMobile && inspectorFlag) {
-                document.body.classList.add("inspector-mode");
-            } else {
-                document.body.classList.remove("inspector-mode");
-            }
-        }
-
-        updateModes();
-        window.addEventListener("resize", updateModes);
-
-    })();
-    </script>
 </body>
 </html>

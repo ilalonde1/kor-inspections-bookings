@@ -160,6 +160,27 @@ document.addEventListener("click", function (e) {
             window.KorPostbackFocus.save();
         }, true);
 
+        function updateModes() {
+            const isMobile = window.matchMedia("(max-width: 1000px)").matches;
+
+            if (isMobile) {
+                document.body.classList.add("mobile-mode");
+            } else {
+                document.body.classList.remove("mobile-mode");
+            }
+
+            const inspectorFlag = document.body.dataset.inspector === "true";
+
+            if (isMobile && inspectorFlag) {
+                document.body.classList.add("inspector-mode");
+            } else {
+                document.body.classList.remove("inspector-mode");
+            }
+        }
+
+        updateModes();
+        window.addEventListener("resize", updateModes);
+
         //---------------------------------------
         // Flatpickr
         //---------------------------------------
