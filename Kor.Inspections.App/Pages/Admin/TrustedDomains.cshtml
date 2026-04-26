@@ -25,15 +25,15 @@ else
 {
     <div class="admin-table-container">
         <div class="table-responsive-mobile">
-            <table class="admin-table" style="text-align:left;">
+            <table class="admin-table u-text-left">
                 <thead>
                     <tr>
-                        <th style="text-align:left;">Project Number</th>
-                        <th style="text-align:left;">Approved Domain</th>
-                        <th style="text-align:left;">Approved At</th>
-                        <th style="text-align:left;">Expires At</th>
-                        <th style="text-align:left;">Status</th>
-                        <th style="text-align:left;">Actions</th>
+                        <th class="u-text-left">Project Number</th>
+                        <th class="u-text-left">Approved Domain</th>
+                        <th class="u-text-left">Approved At</th>
+                        <th class="u-text-left">Expires At</th>
+                        <th class="u-text-left">Status</th>
+                        <th class="u-text-left">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -46,7 +46,7 @@ else
                             <td>@row.ExpiresUtc.ToString("yyyy-MM-dd HH:mm")</td>
                             <td>@(row.IsExpired ? "Expired" : "Active")</td>
                             <td>
-                                <form method="post" asp-page-handler="Revoke" style="margin:0;">
+                                <form method="post" asp-page-handler="Revoke" class="u-margin-0">
                                     <input type="hidden" name="id" value="@row.Id" />
                                     <button type="submit"
                                             class="admin-btn admin-btn-cancel"

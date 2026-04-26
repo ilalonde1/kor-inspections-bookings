@@ -44,19 +44,19 @@ else
 
         @if (Model.CancelledSuccessfully)
         {
-            <p style="color: green; font-weight: bold;">
+            <p class="manage-status-success">
                 This booking has been cancelled successfully.
             </p>
         }
         else if (Model.AlreadyCancelled)
         {
-            <p style="font-style: italic;">
+            <p class="manage-status-cancelled">
                 This booking has already been cancelled.
             </p>
         }
         else if (!Model.CanCancel)
         {
-            <p style="color: darkred;">
+            <p class="manage-status-error">
                 This booking can no longer be cancelled online.
                 Cancellations must be submitted by <strong>2:00 PM Pacific</strong> on the previous business day.
             </p>
