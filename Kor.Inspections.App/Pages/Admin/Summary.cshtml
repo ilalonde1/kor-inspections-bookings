@@ -303,19 +303,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     .map(i => (i.dataset.address || "").trim())
                     .filter(Boolean);
 
-                if (!addresses.length) {
-                    return;
-                }
-
-                const origin = encodeURIComponent(addresses[0]);
-                const destination = encodeURIComponent(addresses[addresses.length - 1]);
-                const waypoints = addresses.slice(1, -1).map(encodeURIComponent).join("|");
-
-                const url =
-                    "https://www.google.com/maps/dir/?api=1"
-                    + "&origin=" + origin
-                    + "&destination=" + destination
-                    + (waypoints ? "&waypoints=" + waypoints : "");
+                const url = window.korBuildMapsRoute(addresses);
+                if (!url) return;
 
                 window.open(url, "_blank");
             });

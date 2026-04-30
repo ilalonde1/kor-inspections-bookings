@@ -534,15 +534,8 @@ document.addEventListener("DOMContentLoaded", function () {
             const addresses = rows
                 .map(getAddress)
                 .filter(Boolean);
-            if (!addresses.length) return;
-            const origin = encodeURIComponent(addresses[0]);
-            const destination = encodeURIComponent(addresses[addresses.length - 1]);
-            const waypoints = addresses.slice(1, -1).map(encodeURIComponent).join("|");
-            const url =
-                "https://www.google.com/maps/dir/?api=1" +
-                "&origin=" + origin +
-                "&destination=" + destination +
-                (waypoints ? "&waypoints=" + waypoints : "");
+            const url = window.korBuildMapsRoute(addresses);
+            if (!url) return;
             window.open(url, "_blank");
         });
     }
