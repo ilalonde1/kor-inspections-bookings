@@ -359,7 +359,7 @@ namespace Kor.Inspections.App.Pages
                 .AsNoTracking()
                 .Where(b =>
                     b.ProjectNumber != null &&
-                    b.ProjectNumber.StartsWith(projectRaw) &&
+                    b.ProjectNumber == projectRaw &&
                     b.ContactEmail == emailRaw)
                 .OrderByDescending(b => b.StartUtc)
                 .ToListAsync();
@@ -429,7 +429,7 @@ namespace Kor.Inspections.App.Pages
                 .FirstOrDefaultAsync(b =>
                     b.BookingId == bookingId &&
                     b.ProjectNumber != null &&
-                    b.ProjectNumber.StartsWith(base5) &&
+                    b.ProjectNumber == base5 &&
                     b.ContactEmail != null &&
                     b.ContactEmail == emailRaw);
             // Shared cancellation rights must be modelled as explicit delegation,
