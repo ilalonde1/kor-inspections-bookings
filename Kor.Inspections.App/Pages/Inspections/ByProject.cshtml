@@ -78,23 +78,6 @@ else
                 }).format(d);
             }
 
-            function getDisplayStatus(inspection) {
-                const rawStatus = `${inspection.status || ""}`.trim().toLowerCase();
-                const start = inspection.startUtc ? new Date(inspection.startUtc) : null;
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-
-                if (start && !Number.isNaN(start.getTime())) {
-                    const scheduledDay = new Date(start);
-                    scheduledDay.setHours(0, 0, 0, 0);
-                    if (scheduledDay >= today) {
-                        return "Received for a future inspection including that day";
-                    }
-                }
-
-                return rawStatus === "cancelled" ? "Cancelled" : "Completed";
-            }
-
             async function load() {
                 try {
                     const response = await fetch("/?handler=LookupInspections", {
