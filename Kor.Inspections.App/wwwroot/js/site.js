@@ -217,7 +217,18 @@ document.addEventListener("click", function (e) {
                 },
 
                 onChange: function () {
-                    document.getElementById("autoRefreshTimesBtn")?.click();
+                    const btn = document.getElementById("autoRefreshTimesBtn");
+                    if (!btn) return;
+                    const form = btn.closest("form");
+                    if (!form) return;
+                    const handler = btn.getAttribute("data-refresh-handler");
+                    const url = new URL(form.action || window.location.href, window.location.origin);
+                    if (handler) url.searchParams.set("handler", handler);
+                    const tempForm = form.cloneNode(true);
+                    tempForm.action = url.toString();
+                    tempForm.setAttribute("novalidate", "novalidate");
+                    document.body.appendChild(tempForm);
+                    tempForm.submit();
                 }
             });
         }
