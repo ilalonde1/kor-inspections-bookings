@@ -61,8 +61,6 @@ namespace Kor.Inspections.App.Data
                       .HasMaxLength(200);
 
                 entity.HasIndex(b => b.ContactEmail);
-                entity.HasIndex(b => b.ProjectNumber);
-                entity.HasIndex(b => b.Status);
                 entity.HasIndex(b => b.StartUtc);
                 entity.HasIndex(b => new { b.ProjectNumber, b.StartUtc });
                 entity.HasIndex(b => new { b.ProjectNumber, b.ContactEmail, b.StartUtc })
