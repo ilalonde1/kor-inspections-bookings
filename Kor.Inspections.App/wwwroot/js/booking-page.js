@@ -803,7 +803,6 @@
             const email = escapeHtml(c.email);
             const phone = escapeHtml(c.phone);
             const contactId = Number(c.id);
-            const safeContactId = Number.isFinite(contactId) ? contactId : "null";
 
             const row = document.createElement("div");
             row.className = "contact-row";
@@ -814,13 +813,17 @@
                     <div class="contact-row-meta">${email} · ${phone}</div>
                 </div>
                 <div class="contact-row-actions">
-                    <button onclick="selectContact(${safeContactId})" class="btn btn-sm btn-secondary">Use</button>
-                    <button onclick="beginEditContact(${safeContactId})" class="btn btn-sm btn-outline-primary">Edit</button>
-                    <button onclick="deleteContact(${safeContactId})" class="btn btn-sm btn-danger">Delete</button>
+                    <button type="button" data-action="select" class="btn btn-sm btn-secondary">Use</button>
+                    <button type="button" data-action="edit" class="btn btn-sm btn-outline-primary">Edit</button>
+                    <button type="button" data-action="delete" data-confirm="Delete this contact?" class="btn btn-sm btn-danger">Delete</button>
                 </div>
             `;
 
             area.appendChild(row);
+
+            row.querySelector('[data-action="select"]').addEventListener("click", () => selectContact(contactId));
+            row.querySelector('[data-action="edit"]').addEventListener("click", () => beginEditContact(contactId));
+            row.querySelector('[data-action="delete"]').addEventListener("click", () => deleteContact(contactId));
         });
     }
 
@@ -883,9 +886,6 @@
     }
 
     function deleteContact(id) {
-
-        if (!confirm("Delete this contact?"))
-            return;
 
         const project = document.getElementById("ProjectNumber").value;
         const email = document.getElementById("ContactEmail").value;
