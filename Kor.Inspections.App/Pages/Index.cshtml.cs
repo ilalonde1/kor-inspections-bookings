@@ -303,7 +303,7 @@ namespace Kor.Inspections.App.Pages
                 return new JsonResult(Array.Empty<ContactDto>());
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(project, email, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(project, email, HttpContext.RequestAborted);
             if (!canAccess)
             {
                 Response.StatusCode = 403;
@@ -347,7 +347,7 @@ namespace Kor.Inspections.App.Pages
             }
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
 
             if (!canAccess)
             {
@@ -404,7 +404,7 @@ namespace Kor.Inspections.App.Pages
             }
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
             if (!canAccess)
             {
                 Response.StatusCode = 403;
@@ -590,7 +590,7 @@ namespace Kor.Inspections.App.Pages
             }
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(project, requesterEmail, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(project, requesterEmail, HttpContext.RequestAborted);
             if (!canAccess)
             {
                 Response.StatusCode = 403;
@@ -651,7 +651,7 @@ namespace Kor.Inspections.App.Pages
             }
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
             if (!canAccess)
             {
                 Response.StatusCode = 403;
@@ -698,7 +698,7 @@ namespace Kor.Inspections.App.Pages
                 return new JsonResult(new { error = "Project number and email are required." }) { StatusCode = 400 };
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
             if (!canAccess)
                 return new JsonResult(new { error = "Please verify your email before deleting a contact." }) { StatusCode = 403 };
 
@@ -780,7 +780,7 @@ namespace Kor.Inspections.App.Pages
             var contactEmail = (ContactEmail?.Trim() ?? string.Empty).ToLowerInvariant();
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
             if (!canAccess)
             {
                 ModelState.AddModelError(string.Empty, "Please verify your email before booking.");

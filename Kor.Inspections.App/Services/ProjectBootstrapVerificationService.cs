@@ -266,7 +266,7 @@ namespace Kor.Inspections.App.Services
             return true;
         }
 
-        public async Task<bool> EnsureVerifiedForProjectAccessAsync(
+        public async Task<bool> EnsureContactEmailVerifiedAsync(
             string projectNumber,
             string email,
             CancellationToken ct = default)
