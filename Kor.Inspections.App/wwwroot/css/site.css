@@ -43,6 +43,10 @@ body {
     --page-padding: 20px;
 }
 
+.content.page-container:has(> .inspections-by-project) {
+    --page-max-width: 1400px;
+}
+
 .admin-page-container {
     max-width: 1600px;
     margin: 18px auto 28px;
