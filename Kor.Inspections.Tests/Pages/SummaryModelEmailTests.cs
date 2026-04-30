@@ -197,8 +197,7 @@ public class SummaryModelEmailTests
         {
             Email = email,
             DisplayName = displayName,
-            Enabled = true,
-            DailyMax = 8
+            Enabled = true
         });
         await db.SaveChangesAsync();
     }

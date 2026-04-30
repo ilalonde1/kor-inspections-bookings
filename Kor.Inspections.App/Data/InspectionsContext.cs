@@ -109,9 +109,6 @@ namespace Kor.Inspections.App.Data
                       .IsUnique()
                       .HasDatabaseName("IX_Inspectors_UniqueEmail");
 
-                entity.Property(i => i.DailyMax)
-                      .HasDefaultValue(8);
-
                 entity.Property(i => i.Enabled)
                       .HasDefaultValue(true);
             });
