@@ -702,7 +702,8 @@ namespace Kor.Inspections.App.Pages.Admin
             var windowStartLocal = defaultWindowStartLocal;
             var windowEndLocal = nowLocal.Date.AddDays(8);
 
-            if (DateTime.TryParse(DateFrom, out var dateFromLocal))
+            if (DateTime.TryParseExact(DateFrom, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var dateFromLocal))
             {
                 windowStartLocal = dateFromLocal.Date;
             }
@@ -711,7 +712,8 @@ namespace Kor.Inspections.App.Pages.Admin
                 DateFrom = defaultWindowStartLocal.ToString("yyyy-MM-dd");
             }
 
-            if (DateTime.TryParse(DateTo, out var dateToLocal))
+            if (DateTime.TryParseExact(DateTo, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var dateToLocal))
             {
                 windowEndLocal = dateToLocal.Date.AddDays(1);
             }
