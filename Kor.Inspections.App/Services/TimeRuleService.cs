@@ -91,6 +91,9 @@ namespace Kor.Inspections.App.Services
             if (date < effectiveMinDate || date > maxDate)
                 return Enumerable.Empty<TimeOnly>();
 
+            if (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                return Enumerable.Empty<TimeOnly>();
+
             var workStart = TimeOnly.ParseExact(
                 _options.WorkStart, "HH:mm", CultureInfo.InvariantCulture);
 

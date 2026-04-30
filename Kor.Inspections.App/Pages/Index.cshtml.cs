@@ -820,6 +820,13 @@ namespace Kor.Inspections.App.Pages
                 return Page();
             }
 
+            if (requestDateOnly.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                await LoadAllowedDatesAndTimesAsync();
+                ModelState.AddModelError(string.Empty, "Field reviews are only available Monday through Friday.");
+                return Page();
+            }
+
             DateTime startUtc;
             DateTime endUtc;
             string? timePreference = null;

@@ -215,6 +215,16 @@ namespace Kor.Inspections.App.Pages.Admin
                 return Page();
             }
 
+            if (requestedDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                ModelState.AddModelError(
+                    "ManualBooking.RequestedDate",
+                    "Field reviews are only available Monday through Friday.");
+                await LoadDataAsync();
+                await LoadManualBookingTimesAsync();
+                return Page();
+            }
+
             var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
             var projectNumber = ProjectNumberHelper.Base5(ManualBooking.ProjectNumber.Trim());
             var submittedProjectNumberDisplay = ManualBooking.ProjectNumber.Trim();
@@ -542,6 +552,12 @@ namespace Kor.Inspections.App.Pages.Admin
                 StatusMessage = edit.OverrideCutoff
                     ? "Selected date is outside the allowed booking window, even with the cutoff override."
                     : "Selected date is outside the allowed booking window.";
+                return RedirectToPage(redirectArgs);
+            }
+
+            if (requestedDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                StatusMessage = "Field reviews are only available Monday through Friday.";
                 return RedirectToPage(redirectArgs);
             }
 

@@ -153,6 +153,21 @@ public class TimeRuleServiceTests
     }
 
     [Fact]
+    public void GetAvailableSlotsForDate_SaturdayInsideAllowedWindow_ReturnsNoSlots()
+    {
+        var zone = TimeRuleServiceTestFactory.FindZone(_ => true);
+        var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zone);
+        var service = TimeRuleServiceTestFactory.Create(zone, Math.Min(nowLocal.Hour + 1, 23));
+        var today = DateOnly.FromDateTime(nowLocal.Date);
+        var daysUntilSaturday = ((int)DayOfWeek.Saturday - (int)today.DayOfWeek + 7) % 7;
+        var date = today.AddDays(daysUntilSaturday);
+
+        var slots = service.GetAvailableSlotsForDate(date, Array.Empty<Booking>(), minDateOverride: date).ToList();
+
+        Assert.Empty(slots);
+    }
+
+    [Fact]
     public void GetAvailableSlotsForDate_OverlappingBooking_BlocksAffectedSlots()
     {
         var zone = TimeRuleServiceTestFactory.FindZone(nowLocal => nowLocal.Hour <= 22);
