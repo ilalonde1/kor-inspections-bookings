@@ -694,8 +694,7 @@ namespace Kor.Inspections.App.Pages.Admin
 
             var inspectorsByEmail = Inspectors
                 .Where(i => !string.IsNullOrWhiteSpace(i.Email))
-                .GroupBy(i => i.Email, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First().DisplayName, StringComparer.OrdinalIgnoreCase);
+                .ToDictionary(i => i.Email, i => i.DisplayName, StringComparer.OrdinalIgnoreCase);
 
             var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
             var defaultWindowStartLocal = nowLocal.Date;

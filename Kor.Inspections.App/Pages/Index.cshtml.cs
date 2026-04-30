@@ -367,9 +367,7 @@ namespace Kor.Inspections.App.Pages
             var inspectorsByEmail = await _db.Inspectors
                 .AsNoTracking()
                 .Where(i => !string.IsNullOrWhiteSpace(i.Email))
-                .GroupBy(i => i.Email)
-                .Select(g => new { Email = g.Key, DisplayName = g.First().DisplayName })
-                .ToDictionaryAsync(x => x.Email, x => x.DisplayName, StringComparer.OrdinalIgnoreCase);
+                .ToDictionaryAsync(i => i.Email, i => i.DisplayName, StringComparer.OrdinalIgnoreCase);
 
             var list = bookings
                 .Select(b => new InspectionDto
