@@ -867,6 +867,19 @@ namespace Kor.Inspections.App.Pages
                 endUtc = startUtc.AddMinutes(_inspectionRules.DefaultDurationMinutes);
             }
 
+            if (timePreference is not null)
+            {
+                var slotAvailable = await _bookingService.IsSlotAvailableAsync(
+                    startUtc, endUtc, ct: HttpContext.RequestAborted);
+                if (!slotAvailable)
+                {
+                    await LoadAllowedDatesAndTimesAsync();
+                    ModelState.AddModelError(string.Empty,
+                        "Selected time is no longer available. Please choose another time.");
+                    return Page();
+                }
+            }
+
             var submittedProjectNumber = projectNumber;
             var submittedContactEmail = contact.ContactEmail.Trim().ToLowerInvariant();
             var duplicateCutoffUtc = DateTime.UtcNow.AddMinutes(-2);
