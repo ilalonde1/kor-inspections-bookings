@@ -117,6 +117,53 @@ public class AdminIndexModelReassignmentTests
                     !body.Contains("Inspector Has Changed", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task OnPostAssignAjaxAsync_SuccessfulAssignment_ReturnsJsonWithUpdatedFields()
+    {
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminReassignTests_");
+
+        var inspector = await SeedInspectorAsync(fixture, "Inspector A", "a@example.com");
+        var booking = await SeedAssignedBookingAsync(fixture, assignedToEmail: null);
+
+        var emailHandler = new CountingHttpMessageHandler();
+        await using var db = fixture.CreateContext();
+        var model = CreateModel(db, emailHandler);
+
+        var result = await model.OnPostAssignAjaxAsync(booking.BookingId, inspector.Email);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = json.Value!;
+        var ok = (bool)payload.GetType().GetProperty("ok")!.GetValue(payload)!;
+        var assignedToValue = (string?)payload.GetType().GetProperty("assignedToValue")!.GetValue(payload);
+        var assignedTo = (string?)payload.GetType().GetProperty("assignedTo")!.GetValue(payload);
+        var status = (string?)payload.GetType().GetProperty("status")!.GetValue(payload);
+
+        Assert.True(ok);
+        Assert.Equal(inspector.Email, assignedToValue);
+        Assert.Equal(inspector.DisplayName, assignedTo);
+        Assert.Equal(BookingStatus.Assigned, status);
+    }
+
+    [Fact]
+    public async Task OnPostAssignAjaxAsync_BookingNotFound_ReturnsJsonWithOkFalse()
+    {
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminReassignTests_");
+
+        var emailHandler = new CountingHttpMessageHandler();
+        await using var db = fixture.CreateContext();
+        var model = CreateModel(db, emailHandler);
+
+        var result = await model.OnPostAssignAjaxAsync(Guid.NewGuid(), "anyone@example.com");
+
+        var json = Assert.IsType<JsonResult>(result);
+        var payload = json.Value!;
+        var ok = (bool)payload.GetType().GetProperty("ok")!.GetValue(payload)!;
+        var message = (string)payload.GetType().GetProperty("message")!.GetValue(payload)!;
+
+        Assert.False(ok);
+        Assert.Contains("not found", message, StringComparison.OrdinalIgnoreCase);
+    }
+
     // --------------------------------------------------
     // HELPERS
     // --------------------------------------------------
