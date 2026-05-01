@@ -16,12 +16,9 @@
         <h2 class="admin-page-title">Field Reviews</h2>
     </div>
 
-    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
-    {
-        <div class="alert alert-info admin-status-banner">
-            @Model.StatusMessage
-        </div>
-    }
+    <div id="adminStatusBanner" class="alert alert-info admin-status-banner" @(string.IsNullOrWhiteSpace(Model.StatusMessage) ? "hidden" : null)>
+        @Model.StatusMessage
+    </div>
 
     <details id="manualBookingPanel" class="phase-box admin-panel admin-manual-panel" @(ViewContext.ModelState.ErrorCount > 0 ? "open" : null)>
         <summary class="admin-panel-summary">
@@ -367,10 +364,82 @@ document.addEventListener("DOMContentLoaded", function () {
         manualBookingPanel.addEventListener("toggle", syncManualBookingToggle);
     }
 
-    if (!requestedDate || !refreshBtn) return;
+    if (requestedDate && refreshBtn) {
+        requestedDate.addEventListener("change", function () {
+            refreshBtn.click();
+        });
+    }
 
-    requestedDate.addEventListener("change", function () {
-        refreshBtn.click();
+    // ---- AJAX assign: avoid full-page reload on each Assign click ----
+    const statusBanner = document.getElementById("adminStatusBanner");
+
+    function setStatusBanner(message, isError) {
+        if (!statusBanner) return;
+        statusBanner.textContent = message || "";
+        statusBanner.classList.toggle("alert-info", !isError);
+        statusBanner.classList.toggle("alert-warning", !!isError);
+        statusBanner.hidden = !message;
+    }
+
+    document.querySelectorAll("form.assign-inline").forEach(function (form) {
+        form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            const submitBtn = form.querySelector("button[type='submit']");
+            const originalText = submitBtn ? submitBtn.textContent : "";
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Assigning...";
+            }
+
+            try {
+                const formData = new FormData(form);
+                const response = await fetch("?handler=AssignAjax", {
+                    method: "POST",
+                    body: formData,
+                    headers: { "X-Requested-With": "fetch" }
+                });
+
+                if (!response.ok) {
+                    setStatusBanner("Assign failed. Please refresh and try again.", true);
+                    return;
+                }
+
+                const result = await response.json();
+                if (!result.ok) {
+                    setStatusBanner(result.message || "Assign failed.", true);
+                    return;
+                }
+
+                // Update the row's Assigned cell + status class.
+                const row = form.closest("tr.booking-row");
+                if (row) {
+                    const cell = row.querySelector(".booking-assigned");
+                    if (cell) {
+                        const isUnassigned = !result.assignedToValue;
+                        cell.textContent = isUnassigned ? "-" : (result.assignedTo || "-");
+                    }
+                    if (result.status) {
+                        row.dataset.status = result.status;
+                        const cls = "status-" + result.status.toLowerCase();
+                        row.className = row.className
+                            .split(" ")
+                            .filter(function (c) { return !c.startsWith("status-"); })
+                            .concat([cls])
+                            .join(" ");
+                    }
+                }
+
+                setStatusBanner(result.message, false);
+            } catch (err) {
+                setStatusBanner("Assign failed. Please refresh and try again.", true);
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            }
+        });
     });
 });
 </script>

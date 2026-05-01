@@ -362,26 +362,27 @@ namespace Kor.Inspections.App.Pages.Admin
         // ASSIGN
         // --------------------------------------------------
 
-        public async Task<IActionResult> OnPostAssignAsync(Guid id, string assignedTo)
+        private sealed class AssignResult
+        {
+            public bool Ok { get; init; }
+            public string Message { get; init; } = string.Empty;
+            public string? AssignedToValue { get; init; }
+            public string AssignedDisplay { get; init; } = string.Empty;
+            public string? Status { get; init; }
+        }
+
+        private async Task<AssignResult> ApplyAssignAsync(Guid id, string? assignedTo)
         {
             var booking = await _db.Bookings.FirstOrDefaultAsync(b => b.BookingId == id);
-            Inspector? inspector = null;
-            var assignedInspectorLabel = BookingStatus.Unassigned;
-
             if (booking == null)
-            {
-                StatusMessage = "Booking not found.";
-                return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
-            }
+                return new AssignResult { Ok = false, Message = "Booking not found." };
 
             if (string.Equals(booking.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(booking.Status, BookingStatus.Completed, StringComparison.OrdinalIgnoreCase))
-            {
-                StatusMessage = "Booking cannot be modified.";
-                return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
-            }
+                return new AssignResult { Ok = false, Message = "Booking cannot be modified." };
 
             var oldAssignedTo = booking.AssignedTo;
+            Inspector? inspector = null;
 
             if (!string.IsNullOrWhiteSpace(assignedTo) &&
                 !assignedTo.Equals(BookingStatus.Unassigned, StringComparison.OrdinalIgnoreCase))
@@ -391,28 +392,25 @@ namespace Kor.Inspections.App.Pages.Admin
                     .FirstOrDefaultAsync(i => i.Enabled && i.Email == assignedToTrimmed);
 
                 if (inspector == null)
-                {
-                    StatusMessage = $"Inspector '{assignedTo}' not found or is disabled.";
-                    return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
-                }
+                    return new AssignResult { Ok = false, Message = $"Inspector '{assignedTo}' not found or is disabled." };
             }
 
-            if (string.IsNullOrWhiteSpace(assignedTo) ||
-                assignedTo.Equals(BookingStatus.Unassigned, StringComparison.OrdinalIgnoreCase))
+            string assignedDisplay;
+            string message;
+            if (inspector == null)
             {
                 booking.AssignedTo = null;
                 booking.Status = BookingStatus.Unassigned;
-                StatusMessage = "Booking marked unassigned.";
+                assignedDisplay = BookingStatus.Unassigned;
+                message = "Booking marked unassigned.";
             }
             else
             {
-                booking.AssignedTo = inspector!.Email;
-                assignedInspectorLabel = inspector.DisplayName;
-
+                booking.AssignedTo = inspector.Email;
+                assignedDisplay = inspector.DisplayName;
                 if (booking.Status.Equals(BookingStatus.Unassigned, StringComparison.OrdinalIgnoreCase))
                     booking.Status = BookingStatus.Assigned;
-
-                StatusMessage = $"Booking assigned to {assignedInspectorLabel}.";
+                message = $"Booking assigned to {assignedDisplay}.";
             }
 
             var isUnassign = booking.AssignedTo is null;
@@ -423,7 +421,7 @@ namespace Kor.Inspections.App.Pages.Admin
                 PerformedBy = User.Identity?.Name,
                 Notes = isUnassign
                     ? $"Unassigned (was: {oldAssignedTo ?? "none"})"
-                    : $"Assigned to {assignedInspectorLabel}",
+                    : $"Assigned to {assignedDisplay}",
                 ActionUtc = DateTime.UtcNow
             });
 
@@ -434,20 +432,15 @@ namespace Kor.Inspections.App.Pages.Admin
             catch (DbUpdateConcurrencyException)
             {
                 _db.ChangeTracker.Clear();
-                StatusMessage = "This booking was just modified by another user. Please refresh and try again.";
-                return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
+                return new AssignResult { Ok = false, Message = "This booking was just modified by another user. Please refresh and try again." };
             }
 
             _logger.LogInformation(
                 "Admin booking assignment: BookingId={BookingId} AssignedTo={AssignedTo} By={AdminUser}",
-                booking.BookingId,
-                assignedInspectorLabel,
-                User.Identity?.Name);
+                booking.BookingId, assignedDisplay, User.Identity?.Name);
 
             // Notify on any AssignedTo change to a new non-null inspector — covers both
             // the initial Unassigned -> Assigned transition and reassignments A -> B.
-            // Unassigning (X -> null) does not trigger an email here; that path can be
-            // added separately when an explicit "unassigned" notification is designed.
             var assignedToChanged = !string.Equals(
                 oldAssignedTo ?? string.Empty,
                 booking.AssignedTo ?? string.Empty,
@@ -460,7 +453,35 @@ namespace Kor.Inspections.App.Pages.Admin
                     isReassignment: !string.IsNullOrWhiteSpace(oldAssignedTo));
             }
 
+            return new AssignResult
+            {
+                Ok = true,
+                Message = message,
+                AssignedToValue = booking.AssignedTo,
+                AssignedDisplay = assignedDisplay,
+                Status = booking.Status
+            };
+        }
+
+        public async Task<IActionResult> OnPostAssignAsync(Guid id, string assignedTo)
+        {
+            var result = await ApplyAssignAsync(id, assignedTo);
+            StatusMessage = result.Message;
             return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
+        }
+
+        public async Task<IActionResult> OnPostAssignAjaxAsync(Guid id, string assignedTo)
+        {
+            var result = await ApplyAssignAsync(id, assignedTo);
+            return new JsonResult(new
+            {
+                ok = result.Ok,
+                message = result.Message,
+                bookingId = id,
+                assignedToValue = result.AssignedToValue,
+                assignedTo = result.AssignedDisplay,
+                status = result.Status
+            });
         }
         // --------------------------------------------------
         // CANCEL
