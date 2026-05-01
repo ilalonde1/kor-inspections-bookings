@@ -43,6 +43,16 @@ namespace Kor.Inspections.App.Pages.Admin
         public IList<Inspector> Inspectors { get; private set; } = new List<Inspector>();
         public List<string> AvailableManualTimes { get; private set; } = new();
 
+        public IList<DayQuickAccessItem> DayQuickAccess { get; private set; } = new List<DayQuickAccessItem>();
+
+        public sealed class DayQuickAccessItem
+        {
+            public DateOnly Date { get; init; }
+            public string Label { get; init; } = string.Empty;
+            public int Count { get; init; }
+            public bool IsSelected { get; init; }
+        }
+
         [TempData]
         public string? StatusMessage { get; set; }
 
@@ -824,6 +834,67 @@ namespace Kor.Inspections.App.Pages.Admin
                     Comments = b.Comments
                 };
             }).ToList();
+
+            await LoadDayQuickAccessAsync(tz, nowLocal);
+        }
+
+        private async Task LoadDayQuickAccessAsync(TimeZoneInfo tz, DateTime nowLocal)
+        {
+            const int DayQuickAccessCount = 6;
+
+            var todayLocal = DateOnly.FromDateTime(nowLocal.Date);
+            var days = new List<DateOnly>(DayQuickAccessCount);
+            var cursor = todayLocal;
+            while (days.Count < DayQuickAccessCount)
+            {
+                if (cursor.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
+                    days.Add(cursor);
+                cursor = cursor.AddDays(1);
+            }
+
+            var rangeStartUtc = TimeZoneInfo.ConvertTimeToUtc(
+                days[0].ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), tz);
+            var rangeEndUtc = TimeZoneInfo.ConvertTimeToUtc(
+                days[^1].AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), tz);
+
+            var startsUtc = await _db.Bookings
+                .AsNoTracking()
+                .Where(b =>
+                    b.StartUtc >= rangeStartUtc &&
+                    b.StartUtc < rangeEndUtc &&
+                    b.Status != BookingStatus.Cancelled &&
+                    b.Status != BookingStatus.Completed)
+                .Select(b => b.StartUtc)
+                .ToListAsync();
+
+            var countsByDate = startsUtc
+                .GroupBy(s => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(s, tz)))
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            DateOnly? selectedDate = null;
+            if (string.Equals(DateFrom, DateTo, StringComparison.Ordinal) &&
+                DateOnly.TryParseExact(DateFrom, "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out var parsedSelected))
+            {
+                selectedDate = parsedSelected;
+            }
+
+            DayQuickAccess = days.Select(d => new DayQuickAccessItem
+            {
+                Date = d,
+                Label = BuildDayQuickLabel(d, todayLocal),
+                Count = countsByDate.GetValueOrDefault(d, 0),
+                IsSelected = selectedDate == d
+            }).ToList();
+        }
+
+        private static string BuildDayQuickLabel(DateOnly date, DateOnly today)
+        {
+            if (date == today) return $"Today ({date:MMM d})";
+            if (date == today.AddDays(1)) return $"Tomorrow ({date:MMM d})";
+            return $"{date:dddd} {date:MMM d}";
         }
 
         // --------------------------------------------------
