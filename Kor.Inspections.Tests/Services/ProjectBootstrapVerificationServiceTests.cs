@@ -131,6 +131,47 @@ public class ProjectBootstrapVerificationServiceTests
     }
 
     [Fact]
+    public async Task VerifyCodeAsync_OnSuccess_WritesProjectDefaultsRowForDomain()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        await using var db = CreateContext(dbName);
+
+        var service = CreateService(db);
+        await service.SendCodeAsync(ProjectNumber, Email);
+        var code = (await db.ProjectVerifications.AsNoTracking().SingleAsync()).Code;
+        Assert.True(await service.VerifyCodeAsync(ProjectNumber, Email, code));
+
+        var row = await db.ProjectDefaults.AsNoTracking().SingleAsync(
+            x => x.ProjectNumber == ProjectNumber && x.EmailDomain == "acme.com");
+        Assert.True(row.UpdatedUtc > DateTime.UtcNow.AddMinutes(-1));
+    }
+
+    [Fact]
+    public async Task VerifyCodeAsync_AfterDomainApproved_OtherUserOnSameDomainSkipsOtp()
+    {
+        const string otherEmail = "someone-else@acme.com";
+
+        var dbName = Guid.NewGuid().ToString("N");
+        await using var db = CreateContext(dbName);
+
+        var service = CreateService(db);
+        await service.SendCodeAsync(ProjectNumber, Email);
+        var code = (await db.ProjectVerifications.AsNoTracking().SingleAsync()).Code;
+        Assert.True(await service.VerifyCodeAsync(ProjectNumber, Email, code));
+
+        // A different user from the same domain should now be considered verified
+        // via the explicit domain approval row written by VerifyCodeAsync above —
+        // even though they have no ProjectVerifications row of their own.
+        var status = await service.GetStatusAsync(ProjectNumber, otherEmail);
+        Assert.True(status.RequiresVerification);
+        Assert.True(status.IsVerified);
+
+        Assert.False(await db.ProjectVerifications
+            .AsNoTracking()
+            .AnyAsync(v => v.Email == otherEmail));
+    }
+
+    [Fact]
     public async Task SendCodeAsync_TwoConcurrentCallsForSameProjectEmail_BothSucceedAndOnlyOneRowPersists()
     {
         // Sqlite in-memory enforces unique indexes; EF InMemory does not.

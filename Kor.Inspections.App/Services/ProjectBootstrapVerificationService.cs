@@ -263,7 +263,73 @@ namespace Kor.Inspections.App.Services
             row.UpdatedUtc = now;
             await _db.SaveChangesAsync(ct);
 
+            await UpsertExplicitDomainApprovalAsync(normalizedProject, normalizedEmail, ct);
+
             return true;
+        }
+
+        private async Task UpsertExplicitDomainApprovalAsync(
+            string normalizedProject,
+            string normalizedEmail,
+            CancellationToken ct)
+        {
+            var domain = EmailHelper.GetDomain(normalizedEmail);
+            if (string.IsNullOrWhiteSpace(domain))
+                return;
+
+            var now = DateTime.UtcNow;
+
+            try
+            {
+                var existing = await _db.ProjectDefaults
+                    .FirstOrDefaultAsync(
+                        x => x.ProjectNumber == normalizedProject && x.EmailDomain == domain,
+                        ct);
+
+                if (existing != null)
+                {
+                    existing.UpdatedUtc = now;
+                }
+                else
+                {
+                    _db.ProjectDefaults.Add(new ProjectDefault
+                    {
+                        ProjectNumber = normalizedProject,
+                        EmailDomain = domain,
+                        UpdatedUtc = now
+                    });
+                }
+
+                await _db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex)
+                when (DbUpdateExceptionClassifier.IsNamedUniqueConstraintViolation(
+                    ex,
+                    "IX_ProjectDefaults_ProjectNumber_EmailDomain"))
+            {
+                foreach (var entry in _db.ChangeTracker.Entries<ProjectDefault>()
+                    .Where(e => e.State == EntityState.Added).ToList())
+                {
+                    entry.State = EntityState.Detached;
+                }
+
+                var winner = await _db.ProjectDefaults.FirstOrDefaultAsync(
+                    x => x.ProjectNumber == normalizedProject && x.EmailDomain == domain,
+                    ct);
+
+                if (winner != null)
+                {
+                    winner.UpdatedUtc = now;
+                    try { await _db.SaveChangesAsync(ct); }
+                    catch { /* concurrent refresh; non-fatal */ }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Failed to upsert explicit domain approval for project {ProjectNumber}, domain {Domain}.",
+                    normalizedProject, domain);
+            }
         }
 
         public async Task<bool> EnsureContactEmailVerifiedAsync(
