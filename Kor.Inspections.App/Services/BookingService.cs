@@ -765,7 +765,7 @@ namespace Kor.Inspections.App.Services
             sb.AppendRow("Kor Job #", FormatJobLine(booking));
             sb.AppendRow("Project Address", booking.ProjectAddress);
             sb.AppendRow("Site Contact",
-                $"{booking.ContactName} ({booking.ContactPhone}, {booking.ContactEmail})");
+                $"{booking.ContactName} ({PhoneNormalizer.Format(booking.ContactPhone)}, {booking.ContactEmail})");
             sb.AppendRow("Requested Date", startLocal.ToString("yyyy-MM-dd"));
             sb.AppendRow(
     "Requested Time",
