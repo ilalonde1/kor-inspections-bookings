@@ -943,7 +943,7 @@ ASSIGN + ACTION BUTTONS
 .admin-table-container {
     width: 100%;
     border-radius: 12px;
-    overflow: hidden;
+    overflow-x: auto;
     background: linear-gradient(180deg, #f8fafc 0%, #f2f6fa 100%);
     box-shadow: 0 10px 26px rgba(31, 45, 58, 0.06);
     padding: 10px;
