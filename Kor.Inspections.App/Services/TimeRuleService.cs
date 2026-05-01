@@ -56,19 +56,21 @@ namespace Kor.Inspections.App.Services
             var cutoff = new TimeOnly(_options.CutoffHourLocal, 0);
             var today = DateOnly.FromDateTime(nowLocal.Date);
 
-            DateOnly minDate;
-
-            if (TimeOnly.FromDateTime(nowLocal) < cutoff)
-                minDate = today.AddDays(1);
-            else
-                minDate = today.AddDays(2);
-
-            // Inspections only run Mon-Fri. If minDate lands on a weekend,
-            // advance to the next business day. Matches IsCancellationAllowed.
-            while (minDate.DayOfWeek == DayOfWeek.Saturday ||
-                   minDate.DayOfWeek == DayOfWeek.Sunday)
+            // Walk forward by BUSINESS days, not calendar days. Calendar-day
+            // arithmetic with a single trailing weekend-skip diverges from the
+            // intended rule on Friday afternoon: Fri+2 calendar days = Sun,
+            // skip-once = Mon, but the symmetric reading of "after cutoff you
+            // can't book the next business day" requires Tue (Mon is the next
+            // business day; cutoff blocks it). IsCancellationAllowed already
+            // walks backward in business-day steps, so doing the forward walk
+            // in business days too keeps both rules symmetric.
+            var businessDaysToAdd = TimeOnly.FromDateTime(nowLocal) < cutoff ? 1 : 2;
+            var minDate = today;
+            for (int i = 0; i < businessDaysToAdd; i++)
             {
                 minDate = minDate.AddDays(1);
+                while (minDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                    minDate = minDate.AddDays(1);
             }
 
             var maxDate = today.AddDays(_options.BookingWindowDays);

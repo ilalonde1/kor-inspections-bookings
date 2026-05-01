@@ -49,4 +49,26 @@ internal static class TimeRuleServiceTestFactory
 
         throw new InvalidOperationException("Could not find a timezone that satisfies the test precondition.");
     }
+
+    /// <summary>
+    /// Non-throwing variant: returns true if a zone satisfying <paramref name="predicate"/>
+    /// exists at the current UTC instant, false otherwise. Use to drive the skip
+    /// pattern in tests whose preconditions are calendar-dependent (e.g. "tomorrow
+    /// is a weekday" is unsatisfiable late on Friday UTC).
+    /// </summary>
+    public static bool TryFindZone(Func<DateTime, bool> predicate, out TimeZoneInfo zone)
+    {
+        foreach (var z in TimeZoneInfo.GetSystemTimeZones())
+        {
+            var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, z);
+            if (predicate(nowLocal))
+            {
+                zone = z;
+                return true;
+            }
+        }
+
+        zone = TimeZoneInfo.Utc;
+        return false;
+    }
 }
