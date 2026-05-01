@@ -1087,6 +1087,50 @@ ASSIGN + ACTION BUTTONS
     margin-top: -4px;
 }
 
+.admin-day-quick-access {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.admin-day-quick-btn {
+    flex: 1 1 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 10px 14px;
+    border: 1px solid #d8e0ea;
+    border-radius: 10px;
+    background: #fff;
+    color: #28425b;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(31, 45, 58, 0.04);
+    transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.admin-day-quick-btn:hover {
+    background: #f2f6fa;
+    border-color: #b8c6d6;
+    color: #1d334a;
+}
+
+.admin-day-quick-btn.is-active {
+    background: #3F5364;
+    border-color: #3F5364;
+    color: #fff;
+}
+
+.admin-day-quick-label {
+    font-weight: 600;
+    font-size: .9rem;
+}
+
+.admin-day-quick-count {
+    font-size: .78rem;
+    opacity: .85;
+}
+
 .admin-empty-state {
     margin: 0;
     padding: 22px;

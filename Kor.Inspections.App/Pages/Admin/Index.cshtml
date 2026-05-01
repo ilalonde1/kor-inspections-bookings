@@ -119,6 +119,24 @@
         <input type="date" name="dateTo" value="@Model.DateTo" class="form-control" />
         <button type="submit" class="btn-smooth admin-filter-apply">Apply</button>
     </form>
+    <div class="admin-day-quick-access">
+        @foreach (var day in Model.DayQuickAccess)
+        {
+            <a asp-page="./Index"
+               asp-route-dateFrom="@day.Date.ToString("yyyy-MM-dd")"
+               asp-route-dateTo="@day.Date.ToString("yyyy-MM-dd")"
+               asp-route-view="@Model.View"
+               asp-route-sort="@Model.Sort"
+               asp-route-dir="@Model.Dir"
+               asp-route-project="@Model.Project"
+               asp-route-inspector="@Model.Inspector"
+               class="btn-smooth admin-day-quick-btn @(day.IsSelected ? "is-active" : string.Empty)">
+                <span class="admin-day-quick-label">@day.Label</span>
+                <span class="admin-day-quick-count">@day.Count Inspection@(day.Count == 1 ? "" : "s")</span>
+            </a>
+        }
+    </div>
+
     <div class="helper-text-muted admin-filter-hint">Defaults to the next workday unless you set custom dates.</div>
 
     <div class="admin-shortcuts">
