@@ -303,7 +303,7 @@ namespace Kor.Inspections.App.Pages
                 return new JsonResult(Array.Empty<ContactDto>());
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(project, email, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(project, email, HttpContext.RequestAborted);
             if (!canAccess)
             {
                 Response.StatusCode = 403;
@@ -347,7 +347,7 @@ namespace Kor.Inspections.App.Pages
             }
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
 
             if (!canAccess)
             {
@@ -359,7 +359,7 @@ namespace Kor.Inspections.App.Pages
                 .AsNoTracking()
                 .Where(b =>
                     b.ProjectNumber != null &&
-                    b.ProjectNumber.StartsWith(projectRaw) &&
+                    b.ProjectNumber == projectRaw &&
                     b.ContactEmail == emailRaw)
                 .OrderByDescending(b => b.StartUtc)
                 .ToListAsync();
@@ -367,9 +367,7 @@ namespace Kor.Inspections.App.Pages
             var inspectorsByEmail = await _db.Inspectors
                 .AsNoTracking()
                 .Where(i => !string.IsNullOrWhiteSpace(i.Email))
-                .GroupBy(i => i.Email)
-                .Select(g => new { Email = g.Key, DisplayName = g.First().DisplayName })
-                .ToDictionaryAsync(x => x.Email, x => x.DisplayName, StringComparer.OrdinalIgnoreCase);
+                .ToDictionaryAsync(i => i.Email, i => i.DisplayName, StringComparer.OrdinalIgnoreCase);
 
             var list = bookings
                 .Select(b => new InspectionDto
@@ -406,7 +404,7 @@ namespace Kor.Inspections.App.Pages
             }
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(projectRaw, emailRaw, HttpContext.RequestAborted);
             if (!canAccess)
             {
                 Response.StatusCode = 403;
@@ -431,7 +429,7 @@ namespace Kor.Inspections.App.Pages
                 .FirstOrDefaultAsync(b =>
                     b.BookingId == bookingId &&
                     b.ProjectNumber != null &&
-                    b.ProjectNumber.StartsWith(base5) &&
+                    b.ProjectNumber == base5 &&
                     b.ContactEmail != null &&
                     b.ContactEmail == emailRaw);
             // Shared cancellation rights must be modelled as explicit delegation,
@@ -592,7 +590,7 @@ namespace Kor.Inspections.App.Pages
             }
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(project, requesterEmail, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(project, requesterEmail, HttpContext.RequestAborted);
             if (!canAccess)
             {
                 Response.StatusCode = 403;
@@ -653,7 +651,7 @@ namespace Kor.Inspections.App.Pages
             }
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
             if (!canAccess)
             {
                 Response.StatusCode = 403;
@@ -700,7 +698,7 @@ namespace Kor.Inspections.App.Pages
                 return new JsonResult(new { error = "Project number and email are required." }) { StatusCode = 400 };
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
             if (!canAccess)
                 return new JsonResult(new { error = "Please verify your email before deleting a contact." }) { StatusCode = 403 };
 
@@ -782,7 +780,7 @@ namespace Kor.Inspections.App.Pages
             var contactEmail = (ContactEmail?.Trim() ?? string.Empty).ToLowerInvariant();
 
             var canAccess = await _projectBootstrapVerificationService
-                .EnsureVerifiedForProjectAccessAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
+                .EnsureContactEmailVerifiedAsync(projectNumber, contactEmail, HttpContext.RequestAborted);
             if (!canAccess)
             {
                 ModelState.AddModelError(string.Empty, "Please verify your email before booking.");
@@ -817,6 +815,13 @@ namespace Kor.Inspections.App.Pages
             {
                 await LoadAllowedDatesAndTimesAsync();
                 ModelState.AddModelError(string.Empty, "Selected date is outside the allowed booking window.");
+                return Page();
+            }
+
+            if (requestDateOnly.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                await LoadAllowedDatesAndTimesAsync();
+                ModelState.AddModelError(string.Empty, "Field reviews are only available Monday through Friday.");
                 return Page();
             }
 
@@ -858,6 +863,19 @@ namespace Kor.Inspections.App.Pages
 
                 startUtc = _timeRules.ConvertLocalToUtc(requestDateOnly, timeOnly);
                 endUtc = startUtc.AddMinutes(_inspectionRules.DefaultDurationMinutes);
+            }
+
+            if (timePreference is not null)
+            {
+                var slotAvailable = await _bookingService.IsSlotAvailableAsync(
+                    startUtc, endUtc, ct: HttpContext.RequestAborted);
+                if (!slotAvailable)
+                {
+                    await LoadAllowedDatesAndTimesAsync();
+                    ModelState.AddModelError(string.Empty,
+                        "Selected time is no longer available. Please choose another time.");
+                    return Page();
+                }
             }
 
             var submittedProjectNumber = projectNumber;

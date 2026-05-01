@@ -215,6 +215,16 @@ namespace Kor.Inspections.App.Pages.Admin
                 return Page();
             }
 
+            if (requestedDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                ModelState.AddModelError(
+                    "ManualBooking.RequestedDate",
+                    "Field reviews are only available Monday through Friday.");
+                await LoadDataAsync();
+                await LoadManualBookingTimesAsync();
+                return Page();
+            }
+
             var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
             var projectNumber = ProjectNumberHelper.Base5(ManualBooking.ProjectNumber.Trim());
             var submittedProjectNumberDisplay = ManualBooking.ProjectNumber.Trim();
@@ -545,6 +555,12 @@ namespace Kor.Inspections.App.Pages.Admin
                 return RedirectToPage(redirectArgs);
             }
 
+            if (requestedDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                StatusMessage = "Field reviews are only available Monday through Friday.";
+                return RedirectToPage(redirectArgs);
+            }
+
             DateTime newStartUtc;
             DateTime newEndUtc;
             string? newTimePreference = null;
@@ -678,15 +694,15 @@ namespace Kor.Inspections.App.Pages.Admin
 
             var inspectorsByEmail = Inspectors
                 .Where(i => !string.IsNullOrWhiteSpace(i.Email))
-                .GroupBy(i => i.Email, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First().DisplayName, StringComparer.OrdinalIgnoreCase);
+                .ToDictionary(i => i.Email, i => i.DisplayName, StringComparer.OrdinalIgnoreCase);
 
             var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
             var defaultWindowStartLocal = nowLocal.Date;
             var windowStartLocal = defaultWindowStartLocal;
             var windowEndLocal = nowLocal.Date.AddDays(8);
 
-            if (DateTime.TryParse(DateFrom, out var dateFromLocal))
+            if (DateTime.TryParseExact(DateFrom, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var dateFromLocal))
             {
                 windowStartLocal = dateFromLocal.Date;
             }
@@ -695,7 +711,8 @@ namespace Kor.Inspections.App.Pages.Admin
                 DateFrom = defaultWindowStartLocal.ToString("yyyy-MM-dd");
             }
 
-            if (DateTime.TryParse(DateTo, out var dateToLocal))
+            if (DateTime.TryParseExact(DateTo, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var dateToLocal))
             {
                 windowEndLocal = dateToLocal.Date.AddDays(1);
             }

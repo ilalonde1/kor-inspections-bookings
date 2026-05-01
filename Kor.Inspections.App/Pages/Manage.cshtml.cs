@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Kor.Inspections.App.Data;
 using Kor.Inspections.App.Data.Models;
@@ -126,7 +127,11 @@ namespace Kor.Inspections.App.Pages
                 localStart,
                 localEnd);
             StatusText = booking.Status;
-            AssignedTo = await BookingDisplayHelper.ResolveAssignedToDisplayAsync(booking.AssignedTo, _db);
+            var inspectorsByEmail = await _db.Inspectors
+                .AsNoTracking()
+                .Where(i => i.Email == booking.AssignedTo)
+                .ToDictionaryAsync(i => i.Email, i => i.DisplayName, StringComparer.OrdinalIgnoreCase);
+            AssignedTo = BookingDisplayHelper.ResolveAssignedToDisplay(booking.AssignedTo, inspectorsByEmail);
 
             var isTerminal = (string.Equals(booking.Status, BookingStatus.Completed, StringComparison.OrdinalIgnoreCase) ||
                               string.Equals(booking.Status, BookingStatus.Cancelled, StringComparison.OrdinalIgnoreCase)) &&

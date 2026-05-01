@@ -87,7 +87,7 @@ namespace Kor.Inspections.App.Pages.Admin
             public string? OrderedBookingIds { get; set; }
         }
 
-        public async Task OnGetAsync()
+        private void InitDateState()
         {
             ViewData["Title"] = "Summary";
             var tz = _timeRules.TimeZone;
@@ -107,7 +107,11 @@ namespace Kor.Inspections.App.Pages.Admin
             SelectedDate = selectedDate.Date;
             Date = SelectedDate.ToString("yyyy-MM-dd");
             SummaryDateLocal = SelectedDate;
+        }
 
+        private async Task LoadAsync()
+        {
+            var tz = _timeRules.TimeZone;
             var startUtc = TimeZoneInfo.ConvertTimeToUtc(SelectedDate, tz);
             var endUtc = TimeZoneInfo.ConvertTimeToUtc(SelectedDate.AddDays(1), tz);
 
@@ -140,8 +144,7 @@ namespace Kor.Inspections.App.Pages.Admin
 
             var inspectorsByEmail = Inspectors
                 .Where(i => !string.IsNullOrWhiteSpace(i.Email))
-                .GroupBy(i => i.Email, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First().DisplayName, StringComparer.OrdinalIgnoreCase);
+                .ToDictionary(i => i.Email, i => i.DisplayName, StringComparer.OrdinalIgnoreCase);
 
             Bookings = bookings
                 .Select(b =>
@@ -169,6 +172,12 @@ namespace Kor.Inspections.App.Pages.Admin
                     };
                 })
                 .ToList();
+        }
+
+        public async Task OnGetAsync()
+        {
+            InitDateState();
+            await LoadAsync();
         }
 
         // ---------------------------------------------------
@@ -307,7 +316,7 @@ namespace Kor.Inspections.App.Pages.Admin
 
         public async Task<IActionResult> OnPostSaveRouteOrderAsync(RouteOrderRequest request)
         {
-            await OnGetAsync();
+            InitDateState();
 
             var persisted = await PersistRouteOrderAsync(request);
             if (persisted.Count == 0)
@@ -322,7 +331,7 @@ namespace Kor.Inspections.App.Pages.Admin
 
         public async Task<IActionResult> OnPostEmailRouteAsync(RouteOrderRequest request)
         {
-            await OnGetAsync();
+            InitDateState();
 
             var persisted = await PersistRouteOrderAsync(request);
             if (persisted.Count == 0 || string.IsNullOrWhiteSpace(request.InspectorEmail))
@@ -332,7 +341,7 @@ namespace Kor.Inspections.App.Pages.Admin
             }
 
             // Refresh Bookings so the email uses the persisted route order.
-            await OnGetAsync();
+            await LoadAsync();
 
             var normalizedInspectorEmail = (request.InspectorEmail ?? string.Empty).Trim();
             var inspector = Inspectors.FirstOrDefault(i =>

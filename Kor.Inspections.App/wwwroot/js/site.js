@@ -31,6 +31,20 @@ window.formatKorPhoneInput = function formatKorPhoneInput(str, options) {
     return "";
 };
 
+window.korBuildMapsRoute = function korBuildMapsRoute(addresses) {
+    if (!Array.isArray(addresses) || addresses.length === 0) return null;
+
+    const origin = encodeURIComponent(addresses[0]);
+    const destination = encodeURIComponent(addresses[addresses.length - 1]);
+    const waypoints = addresses.slice(1, -1).map(encodeURIComponent).join("|");
+
+    let url = "https://www.google.com/maps/dir/?api=1" +
+        "&origin=" + origin +
+        "&destination=" + destination;
+    if (waypoints) url += "&waypoints=" + waypoints;
+    return url;
+};
+
 window.KorPostbackFocus = (function () {
     const key = `kor:focus:${window.location.pathname}`;
 
@@ -217,7 +231,18 @@ document.addEventListener("click", function (e) {
                 },
 
                 onChange: function () {
-                    document.getElementById("autoRefreshTimesBtn")?.click();
+                    const btn = document.getElementById("autoRefreshTimesBtn");
+                    if (!btn) return;
+                    const form = btn.closest("form");
+                    if (!form) return;
+                    const handler = btn.getAttribute("data-refresh-handler");
+                    const url = new URL(form.action || window.location.href, window.location.origin);
+                    if (handler) url.searchParams.set("handler", handler);
+                    const tempForm = form.cloneNode(true);
+                    tempForm.action = url.toString();
+                    tempForm.setAttribute("novalidate", "novalidate");
+                    document.body.appendChild(tempForm);
+                    tempForm.submit();
                 }
             });
         }

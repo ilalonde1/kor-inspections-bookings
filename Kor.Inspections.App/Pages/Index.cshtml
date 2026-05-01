@@ -164,11 +164,10 @@
                 <span asp-validation-for="RequestedDate" class="text-danger"></span>
             </div>
 
-            <button type="submit"
-                    asp-page-handler="RefreshTimes"
-                    formnovalidate
+            <button type="button"
                     id="autoRefreshTimesBtn"
-                    style="display:none;">
+                    data-refresh-handler="RefreshTimes"
+                    hidden>
             </button>
 
             <div class="form-group">
