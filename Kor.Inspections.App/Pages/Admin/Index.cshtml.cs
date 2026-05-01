@@ -697,9 +697,11 @@ namespace Kor.Inspections.App.Pages.Admin
                 .ToDictionary(i => i.Email, i => i.DisplayName, StringComparer.OrdinalIgnoreCase);
 
             var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
-            var defaultWindowStartLocal = nowLocal.Date;
-            var windowStartLocal = defaultWindowStartLocal;
-            var windowEndLocal = nowLocal.Date.AddDays(8);
+            var defaultDate = nowLocal.Date.AddDays(1);
+            while (defaultDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                defaultDate = defaultDate.AddDays(1);
+            var windowStartLocal = defaultDate;
+            var windowEndLocal = defaultDate.AddDays(1);
 
             if (DateTime.TryParseExact(DateFrom, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.None, out var dateFromLocal))
@@ -708,13 +710,17 @@ namespace Kor.Inspections.App.Pages.Admin
             }
             else
             {
-                DateFrom = defaultWindowStartLocal.ToString("yyyy-MM-dd");
+                DateFrom = defaultDate.ToString("yyyy-MM-dd");
             }
 
             if (DateTime.TryParseExact(DateTo, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.None, out var dateToLocal))
             {
                 windowEndLocal = dateToLocal.Date.AddDays(1);
+            }
+            else
+            {
+                DateTo = defaultDate.ToString("yyyy-MM-dd");
             }
 
             if ((windowEndLocal - windowStartLocal).TotalDays > MaxQueryDays)

@@ -108,30 +108,6 @@
     </details>
 
     <div class="admin-toolbar">
-        <div class="admin-view-toggle">
-        <a asp-page="./Index"
-           asp-route-view="active"
-           asp-route-sort="@Model.Sort"
-           asp-route-dir="@Model.Dir"
-           asp-route-project="@Model.Project"
-           asp-route-inspector="@Model.Inspector"
-           asp-route-dateFrom="@Model.DateFrom"
-           asp-route-dateTo="@Model.DateTo"
-           class="btn-smooth admin-chip @(string.Equals(Model.View, "all", StringComparison.OrdinalIgnoreCase) ? string.Empty : "is-active")">
-            Active
-        </a>
-        <a asp-page="./Index"
-           asp-route-view="all"
-           asp-route-sort="@Model.Sort"
-           asp-route-dir="@Model.Dir"
-           asp-route-project="@Model.Project"
-           asp-route-inspector="@Model.Inspector"
-           asp-route-dateFrom="@Model.DateFrom"
-           asp-route-dateTo="@Model.DateTo"
-           class="btn-smooth admin-chip @(string.Equals(Model.View, "all", StringComparison.OrdinalIgnoreCase) ? "is-active" : string.Empty)">
-            All
-        </a>
-    </div>
 
     <form method="get" class="admin-filter-form admin-filter-shell">
         <input type="hidden" name="view" value="@Model.View" />
@@ -143,7 +119,7 @@
         <input type="date" name="dateTo" value="@Model.DateTo" class="form-control" />
         <button type="submit" class="btn-smooth admin-filter-apply">Apply</button>
     </form>
-    <div class="helper-text-muted admin-filter-hint">Default range starts today and ends in 7 days unless you set custom dates.</div>
+    <div class="helper-text-muted admin-filter-hint">Defaults to the next workday unless you set custom dates.</div>
 
     <div class="admin-shortcuts">
         <a asp-page="/Admin/Summary"
