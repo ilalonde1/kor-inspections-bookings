@@ -40,15 +40,22 @@ public class TimeRuleServiceTests
         TimeZoneInfo zone;
         try
         {
+            // Require today, today+1, AND today+2 all weekdays so the
+            // calendar-day and business-day shapes of the rule agree (this
+            // test only claims to verify the Mon-Wed slice). Without the
+            // today and today+1 weekday clauses, FindZone could pick a
+            // Saturday-today zone where the rules diverge.
             zone = TimeRuleServiceTestFactory.FindZone(nowLocal =>
             {
                 var today = DateOnly.FromDateTime(nowLocal.Date);
-                return today.AddDays(2).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday;
+                return today.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
+                       today.AddDays(1).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
+                       today.AddDays(2).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday;
             });
         }
         catch (InvalidOperationException)
         {
-            Assert.True(true); // Calendar-dependent edge: no host timezone currently yields a weekday two days out.
+            Assert.True(true); // Calendar-dependent edge: no host timezone currently yields three weekdays in a row.
             return;
         }
 
@@ -59,6 +66,42 @@ public class TimeRuleServiceTests
 
         Assert.Equal(DateOnly.FromDateTime(nowLocal.Date).AddDays(2), result.MinDate);
         Assert.Equal(DateOnly.FromDateTime(nowLocal.Date).AddDays(7), result.MaxDate);
+    }
+
+    [Fact]
+    public void GetAllowedDateRangeUtcNow_FridayAfterCutoff_SkipsMondayAndAllowsTuesday()
+    {
+        // Regression: pre-fix, Fri-after-cutoff used calendar-day arithmetic
+        // (Fri+2 = Sun, skip-once = Mon) so users could still book Monday
+        // after the 2pm cutoff on Friday. Business-day arithmetic walks
+        // Fri -> Mon (1 bizday) -> Tue (2 bizdays), matching the rule
+        // "after cutoff you cannot book the next business day."
+        TimeZoneInfo zone;
+        try
+        {
+            zone = TimeRuleServiceTestFactory.FindZone(nowLocal =>
+                nowLocal.DayOfWeek == DayOfWeek.Friday &&
+                nowLocal.Hour >= 14);
+        }
+        catch (InvalidOperationException)
+        {
+            Assert.True(true); // No host timezone currently shows Friday after 14:00 local.
+            return;
+        }
+
+        var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zone);
+        var service = TimeRuleServiceTestFactory.Create(zone, cutoffHourLocal: 14);
+
+        var result = service.GetAllowedDateRangeUtcNow();
+
+        var today = DateOnly.FromDateTime(nowLocal.Date);
+        var monday = today.AddDays(3);
+        var tuesday = today.AddDays(4);
+
+        Assert.Equal(DayOfWeek.Monday, monday.DayOfWeek);
+        Assert.Equal(DayOfWeek.Tuesday, tuesday.DayOfWeek);
+        Assert.NotEqual(monday, result.MinDate);
+        Assert.Equal(tuesday, result.MinDate);
     }
 
     [Fact]
@@ -135,8 +178,18 @@ public class TimeRuleServiceTests
     [Fact]
     public void IsCancellationAllowed_NextBusinessDayAfterCutoff_ReturnsFalse()
     {
-        var zone = TimeRuleServiceTestFactory.FindZone(nowLocal =>
-            nowLocal.AddDays(1).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday);
+        TimeZoneInfo zone;
+        try
+        {
+            zone = TimeRuleServiceTestFactory.FindZone(nowLocal =>
+                nowLocal.AddDays(1).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday);
+        }
+        catch (InvalidOperationException)
+        {
+            Assert.True(true); // Calendar-dependent edge: no host timezone currently yields a weekday tomorrow.
+            return;
+        }
+
         var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zone);
         var service = TimeRuleServiceTestFactory.Create(zone, nowLocal.Hour);
         var bookingDate = DateOnly.FromDateTime(nowLocal.Date.AddDays(1));
