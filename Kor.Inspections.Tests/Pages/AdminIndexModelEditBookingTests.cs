@@ -290,13 +290,20 @@ public class AdminIndexModelEditBookingTests
 
     private static DateOnly GetAllowedDate(DateTime nowLocal, int cutoffHourLocal, int dayOffset)
     {
-        var minDate = DateOnly.FromDateTime(nowLocal.Date)
+        var date = DateOnly.FromDateTime(nowLocal.Date)
             .AddDays(nowLocal.Hour < cutoffHourLocal ? 1 : 2);
 
-        while (minDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
-            minDate = minDate.AddDays(1);
+        while (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            date = date.AddDays(1);
 
-        return minDate.AddDays(dayOffset);
+        for (int i = 0; i < dayOffset; i++)
+        {
+            date = date.AddDays(1);
+            while (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                date = date.AddDays(1);
+        }
+
+        return date;
     }
 
     private static IndexModel CreateModel(InspectionsContext db, TimeZoneInfo timeZone)
