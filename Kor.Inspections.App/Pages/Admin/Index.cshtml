@@ -138,7 +138,7 @@
 
     <div class="admin-shortcuts">
         <a asp-page="/Admin/Summary"
-           asp-route-date="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")"
+           asp-route-date="@Model.NextWorkdayDate.ToString("yyyy-MM-dd")"
            class="btn-smooth admin-shortcut-link">
             View Tomorrow's Summary
         </a>

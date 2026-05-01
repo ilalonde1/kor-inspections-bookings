@@ -93,6 +93,8 @@ namespace Kor.Inspections.App.Pages.Admin
             var tz = _timeRules.TimeZone;
             var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
             var defaultDate = nowLocal.Date.AddDays(1);
+            while (defaultDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                defaultDate = defaultDate.AddDays(1);
 
             if (!DateTime.TryParseExact(
                     Date,
