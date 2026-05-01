@@ -394,10 +394,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
             try {
                 const formData = new FormData(form);
+                const tokenInput = form.querySelector("input[name='__RequestVerificationToken']");
+                const headers = { "X-Requested-With": "fetch" };
+                if (tokenInput && tokenInput.value) {
+                    headers["RequestVerificationToken"] = tokenInput.value;
+                }
                 const response = await fetch("?handler=AssignAjax", {
                     method: "POST",
                     body: formData,
-                    headers: { "X-Requested-With": "fetch" }
+                    headers: headers
                 });
 
                 if (!response.ok) {

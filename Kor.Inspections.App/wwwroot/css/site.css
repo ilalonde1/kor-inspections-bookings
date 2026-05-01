@@ -1049,22 +1049,16 @@ ASSIGN + ACTION BUTTONS
     gap: 12px;
 }
 
-.admin-view-toggle,
 .admin-shortcuts {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
 
-.admin-chip.is-active,
 .admin-shortcut-link:hover,
 .admin-filter-apply:hover {
     background: #dbe7f3;
     border-color: #b9c7d8;
-}
-
-.admin-chip.is-active {
-    color: #1d334a;
 }
 
 .admin-filter-shell {
@@ -1485,12 +1479,10 @@ ASSIGN + ACTION BUTTONS
     }
 
     .admin-form-actions,
-    .admin-view-toggle,
     .admin-shortcuts {
         width: 100%;
     }
 
-    .admin-view-toggle .btn-smooth,
     .admin-shortcuts .btn-smooth,
     .admin-form-actions .btn,
     .admin-filter-apply {
