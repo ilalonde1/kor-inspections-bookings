@@ -369,8 +369,7 @@ namespace Kor.Inspections.App.Services
                     submitterSubject,
                     submitterBody);
 
-                var adminSubject =
-                    $"NEW Field Review Booking – {FormatJobLine(booking)} – {startLocal:yyyy-MM-dd HH:mm}";
+                var adminSubject = FormatJobLine(booking);
 
                 var adminBody = BuildDetailedBookingHtml(
                     booking,
