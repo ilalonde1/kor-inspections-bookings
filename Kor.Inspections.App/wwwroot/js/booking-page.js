@@ -944,6 +944,7 @@
                 phone: contactPhoneInput.value,
                 address: contactAddressInput.value,
                 projectNumber: document.getElementById("ProjectNumber").value,
+                requesterEmail: (contactEmailField?.value || emailForSave),
                 email: emailForSave
             };
 

@@ -184,7 +184,8 @@ namespace Kor.Inspections.App.Pages
         {
             public int? Id { get; set; } // optional for update (int)
             public string? ProjectNumber { get; set; }
-            public string? Email { get; set; } // lookup email (domain scope)
+            public string? RequesterEmail { get; set; } // verified user performing the save (Step 1 email)
+            public string? Email { get; set; } // contact's own email being saved
             public string? Name { get; set; }
             public string? Phone { get; set; }
             public string? Address { get; set; }
@@ -571,9 +572,11 @@ namespace Kor.Inspections.App.Pages
         public async Task<JsonResult> OnPostSaveContactAjaxAsync([FromBody] SaveContactRequest req)
         {
             var project = ProjectNumberHelper.Base5((req.ProjectNumber ?? "").Trim());
-            var requesterEmail = (string.IsNullOrWhiteSpace(ContactEmail)
-                ? (req.Email ?? "").Trim()
-                : ContactEmail.Trim()).ToLowerInvariant();
+            var requesterEmail = (
+                !string.IsNullOrWhiteSpace(req.RequesterEmail) ? req.RequesterEmail.Trim()
+                : !string.IsNullOrWhiteSpace(ContactEmail) ? ContactEmail.Trim()
+                : (req.Email ?? "").Trim()
+            ).ToLowerInvariant();
             var contactEmail = (req.Email ?? "").Trim().ToLowerInvariant();
             var name = (req.Name ?? "").Trim();
             var phone = (req.Phone ?? "").Trim();
@@ -773,8 +776,6 @@ namespace Kor.Inspections.App.Pages
                     _logger.LogWarning(ex,
                         "Deltek lookup failed for project name on submit ({ProjectNumber}). Continuing without name.",
                         submittedProjectNumberDisplay);
-                    ModelState.AddModelError(string.Empty,
-                        "Project name lookup is temporarily unavailable. Your booking will be saved with just the project number.");
                 }
             }
             var contactEmail = (ContactEmail?.Trim() ?? string.Empty).ToLowerInvariant();
