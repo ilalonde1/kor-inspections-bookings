@@ -528,7 +528,9 @@
             const row = document.createElement("button");
             row.type = "button";
             row.className = "project-suggestion-item";
-            row.textContent = item.projectNumber || "";
+            const number = item.projectNumber || "";
+            const name = (item.projectName || "").trim();
+            row.textContent = name ? `${number} — ${name}` : number;
             row.addEventListener("click", () => applyProjectSuggestion(item));
             row.addEventListener("mouseenter", () => {
                 activeProjectSuggestionIndex = index;
