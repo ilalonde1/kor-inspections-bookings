@@ -976,6 +976,12 @@ ASSIGN + ACTION BUTTONS
     border-radius: 10px;
 }
 
+.admin-status-banner.alert-warning {
+    border-color: #f0d68a;
+    background: #fff8e6;
+    color: #6b4d00;
+}
+
 .admin-panel {
     margin-bottom: 0;
     border-color: #d8e0ea;

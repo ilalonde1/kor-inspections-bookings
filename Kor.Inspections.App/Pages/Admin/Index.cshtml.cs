@@ -45,6 +45,8 @@ namespace Kor.Inspections.App.Pages.Admin
 
         public IList<DayQuickAccessItem> DayQuickAccess { get; private set; } = new List<DayQuickAccessItem>();
 
+        public DateOnly NextWorkdayDate { get; private set; }
+
         public sealed class DayQuickAccessItem
         {
             public DateOnly Date { get; init; }
@@ -731,6 +733,7 @@ namespace Kor.Inspections.App.Pages.Admin
             var defaultDate = nowLocal.Date.AddDays(1);
             while (defaultDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
                 defaultDate = defaultDate.AddDays(1);
+            NextWorkdayDate = DateOnly.FromDateTime(defaultDate);
             var windowStartLocal = defaultDate;
             var windowEndLocal = defaultDate.AddDays(1);
 
