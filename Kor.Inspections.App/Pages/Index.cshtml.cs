@@ -773,8 +773,6 @@ namespace Kor.Inspections.App.Pages
                     _logger.LogWarning(ex,
                         "Deltek lookup failed for project name on submit ({ProjectNumber}). Continuing without name.",
                         submittedProjectNumberDisplay);
-                    ModelState.AddModelError(string.Empty,
-                        "Project name lookup is temporarily unavailable. Your booking will be saved with just the project number.");
                 }
             }
             var contactEmail = (ContactEmail?.Trim() ?? string.Empty).ToLowerInvariant();
