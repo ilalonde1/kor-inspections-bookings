@@ -57,13 +57,14 @@ public class LookupInspectionsAuthorizationTests
     }
 
     [Fact]
-    public async Task OnPostLookupInspectionsAsync_VerifiedMatchingEmail_ReturnsOnlyThatUsersBookings()
+    public async Task OnPostLookupInspectionsAsync_VerifiedEmail_ReturnsAllSameDomainBookingsForJob()
     {
         if (!TryGetCalendarZone(out _)) { Assert.True(true); return; }
 
         await using var db = CreateContext();
         await SeedBookingAsync(db, "30844", "verified@example.com");
-        await SeedBookingAsync(db, "30844", "other@example.com");
+        await SeedBookingAsync(db, "30844", "colleague@example.com");
+        await SeedBookingAsync(db, "30844", "stranger@otherco.com");
 
         db.ProjectDefaults.Add(new ProjectDefault
         {
@@ -86,8 +87,9 @@ public class LookupInspectionsAuthorizationTests
         var inspections = Assert.IsAssignableFrom<IEnumerable<IndexModel.InspectionDto>>(payload.Value).ToList();
 
         Assert.Equal(StatusCodes.Status200OK, model.Response.StatusCode == 0 ? StatusCodes.Status200OK : model.Response.StatusCode);
-        Assert.Single(inspections);
-        Assert.Equal("verified@example.com", inspections[0].ContactEmail);
+        Assert.Equal(2, inspections.Count);
+        Assert.All(inspections, i => Assert.EndsWith("@example.com", i.ContactEmail));
+        Assert.DoesNotContain(inspections, i => i.ContactEmail == "stranger@otherco.com");
     }
 
     /// <summary>

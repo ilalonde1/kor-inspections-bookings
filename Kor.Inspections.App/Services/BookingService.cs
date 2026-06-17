@@ -423,6 +423,14 @@ namespace Kor.Inspections.App.Services
                     clientSubject,
                     clientBody);
 
+                // Reviews inbox copy (Tyler wants to know about every cancellation, regardless of timing)
+                var adminInbox = _notificationOptions.AdminRecipientEmail;
+                if (!string.IsNullOrWhiteSpace(adminInbox) &&
+                    !string.Equals(adminInbox, booking.ContactEmail, StringComparison.OrdinalIgnoreCase))
+                {
+                    await _graphMail.SendHtmlAsync(fromMailbox, adminInbox, clientSubject, clientBody);
+                }
+
                 // -------------------------
                 // INSPECTOR EMAIL (only if assigned)
                 // -------------------------
@@ -596,6 +604,7 @@ namespace Kor.Inspections.App.Services
     endLocal)}</li>");
 
             sb.Append($"<li><strong>Address:</strong> {WebUtility.HtmlEncode(booking.ProjectAddress)}</li>");
+            sb.Append($"<li><strong>Site Contact:</strong> {WebUtility.HtmlEncode($"{booking.ContactName} ({PhoneNormalizer.Format(booking.ContactPhone)}, {booking.ContactEmail})")}</li>");
 
             if (!string.IsNullOrWhiteSpace(booking.Comments))
             {

@@ -120,7 +120,7 @@ namespace Kor.Inspections.App.Pages.Admin
         public sealed class ManualBookingInput
         {
             [Required(ErrorMessage = "Kor Job Number is required.")]
-            [RegularExpression(@"^\s*\d{5}.*$", ErrorMessage = "Job number must start with 5 digits (e.g., 30844-01).")]
+            [RegularExpression(@"^\s*\d{5}-\d{2}.*$", ErrorMessage = "Job number must include a sub-number (e.g., 30844-01).")]
             [Display(Name = "Kor Job Number")]
             public string ProjectNumber { get; set; } = string.Empty;
 
@@ -199,6 +199,38 @@ namespace Kor.Inspections.App.Pages.Admin
                 User?.Identity?.Name ?? "anonymous");
 
             return new JsonResult(new { ok = true });
+        }
+
+        public async Task<JsonResult> OnGetJobContactsAsync(string? projectNumber)
+        {
+            var base5 = ProjectNumberHelper.Base5((projectNumber ?? string.Empty).Trim());
+            if (string.IsNullOrWhiteSpace(base5))
+                return new JsonResult(Array.Empty<object>());
+
+            var bookings = await _db.Bookings
+                .AsNoTracking()
+                .Where(b => b.ProjectNumber == base5 && b.ContactEmail != null)
+                .OrderByDescending(b => b.CreatedUtc)
+                .ToListAsync();
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var contacts = new List<object>();
+            foreach (var b in bookings)
+            {
+                var email = (b.ContactEmail ?? string.Empty).Trim();
+                if (email.Length == 0 || !seen.Add(email))
+                    continue;
+
+                contacts.Add(new
+                {
+                    name = b.ContactName ?? string.Empty,
+                    phone = PhoneNormalizer.Format(b.ContactPhone),
+                    email,
+                    address = b.ProjectAddress ?? string.Empty
+                });
+            }
+
+            return new JsonResult(contacts);
         }
 
         public async Task<IActionResult> OnPostCreateAsync()

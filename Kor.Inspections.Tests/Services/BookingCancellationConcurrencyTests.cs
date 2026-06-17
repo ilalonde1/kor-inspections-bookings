@@ -40,7 +40,7 @@ public class BookingCancellationConcurrencyTests
         var action = Assert.Single(actions);
         Assert.Equal("Cancelled", action.ActionType);
         Assert.Equal("client-token", action.PerformedBy);
-        Assert.Equal(1, emailHandler.RequestCount);
+        Assert.Equal(2, emailHandler.RequestCount); // client + reviews-inbox copy
     }
 
     [Fact]

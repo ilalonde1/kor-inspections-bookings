@@ -34,7 +34,7 @@
     let currentContacts = [];
     let currentInspections = [];
     let selectedInspectionId = null;
-    let inspectionFilterMode = "active";
+    let inspectionFilterMode = "future";
     let projectSuggestionItems = [];
     let activeProjectSuggestionIndex = -1;
     let projectSuggestRequestCounter = 0;
@@ -273,7 +273,12 @@
         const filtered = currentInspections.filter(i => {
             if (inspectionFilterMode === "all") return true;
             const status = `${i.status ?? ""}`.trim().toLowerCase();
-            return status !== "cancelled" && status !== "completed";
+            if (status === "cancelled") return false;
+            if (!i.startUtc) return true;
+            const start = new Date(i.startUtc);
+            const todayMidnight = new Date();
+            todayMidnight.setHours(0, 0, 0, 0);
+            return start >= todayMidnight;
         });
         if (inspectionCountLabel) {
             inspectionCountLabel.textContent = `Showing ${filtered.length}`;
@@ -320,7 +325,7 @@
         if (!inspectionListTitle) return;
         inspectionListTitle.textContent = inspectionFilterMode === "all"
             ? "All Inspections"
-            : "Active Inspections";
+            : "Future Inspections";
     }
 
     function hideInspectionDetails() {
@@ -355,7 +360,7 @@
 
     if (inspectionFilterActiveBtn) {
         inspectionFilterActiveBtn.addEventListener("click", () => {
-            inspectionFilterMode = "active";
+            inspectionFilterMode = "future";
             inspectionFilterActiveBtn.classList.add("active");
             inspectionFilterAllBtn?.classList.remove("active");
             updateInspectionListTitle();
@@ -736,7 +741,7 @@
             return;
         }
 
-        inspectionFilterMode = "active";
+        inspectionFilterMode = "future";
         inspectionFilterActiveBtn?.classList.add("active");
         inspectionFilterAllBtn?.classList.remove("active");
         updateInspectionListTitle();
