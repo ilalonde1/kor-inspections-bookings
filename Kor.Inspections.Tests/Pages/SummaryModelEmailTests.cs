@@ -31,7 +31,7 @@ public class SummaryModelEmailTests
         var result = await model.OnPostEmailAsync();
 
         Assert.IsType<RedirectToPageResult>(result);
-        Assert.Equal("Unable to send the full summary. Please try again.", model.StatusMessage);
+        Assert.Contains("Full summary failed", model.StatusMessage, StringComparison.Ordinal);
     }
 
     [Fact]

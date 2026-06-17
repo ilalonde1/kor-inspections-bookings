@@ -194,10 +194,21 @@ namespace Kor.Inspections.App.Pages.Admin
             var subject = $"Kor Field Reviews - {SummaryDateLocal:yyyy-MM-dd} (Tomorrow)";
             var html = BuildEmailHtml(SummaryDateLocal, Bookings, routeUrl: null);
 
-            if (!await TrySendSummaryEmailAsync(fromMailbox, toEmail, subject, html, "full summary"))
-                return RedirectToPage();
+            var fullSent = await TrySendSummaryEmailAsync(fromMailbox, toEmail, subject, html, "full summary");
+            var (sentEmails, failedEmails) = await SendInspectorSummariesAsync();
 
-            StatusMessage = $"Summary email sent to {toEmail}.";
+            var parts = new List<string>
+            {
+                fullSent ? $"Full summary sent to {toEmail}." : $"Full summary failed to {toEmail}."
+            };
+            if (sentEmails.Count > 0)
+                parts.Add($"Inspector summaries sent to {sentEmails.Count} inspector(s).");
+            if (failedEmails.Count > 0)
+                parts.Add($"Failed: {string.Join(", ", failedEmails)}.");
+            if (sentEmails.Count == 0 && failedEmails.Count == 0)
+                parts.Add("No assigned inspector bookings to email.");
+
+            StatusMessage = string.Join(" ", parts);
             return RedirectToPage();
         }
 
@@ -252,7 +263,22 @@ namespace Kor.Inspections.App.Pages.Admin
         public async Task<IActionResult> OnPostEmailAllInspectorsAsync()
         {
             await OnGetAsync();
+            var (sentEmails, failedEmails) = await SendInspectorSummariesAsync();
 
+            if (sentEmails.Count == 0 && failedEmails.Count == 0)
+                StatusMessage = "No assigned inspector bookings found to email.";
+            else if (failedEmails.Count == 0)
+                StatusMessage = $"Inspector summaries sent to {sentEmails.Count} inspector(s).";
+            else
+                StatusMessage =
+                    $"Inspector summaries sent: {string.Join(", ", sentEmails)}. " +
+                    $"Failed: {string.Join(", ", failedEmails)}.";
+
+            return RedirectToPage();
+        }
+
+        private async Task<(List<string> Sent, List<string> Failed)> SendInspectorSummariesAsync()
+        {
             var fromMailbox = _notificationOptions.FromMailbox;
             var sentEmails = new List<string>();
             var failedEmails = new List<string>();
@@ -298,22 +324,7 @@ namespace Kor.Inspections.App.Pages.Admin
                     failedEmails.Add(inspectorEmail);
             }
 
-            if (sentEmails.Count == 0 && failedEmails.Count == 0)
-            {
-                StatusMessage = "No assigned inspector bookings found to email.";
-            }
-            else if (failedEmails.Count == 0)
-            {
-                StatusMessage = $"Inspector summaries sent to {sentEmails.Count} inspector(s).";
-            }
-            else
-            {
-                StatusMessage =
-                    $"Inspector summaries sent: {string.Join(", ", sentEmails)}. " +
-                    $"Failed: {string.Join(", ", failedEmails)}.";
-            }
-
-            return RedirectToPage();
+            return (sentEmails, failedEmails);
         }
 
         public async Task<IActionResult> OnPostSaveRouteOrderAsync(RouteOrderRequest request)

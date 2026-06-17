@@ -57,7 +57,7 @@ namespace Kor.Inspections.App.Pages
 
         [BindProperty]
         [Required(ErrorMessage = "Kor Job Number is required.")]
-        [RegularExpression(@"^\s*\d{5}.*$", ErrorMessage = "Job number must start with 5 digits (e.g., 30844-01).")]
+        [RegularExpression(@"^\s*\d{5}-\d{2}.*$", ErrorMessage = "Job number must include a sub-number (e.g., 30844-01).")]
         [StringLength(90)]
         [Display(Name = "Kor Job Number")]
         public string ProjectNumber { get; set; } = string.Empty;
@@ -356,12 +356,14 @@ namespace Kor.Inspections.App.Pages
                 return new JsonResult(new { error = "Please verify your email before viewing inspections." });
             }
 
-            var bookings = await _db.Bookings
+            var requesterDomain = EmailHelper.GetDomain(emailRaw);
+            var bookingsQuery = _db.Bookings
                 .AsNoTracking()
-                .Where(b =>
-                    b.ProjectNumber != null &&
-                    b.ProjectNumber == projectRaw &&
-                    b.ContactEmail == emailRaw)
+                .Where(b => b.ProjectNumber != null && b.ProjectNumber == projectRaw && b.ContactEmail != null);
+            bookingsQuery = string.IsNullOrEmpty(requesterDomain)
+                ? bookingsQuery.Where(b => b.ContactEmail == emailRaw)
+                : bookingsQuery.Where(b => b.ContactEmail!.EndsWith("@" + requesterDomain));
+            var bookings = await bookingsQuery
                 .OrderByDescending(b => b.StartUtc)
                 .ToListAsync();
 
@@ -426,15 +428,15 @@ namespace Kor.Inspections.App.Pages
                 return new JsonResult(new { error = "Invalid project scope." });
             }
 
-            var booking = await _db.Bookings
-                .FirstOrDefaultAsync(b =>
-                    b.BookingId == bookingId &&
-                    b.ProjectNumber != null &&
-                    b.ProjectNumber == base5 &&
-                    b.ContactEmail != null &&
-                    b.ContactEmail == emailRaw);
-            // Shared cancellation rights must be modelled as explicit delegation,
-            // not inferred from the email domain.
+            // Per stakeholder decision (2026-06): cancellation rights are shared across the
+            // verified email domain  any verified contact on the same domain may cancel the job's bookings.
+            var requesterDomain = EmailHelper.GetDomain(emailRaw);
+            var booking = string.IsNullOrEmpty(requesterDomain)
+                ? await _db.Bookings.FirstOrDefaultAsync(b =>
+                    b.BookingId == bookingId && b.ProjectNumber == base5 && b.ContactEmail == emailRaw)
+                : await _db.Bookings.FirstOrDefaultAsync(b =>
+                    b.BookingId == bookingId && b.ProjectNumber == base5 &&
+                    b.ContactEmail != null && b.ContactEmail!.EndsWith("@" + requesterDomain));
 
             if (booking == null)
             {

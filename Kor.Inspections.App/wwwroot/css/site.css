@@ -1918,3 +1918,6 @@ display:none !important;
     border-radius: 6px;
     font-weight: 600;
 }
+
+.job-contacts-list { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.job-contact-item { text-align: left; }

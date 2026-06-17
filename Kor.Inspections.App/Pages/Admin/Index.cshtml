@@ -38,6 +38,8 @@
                     <label asp-for="ManualBooking.ProjectNumber"></label>
                     <input asp-for="ManualBooking.ProjectNumber" class="form-control" />
                     <span asp-validation-for="ManualBooking.ProjectNumber" class="text-danger"></span>
+                    <button type="button" id="findJobContactsBtn" class="btn btn-sm btn-secondary">Find prior contacts</button>
+                    <div id="jobContactsList" class="job-contacts-list" hidden></div>
                 </div>
                 <div class="form-group">
                     <label asp-for="ManualBooking.ProjectAddress"></label>
@@ -291,7 +293,7 @@
                                           asp-page-handler="Cancel"
                                           class="admin-cancel-form">
                                         <input type="hidden" name="id" value="@b.BookingId" />
-                                        <button type="submit" class="admin-btn admin-btn-cancel admin-action-full">Cancel Booking</button>
+                                        <button type="submit" class="admin-btn admin-btn-cancel admin-action-full" data-confirm="Cancel this inspection? This cannot be undone.">Cancel Booking</button>
                                     </form>
 
                                     <details class="admin-edit-panel">
@@ -446,6 +448,64 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
     });
+
+    // ---- Prior-contact lookup for manual booking ----
+    const findJobContactsBtn = document.getElementById("findJobContactsBtn");
+    const jobContactsList = document.getElementById("jobContactsList");
+    const manualProjectInput = document.getElementById("ManualBooking_ProjectNumber");
+
+    function fillManualContact(c) {
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ""; };
+        set("ManualBooking_ContactName", c.name);
+        set("ManualBooking_ContactPhone", c.phone);
+        set("ManualBooking_ContactEmail", c.email);
+        if (c.address) set("ManualBooking_ProjectAddress", c.address);
+    }
+
+    if (findJobContactsBtn && jobContactsList && manualProjectInput) {
+        findJobContactsBtn.addEventListener("click", async function () {
+            const project = (manualProjectInput.value || "").trim();
+            jobContactsList.hidden = false;
+            if (!project) {
+                jobContactsList.textContent = "Enter a job number first.";
+                return;
+            }
+            findJobContactsBtn.disabled = true;
+            const original = findJobContactsBtn.textContent;
+            findJobContactsBtn.textContent = "Loading...";
+            try {
+                const response = await fetch("?handler=JobContacts&projectNumber=" + encodeURIComponent(project), {
+                    headers: { "X-Requested-With": "fetch" }
+                });
+                if (!response.ok) {
+                    jobContactsList.textContent = "Could not load prior contacts.";
+                    return;
+                }
+                const contacts = await response.json();
+                jobContactsList.innerHTML = "";
+                if (!Array.isArray(contacts) || contacts.length === 0) {
+                    jobContactsList.textContent = "No prior contacts for this job.";
+                    return;
+                }
+                contacts.forEach(function (c) {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "btn btn-sm btn-outline-secondary job-contact-item";
+                    btn.textContent = `${c.name || "(no name)"} - ${c.phone || ""} - ${c.email || ""}`;
+                    btn.addEventListener("click", function () {
+                        fillManualContact(c);
+                        jobContactsList.hidden = true;
+                    });
+                    jobContactsList.appendChild(btn);
+                });
+            } catch (err) {
+                jobContactsList.textContent = "Could not load prior contacts.";
+            } finally {
+                findJobContactsBtn.disabled = false;
+                findJobContactsBtn.textContent = original;
+            }
+        });
+    }
 });
 </script>
 @if (inspectorMobileToolsEnabled)
