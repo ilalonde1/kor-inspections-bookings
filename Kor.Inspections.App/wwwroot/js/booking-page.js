@@ -616,6 +616,46 @@
         });
     }
 
+    // Matches the server-side booking validation regex (^\s*\d{5}-\d{2}.*$):
+    // a job is only bookable with its sub-number (e.g. "30844-01").
+    const FULL_JOB_FORMAT = /^\s*\d{5}-\d{2}/;
+
+    // A typed-but-not-selected job number (e.g. "30844") passes Step 1 because
+    // contact lookups key on the 5-digit base, but the final booking submit
+    // rejects it for the missing sub-number. Resolve it up front: auto-select
+    // when exactly one job matches, otherwise prompt the user to pick one.
+    async function resolveTypedProjectNumber(term) {
+        try {
+            const response = await fetch(
+                `?handler=ProjectSuggestions&term=${encodeURIComponent(term)}&limit=15`,
+                { method: "GET" });
+
+            if (!response.ok) {
+                setProjectSearchStatus("Project search failed. Please try again.");
+                return null;
+            }
+
+            const data = await readJsonSafe(response);
+            if (!Array.isArray(data) || data.length === 0) {
+                closeProjectSuggestions();
+                setProjectSearchStatus(`No matching jobs found for "${term}". Check the job number and try again.`);
+                return null;
+            }
+
+            if (data.length === 1 && data[0].projectNumber) {
+                applyProjectSuggestion(data[0]);
+                return data[0].projectNumber;
+            }
+
+            renderProjectSuggestions(data);
+            setProjectSearchStatus("Multiple jobs match. Select the full job number (with sub-number) to continue.");
+            return null;
+        } catch {
+            setProjectSearchStatus("Project search failed. Please try again.");
+            return null;
+        }
+    }
+
     if (projectInput) {
         projectInput.addEventListener("input", () => {
             closeProjectSuggestions();
@@ -733,12 +773,25 @@
         projectInputEl.blur();
         emailInputEl.blur();
 
-        const project = (projectInputEl?.value || "").trim();
+        let project = (projectInputEl?.value || "").trim();
         const email = (emailInputEl?.value || "").trim();
 
         if (!project || !email) {
             alert("Enter a valid project number and email first.");
             return;
+        }
+
+        // If the job was typed rather than selected, resolve it to a full job
+        // number (with sub-number) before continuing — otherwise the final
+        // booking submit would reject it.
+        if (!FULL_JOB_FORMAT.test(project)) {
+            const resolved = await resolveTypedProjectNumber(project);
+            if (!resolved) {
+                projectInputEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                projectInputEl.focus();
+                return;
+            }
+            project = resolved.trim();
         }
 
         inspectionFilterMode = "future";

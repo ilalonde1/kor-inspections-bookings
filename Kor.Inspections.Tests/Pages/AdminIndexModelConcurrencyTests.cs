@@ -96,6 +96,29 @@ public class AdminIndexModelConcurrencyTests
         Assert.Equal("Cancelled", action.ActionType);
     }
 
+    [Fact]
+    public async Task OnPostCancelAsync_CompletedBooking_IsNotCancelled()
+    {
+        if (!TryGetCalendarZone(out _)) { Assert.True(true); return; }
+
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminIndexTests_");
+        var booking = await SeedBookingAsync(fixture, "Completed");
+
+        await using var db = fixture.CreateContext();
+        var model = CreateModel(db);
+
+        var result = await model.OnPostCancelAsync(booking.BookingId);
+
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        Assert.Null(redirect.PageName);
+        Assert.Equal("Booking cannot be modified.", model.StatusMessage);
+
+        await using var verifyDb = fixture.CreateContext();
+        var unchanged = await verifyDb.Bookings.AsNoTracking().SingleAsync(b => b.BookingId == booking.BookingId);
+        Assert.Equal("Completed", unchanged.Status);
+        Assert.Empty(await verifyDb.BookingActions.AsNoTracking().ToListAsync());
+    }
+
     private static bool TryGetCalendarZone(out TimeZoneInfo zone) =>
         TimeRuleServiceTestFactory.TryFindZone(nowLocal =>
             nowLocal.AddDays(1).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&

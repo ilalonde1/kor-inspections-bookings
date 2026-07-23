@@ -172,6 +172,131 @@ public class ProjectBootstrapVerificationServiceTests
     }
 
     [Fact]
+    public async Task VerifyCodeAsync_WrongCodeWithActiveRow_FailsEvenWhenDomainIsTrusted()
+    {
+        // Regression: a typo'd code used to report success whenever the email's
+        // domain already had an explicit approval row, masking user confusion.
+        var dbName = Guid.NewGuid().ToString("N");
+        await using var db = CreateContext(dbName);
+
+        db.ProjectDefaults.Add(new ProjectDefault
+        {
+            ProjectNumber = ProjectNumber,
+            EmailDomain = "acme.com",
+            UpdatedUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        await service.SendCodeAsync(ProjectNumber, Email);
+
+        // Row exists because SendCodeAsync short-circuits for trusted domains —
+        // seed the pending row directly to model the mid-flow trust race.
+        var row = await db.ProjectVerifications.SingleOrDefaultAsync();
+        if (row == null)
+        {
+            db.ProjectVerifications.Add(new ProjectVerification
+            {
+                ProjectNumber = ProjectNumber,
+                Email = Email,
+                Code = "123456",
+                Verified = false,
+                FailedAttempts = 0,
+                ExpiresUtc = DateTime.UtcNow.AddMinutes(15),
+                CreatedUtc = DateTime.UtcNow,
+                UpdatedUtc = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        Assert.False(await service.VerifyCodeAsync(ProjectNumber, Email, "999999"));
+
+        var updated = await db.ProjectVerifications.AsNoTracking().SingleAsync();
+        Assert.Equal(1, updated.FailedAttempts);
+        Assert.False(updated.Verified);
+    }
+
+    [Fact]
+    public async Task VerifyCodeAsync_NoRow_StillSucceedsWhenDomainIsTrusted()
+    {
+        // Preserved behavior: with no OTP row at all, an active domain approval
+        // is enough (a colleague on the same domain verified earlier).
+        var dbName = Guid.NewGuid().ToString("N");
+        await using var db = CreateContext(dbName);
+
+        db.ProjectDefaults.Add(new ProjectDefault
+        {
+            ProjectNumber = ProjectNumber,
+            EmailDomain = "acme.com",
+            UpdatedUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        Assert.True(await service.VerifyCodeAsync(ProjectNumber, Email, "000000"));
+        Assert.False(await db.ProjectVerifications.AsNoTracking().AnyAsync());
+    }
+
+    [Fact]
+    public async Task SendCodeAsync_PurgesRowsExpiredLongerThanRetention()
+    {
+        // Sqlite (relational) supports ExecuteDelete; EF InMemory does not.
+        var connection = new Microsoft.Data.Sqlite.SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        try
+        {
+            var options = new DbContextOptionsBuilder<InspectionsContext>()
+                .UseSqlite(connection)
+                .Options;
+
+            await using (var schemaDb = new InspectionsContext(options))
+            {
+                await schemaDb.Database.EnsureCreatedAsync();
+            }
+
+            await using var db = new InspectionsContext(options);
+            db.ProjectVerifications.Add(new ProjectVerification
+            {
+                ProjectNumber = "11111",
+                Email = "stale@old.com",
+                Code = "123456",
+                Verified = false,
+                FailedAttempts = 0,
+                ExpiresUtc = DateTime.UtcNow.AddDays(-31),
+                CreatedUtc = DateTime.UtcNow.AddDays(-32),
+                UpdatedUtc = DateTime.UtcNow.AddDays(-32)
+            });
+            db.ProjectVerifications.Add(new ProjectVerification
+            {
+                ProjectNumber = "22222",
+                Email = "recent@new.com",
+                Code = "654321",
+                Verified = false,
+                FailedAttempts = 0,
+                ExpiresUtc = DateTime.UtcNow.AddDays(-1),
+                CreatedUtc = DateTime.UtcNow.AddDays(-1),
+                UpdatedUtc = DateTime.UtcNow.AddDays(-1)
+            });
+            await db.SaveChangesAsync();
+
+            var service = CreateService(db);
+            await service.SendCodeAsync(ProjectNumber, Email);
+
+            var remaining = await db.ProjectVerifications.AsNoTracking()
+                .Select(v => v.ProjectNumber)
+                .ToListAsync();
+            Assert.DoesNotContain("11111", remaining);   // > 30 days past expiry: purged
+            Assert.Contains("22222", remaining);          // recently expired: retained
+        }
+        finally
+        {
+            await connection.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task SendCodeAsync_TwoConcurrentCallsForSameProjectEmail_BothSucceedAndOnlyOneRowPersists()
     {
         // Sqlite in-memory enforces unique indexes; EF InMemory does not.

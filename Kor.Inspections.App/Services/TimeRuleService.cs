@@ -179,46 +179,5 @@ namespace Kor.Inspections.App.Services
             return nowLocal <= cutoffLocal;
         }
 
-        // --------------------------------------------------
-        // FULLY BOOKED DAYS (for Flatpickr)
-        // --------------------------------------------------
-
-        public async Task<List<string>> GetFullyBookedDatesAsync(InspectionsContext db)
-        {
-            var (min, max) = GetAllowedDateRangeUtcNow();
-
-            // ⭐ Pull bookings ONCE (huge performance win)
-            var minStartUtc = TimeZoneInfo.ConvertTimeToUtc(
-                min.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified),
-                _tz);
-            var maxEndUtc = TimeZoneInfo.ConvertTimeToUtc(
-                max.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified),
-                _tz);
-
-            var bookings = await db.Bookings
-                .Where(b => b.Status != BookingStatus.Cancelled)
-                .Where(b => b.StartUtc >= minStartUtc && b.StartUtc < maxEndUtc)
-                .ToListAsync();
-
-            var results = new List<string>();
-
-            for (var date = min; date <= max; date = date.AddDays(1))
-            {
-                var localForDate = bookings
-                    .Where(b =>
-                    {
-                        var local = TimeZoneInfo.ConvertTimeFromUtc(b.StartUtc, _tz);
-                        return DateOnly.FromDateTime(local) == date;
-                    })
-                    .ToList();
-
-                var slots = GetAvailableSlotsForDate(date, localForDate);
-
-                if (!slots.Any())
-                    results.Add(date.ToString("yyyy-MM-dd"));
-            }
-
-            return results;
-        }
     }
 }

@@ -449,6 +449,65 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
+    // ---- Edit panel: load time slots for the booking's own date ----
+    // The server-rendered options come from the manual-create panel's date, so
+    // refresh them from ?handler=EditTimes whenever a panel opens or its
+    // date/cutoff changes. Server-side validation remains the authority.
+    document.querySelectorAll(".admin-edit-panel").forEach(function (panel) {
+        const form = panel.querySelector(".admin-edit-form");
+        if (!form) return;
+        const idInput = form.querySelector('input[name="id"]');
+        const dateInput = form.querySelector('input[name="edit.RequestedDate"]');
+        const timeSelect = form.querySelector('select[name="edit.RequestedTime"]');
+        const cutoffInput = form.querySelector('input[name="edit.OverrideCutoff"]');
+        if (!idInput || !dateInput || !timeSelect) return;
+
+        async function refreshEditTimes() {
+            const date = (dateInput.value || "").trim();
+            if (!date) return;
+            const url = "?handler=EditTimes"
+                + "&id=" + encodeURIComponent(idInput.value)
+                + "&date=" + encodeURIComponent(date)
+                + "&overrideCutoff=" + (cutoffInput && cutoffInput.checked ? "true" : "false");
+            try {
+                const response = await fetch(url, { headers: { "X-Requested-With": "fetch" } });
+                if (!response.ok) return;
+                const times = await response.json();
+                if (!Array.isArray(times)) return;
+
+                const previous = timeSelect.value;
+                timeSelect.innerHTML = "";
+                [["AM", "Anytime AM"], ["PM", "Anytime PM"]].forEach(function (pair) {
+                    const opt = document.createElement("option");
+                    opt.value = pair[0];
+                    opt.textContent = pair[1];
+                    timeSelect.appendChild(opt);
+                });
+                times.forEach(function (t) {
+                    const opt = document.createElement("option");
+                    opt.value = t;
+                    opt.textContent = t;
+                    timeSelect.appendChild(opt);
+                });
+                if (previous && previous !== "AM" && previous !== "PM" && times.indexOf(previous) < 0) {
+                    const opt = document.createElement("option");
+                    opt.value = previous;
+                    opt.textContent = previous + " (current)";
+                    timeSelect.appendChild(opt);
+                }
+                if (previous) timeSelect.value = previous;
+            } catch (err) {
+                // Leave existing options; the server re-validates on save.
+            }
+        }
+
+        panel.addEventListener("toggle", function () {
+            if (panel.open) refreshEditTimes();
+        });
+        dateInput.addEventListener("change", refreshEditTimes);
+        if (cutoffInput) cutoffInput.addEventListener("change", refreshEditTimes);
+    });
+
     // ---- Prior-contact lookup for manual booking ----
     const findJobContactsBtn = document.getElementById("findJobContactsBtn");
     const jobContactsList = document.getElementById("jobContactsList");
