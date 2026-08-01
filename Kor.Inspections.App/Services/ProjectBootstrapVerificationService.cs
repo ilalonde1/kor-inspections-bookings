@@ -24,6 +24,10 @@ namespace Kor.Inspections.App.Services
         private static readonly TimeSpan PendingTtl = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan VerifiedTtl = TimeSpan.FromHours(8);
         private static readonly TimeSpan ExplicitDomainTrustTtl = TimeSpan.FromDays(30);
+        // Rows are dead once ExpiresUtc passes; keep them a while for
+        // diagnostics, then purge opportunistically from SendCodeAsync so the
+        // table doesn't grow without bound.
+        private static readonly TimeSpan ExpiredRowRetention = TimeSpan.FromDays(30);
         internal static TimeSpan ExplicitDomainApprovalTtl => ExplicitDomainTrustTtl;
         private const int MaxFailedAttempts = 5;
 
@@ -85,6 +89,8 @@ namespace Kor.Inspections.App.Services
 
             if (string.IsNullOrWhiteSpace(normalizedProject) || string.IsNullOrWhiteSpace(normalizedEmail))
                 return false;
+
+            await PurgeLongExpiredRowsAsync(ct);
 
             var status = await GetStatusAsync(normalizedProject, normalizedEmail, ct);
             if (!status.RequiresVerification || status.IsVerified)
@@ -229,9 +235,6 @@ namespace Kor.Inspections.App.Services
                 return false;
             }
 
-            if (await HasExplicitDomainApprovalAsync(normalizedProject, normalizedEmail, ct))
-                return true;
-
             var now = DateTime.UtcNow;
             var row = await _db.ProjectVerifications
                 .FirstOrDefaultAsync(v =>
@@ -239,8 +242,12 @@ namespace Kor.Inspections.App.Services
                     v.Email == normalizedEmail,
                     ct);
 
+            // No usable OTP row: fall back to domain trust (e.g. a colleague on
+            // the same domain already verified). When an ACTIVE row exists, the
+            // submitted code must actually match — previously a typo'd code
+            // reported success whenever the domain happened to be trusted.
             if (row == null || row.ExpiresUtc <= now)
-                return false;
+                return await HasExplicitDomainApprovalAsync(normalizedProject, normalizedEmail, ct);
 
             if (!string.Equals(row.Code, normalizedCode, StringComparison.Ordinal))
             {
@@ -266,6 +273,24 @@ namespace Kor.Inspections.App.Services
             await UpsertExplicitDomainApprovalAsync(normalizedProject, normalizedEmail, ct);
 
             return true;
+        }
+
+        private async Task PurgeLongExpiredRowsAsync(CancellationToken ct)
+        {
+            var cutoffUtc = DateTime.UtcNow - ExpiredRowRetention;
+
+            try
+            {
+                await _db.ProjectVerifications
+                    .Where(v => v.ExpiresUtc < cutoffUtc)
+                    .ExecuteDeleteAsync(ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Cleanup must never block sending a code. (The EF InMemory
+                // test provider also doesn't support ExecuteDelete.)
+                _logger.LogDebug(ex, "Skipped expired ProjectVerifications cleanup.");
+            }
         }
 
         private async Task UpsertExplicitDomainApprovalAsync(

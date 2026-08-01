@@ -537,6 +537,13 @@ namespace Kor.Inspections.App.Pages.Admin
                 return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
             }
 
+            // Completed bookings are immutable here, matching Assign and Edit.
+            if (string.Equals(booking.Status, BookingStatus.Completed, StringComparison.OrdinalIgnoreCase))
+            {
+                StatusMessage = "Booking cannot be modified.";
+                return RedirectToPage(new { sort = Sort, dir = Dir, view = View, project = Project, inspector = Inspector, dateFrom = DateFrom, dateTo = DateTo, pageIndex = PageIndex });
+            }
+
             booking.Status = BookingStatus.Cancelled;
             _db.BookingActions.Add(new BookingAction
             {
@@ -581,6 +588,32 @@ namespace Kor.Inspections.App.Pages.Admin
             public string RequestedTime { get; set; } = string.Empty;
 
             public bool OverrideCutoff { get; set; }
+        }
+
+        /// <summary>
+        /// Available HH:mm slots for the given date, excluding the booking being
+        /// edited. Used by the inline Edit panel so its time dropdown reflects
+        /// the booking's own date instead of the manual-create panel's date.
+        /// </summary>
+        public async Task<JsonResult> OnGetEditTimesAsync(Guid id, string? date, bool overrideCutoff)
+        {
+            if (!DateTime.TryParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var parsedDate))
+            {
+                return new JsonResult(Array.Empty<string>());
+            }
+
+            var requestedDate = DateOnly.FromDateTime(parsedDate);
+            var minDate = GetMinimumManualBookingDate(overrideCutoff);
+            var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
+            var existingExcludingSelf = existingForDate.Where(b => b.BookingId != id).ToList();
+
+            var slots = _timeRules
+                .GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate)
+                .Select(t => t.ToString("HH:mm"))
+                .ToList();
+
+            return new JsonResult(slots);
         }
 
         public async Task<IActionResult> OnPostEditAsync(Guid id, [FromForm] EditBookingInput edit)

@@ -1,15 +1,11 @@
 using Kor.Inspections.App.Data;
 using Kor.Inspections.App.Options;
 using Kor.Inspections.App.Services;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
-using System.Security.Claims;
-using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
-using System.Text.Json;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -50,6 +46,9 @@ builder.Services.AddRazorPages(options =>
     // Protect ONLY the Admin folder
     options.Conventions.AuthorizeFolder("/Admin");
 })
+// Enforces [EnableRateLimiting] on page handler methods — the built-in
+// middleware ignores handler-level attributes (see HandlerRateLimiting.cs).
+.AddMvcOptions(options => options.Filters.Add<PageHandlerRateLimitFilter>())
 .AddMicrosoftIdentityUI();
 
 // --------------------
@@ -111,50 +110,9 @@ builder.Services.AddScoped<DeltekProjectService>();
 // Rate limiting (anti-abuse)
 // --------------------
 
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.OnRejected = async (context, token) =>
-    {
-        // Default rate-limit responses may be empty/plaintext which causes client-side `response.json()` to throw.
-        context.HttpContext.Response.ContentType = "application/json";
-        var payload = JsonSerializer.Serialize(new
-        {
-            error = "Too many requests. Please wait a moment and try again."
-        });
-        await context.HttpContext.Response.WriteAsync(payload, token);
-    };
-
-    options.AddPolicy("booking", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: GetRateLimitPartitionKey(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 5,
-                Window = TimeSpan.FromMinutes(30),
-                QueueLimit = 0
-            }));
-
-    options.AddPolicy("verification", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: GetRateLimitPartitionKey(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 10,
-                Window = TimeSpan.FromMinutes(10),
-                QueueLimit = 0
-            }));
-
-    options.AddPolicy("contactMutation", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 20,
-                Window = TimeSpan.FromMinutes(10),
-                QueueLimit = 0
-            }));
-});
+// Policies live in HandlerRateLimiterService and are enforced by
+// PageHandlerRateLimitFilter (registered with AddRazorPages above).
+builder.Services.AddSingleton<HandlerRateLimiterService>();
 
 var app = builder.Build();
 
@@ -205,9 +163,6 @@ app.UseSerilogRequestLogging();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Enable rate limiting
-app.UseRateLimiter();
-
 // --------------------
 // Routing
 // --------------------
@@ -235,22 +190,6 @@ static void ValidateRequiredConfiguration(IConfiguration config, string key)
     {
         throw new InvalidOperationException($"Missing required configuration: '{key}'.");
     }
-}
-
-static string GetRateLimitPartitionKey(HttpContext httpContext)
-{
-    if (httpContext.User?.Identity?.IsAuthenticated == true)
-    {
-        var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? httpContext.User.FindFirstValue("sub")
-            ?? httpContext.User.Identity?.Name;
-
-        if (!string.IsNullOrWhiteSpace(userId))
-            return $"user:{userId}";
-    }
-
-    var ip = httpContext.Connection.RemoteIpAddress?.ToString();
-    return string.IsNullOrWhiteSpace(ip) ? "ip:unknown" : $"ip:{ip}";
 }
 
 static void ValidateInspectionRulesConfiguration(IConfiguration config, Microsoft.Extensions.Logging.ILogger logger, bool strict)

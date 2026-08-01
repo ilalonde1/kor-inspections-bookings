@@ -6,7 +6,14 @@
       "Bash(cd \"C:/VIsual Studio Projects/KOR Inspections Bookings\" && dotnet build Kor.Inspections.Tests/Kor.Inspections.Tests.csproj -c Release -nologo 2>&1)",
       "Read(//c/Users/ilalonde/Desktop/**)",
       "Bash(python *)",
-      "Bash(pip install *)"
+      "Bash(pip install *)",
+      "Bash(dotnet test *)",
+      "Bash(git stash *)",
+      "Bash(git checkout *)",
+      "Bash(dotnet build *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
