@@ -86,6 +86,20 @@ namespace Kor.Inspections.App.Services
             return (minDate, maxDate);
         }
 
+        /// <summary>
+        /// Earliest date for an admin-only weekend booking (weekends are never
+        /// offered publicly). Uses the calendar-day form of the cutoff - before
+        /// CutoffHourLocal the next day is open, after it the day after - so
+        /// staff can book this Saturday on Friday morning without an override.
+        /// </summary>
+        public DateOnly GetWeekendMinDateUtcNow()
+        {
+            var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(_clock.GetUtcNow().UtcDateTime, _tz);
+            var today = DateOnly.FromDateTime(nowLocal.Date);
+            var cutoff = new TimeOnly(_options.CutoffHourLocal, 0);
+            return today.AddDays(TimeOnly.FromDateTime(nowLocal) < cutoff ? 1 : 2);
+        }
+
         // --------------------------------------------------
         // Available Slots
         // --------------------------------------------------
@@ -93,7 +107,8 @@ namespace Kor.Inspections.App.Services
         public IEnumerable<TimeOnly> GetAvailableSlotsForDate(
             DateOnly date,
             IEnumerable<Booking> existingBookingsUtc,
-            DateOnly? minDateOverride = null)
+            DateOnly? minDateOverride = null,
+            bool allowWeekend = false)
         {
             var (defaultMinDate, maxDate) = GetAllowedDateRangeUtcNow();
             var effectiveMinDate = minDateOverride ?? defaultMinDate;
@@ -101,7 +116,7 @@ namespace Kor.Inspections.App.Services
             if (date < effectiveMinDate || date > maxDate)
                 return Enumerable.Empty<TimeOnly>();
 
-            if (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            if (!allowWeekend && date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
                 return Enumerable.Empty<TimeOnly>();
 
             var workStart = TimeOnly.ParseExact(

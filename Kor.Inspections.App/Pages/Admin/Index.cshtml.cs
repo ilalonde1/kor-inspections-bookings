@@ -245,7 +245,7 @@ namespace Kor.Inspections.App.Pages.Admin
 
             var requestedDate = DateOnly.FromDateTime(ManualBooking.RequestedDate!.Value);
             var (_, maxDate) = _timeRules.GetAllowedDateRangeUtcNow();
-            var minDate = GetMinimumManualBookingDate(ManualBooking.OverrideCutoff);
+            var minDate = GetMinimumManualBookingDate(ManualBooking.OverrideCutoff, requestedDate);
 
             if (requestedDate < minDate || requestedDate > maxDate)
             {
@@ -254,16 +254,6 @@ namespace Kor.Inspections.App.Pages.Admin
                     ManualBooking.OverrideCutoff
                         ? "Selected date is outside the allowed booking window, even with the cutoff override."
                         : "Selected date is outside the allowed booking window.");
-                await LoadDataAsync();
-                await LoadManualBookingTimesAsync();
-                return Page();
-            }
-
-            if (requestedDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
-            {
-                ModelState.AddModelError(
-                    "ManualBooking.RequestedDate",
-                    "Field reviews are only available Monday through Friday.");
                 await LoadDataAsync();
                 await LoadManualBookingTimesAsync();
                 return Page();
@@ -310,7 +300,7 @@ namespace Kor.Inspections.App.Pages.Admin
                     return Page();
                 }
 
-                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate).ToList();
+                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate, allowWeekend: true).ToList();
 
                 if (!availableSlots.Contains(requestedTime))
                 {
@@ -604,12 +594,12 @@ namespace Kor.Inspections.App.Pages.Admin
             }
 
             var requestedDate = DateOnly.FromDateTime(parsedDate);
-            var minDate = GetMinimumManualBookingDate(overrideCutoff);
+            var minDate = GetMinimumManualBookingDate(overrideCutoff, requestedDate);
             var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
             var existingExcludingSelf = existingForDate.Where(b => b.BookingId != id).ToList();
 
             var slots = _timeRules
-                .GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate)
+                .GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate, allowWeekend: true)
                 .Select(t => t.ToString("HH:mm"))
                 .ToList();
 
@@ -643,19 +633,13 @@ namespace Kor.Inspections.App.Pages.Admin
 
             var requestedDate = DateOnly.FromDateTime(edit.RequestedDate.Value);
             var (_, maxDate) = _timeRules.GetAllowedDateRangeUtcNow();
-            var minDate = GetMinimumManualBookingDate(edit.OverrideCutoff);
+            var minDate = GetMinimumManualBookingDate(edit.OverrideCutoff, requestedDate);
 
             if (requestedDate < minDate || requestedDate > maxDate)
             {
                 StatusMessage = edit.OverrideCutoff
                     ? "Selected date is outside the allowed booking window, even with the cutoff override."
                     : "Selected date is outside the allowed booking window.";
-                return RedirectToPage(redirectArgs);
-            }
-
-            if (requestedDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
-            {
-                StatusMessage = "Field reviews are only available Monday through Friday.";
                 return RedirectToPage(redirectArgs);
             }
 
@@ -684,7 +668,7 @@ namespace Kor.Inspections.App.Pages.Admin
                 // Slot availability — EXCLUDE the booking being edited so it doesn't conflict with itself.
                 var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
                 var existingExcludingSelf = existingForDate.Where(b => b.BookingId != id).ToList();
-                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate).ToList();
+                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate, allowWeekend: true).ToList();
 
                 if (!availableSlots.Contains(requestedTime))
                 {
@@ -932,19 +916,21 @@ namespace Kor.Inspections.App.Pages.Admin
             const int DayQuickAccessCount = 6;
 
             var todayLocal = DateOnly.FromDateTime(nowLocal.Date);
-            var days = new List<DateOnly>(DayQuickAccessCount);
+            var weekdays = new List<DateOnly>(DayQuickAccessCount);
             var cursor = todayLocal;
-            while (days.Count < DayQuickAccessCount)
+            while (weekdays.Count < DayQuickAccessCount)
             {
                 if (cursor.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
-                    days.Add(cursor);
+                    weekdays.Add(cursor);
                 cursor = cursor.AddDays(1);
             }
 
+            var rangeStart = todayLocal;
+            var rangeEnd = weekdays[^1];
             var rangeStartUtc = TimeZoneInfo.ConvertTimeToUtc(
-                days[0].ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), tz);
+                rangeStart.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), tz);
             var rangeEndUtc = TimeZoneInfo.ConvertTimeToUtc(
-                days[^1].AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), tz);
+                rangeEnd.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), tz);
 
             var startsUtc = await _db.Bookings
                 .AsNoTracking()
@@ -959,6 +945,17 @@ namespace Kor.Inspections.App.Pages.Admin
             var countsByDate = startsUtc
                 .GroupBy(s => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(s, tz)))
                 .ToDictionary(g => g.Key, g => g.Count());
+
+            // Weekend days only get a button when an (admin-booked) inspection falls on them.
+            var days = new List<DateOnly>();
+            for (var d = rangeStart; d <= rangeEnd; d = d.AddDays(1))
+            {
+                if (d.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday ||
+                    countsByDate.GetValueOrDefault(d, 0) > 0)
+                {
+                    days.Add(d);
+                }
+            }
 
             DateOnly? selectedDate = null;
             if (string.Equals(DateFrom, DateTo, StringComparison.Ordinal) &&
@@ -1000,7 +997,7 @@ namespace Kor.Inspections.App.Pages.Admin
         private void InitializeManualBookingDefaults()
         {
             if (!ManualBooking.RequestedDate.HasValue)
-                ManualBooking.RequestedDate = GetMinimumManualBookingDate(overrideCutoff: false).ToDateTime(TimeOnly.MinValue);
+                ManualBooking.RequestedDate = GetMinimumManualBookingDate(overrideCutoff: false, requestedDate: null).ToDateTime(TimeOnly.MinValue);
 
             if (string.IsNullOrWhiteSpace(ManualBooking.RequestedTime))
                 ManualBooking.RequestedTime = "AM";
@@ -1032,9 +1029,15 @@ namespace Kor.Inspections.App.Pages.Admin
             return false;
         }
 
-        private DateOnly GetMinimumManualBookingDate(bool overrideCutoff)
+        private DateOnly GetMinimumManualBookingDate(bool overrideCutoff, DateOnly? requestedDate)
         {
             var (minDate, _) = _timeRules.GetAllowedDateRangeUtcNow();
+
+            // Weekend inspections are admin-only and rare (not offered on the
+            // public site); they follow the calendar-day cutoff instead.
+            if (requestedDate?.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                minDate = _timeRules.GetWeekendMinDateUtcNow();
+
             if (!overrideCutoff)
                 return minDate;
 
@@ -1051,10 +1054,10 @@ namespace Kor.Inspections.App.Pages.Admin
                 return;
 
             var requestedDate = DateOnly.FromDateTime(ManualBooking.RequestedDate.Value);
-            var minDate = GetMinimumManualBookingDate(ManualBooking.OverrideCutoff);
+            var minDate = GetMinimumManualBookingDate(ManualBooking.OverrideCutoff, requestedDate);
             var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
             AvailableManualTimes = _timeRules
-                .GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate)
+                .GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate, allowWeekend: true)
                 .Select(t => t.ToString("HH:mm"))
                 .ToList();
 
