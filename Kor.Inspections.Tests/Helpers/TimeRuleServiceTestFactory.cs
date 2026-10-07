@@ -10,7 +10,8 @@ internal static class TimeRuleServiceTestFactory
         TimeZoneInfo timeZone,
         int cutoffHourLocal,
         int maxBookingsPerSlot = 3,
-        int defaultDurationMinutes = 60)
+        int defaultDurationMinutes = 60,
+        TimeProvider? clock = null)
     {
         var options = Options.Create(new InspectionRulesOptions
         {
@@ -25,7 +26,22 @@ internal static class TimeRuleServiceTestFactory
             TimeZoneId = timeZone.Id
         });
 
-        return new TimeRuleService(options);
+        return new TimeRuleService(options, clock);
+    }
+
+    /// <summary>
+    /// Creates a service whose clock is pinned to <paramref name="localNow"/> in
+    /// <paramref name="timeZone"/>, so day-of-week rules can be tested on any day.
+    /// </summary>
+    public static TimeRuleService CreateAt(TimeZoneInfo timeZone, DateTime localNow, int cutoffHourLocal = 14)
+    {
+        var utcNow = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localNow, DateTimeKind.Unspecified), timeZone);
+        return Create(timeZone, cutoffHourLocal, clock: new FixedTimeProvider(new DateTimeOffset(utcNow, TimeSpan.Zero)));
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 
     /// <summary>

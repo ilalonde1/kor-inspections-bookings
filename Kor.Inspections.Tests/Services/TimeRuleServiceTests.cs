@@ -136,6 +136,66 @@ public class TimeRuleServiceTests
         Assert.NotEqual(DayOfWeek.Sunday, result.MinDate.DayOfWeek);
     }
 
+    // Pinned-clock cases (Pacific time, 2pm cutoff). 2026-10-09 is a Friday.
+    [Theory]
+    [InlineData("2026-10-08 09:00", "2026-10-09")] // Thu before cutoff -> Fri
+    [InlineData("2026-10-08 15:00", "2026-10-12")] // Thu after cutoff -> Mon
+    [InlineData("2026-10-09 09:00", "2026-10-12")] // Fri before cutoff -> Mon
+    [InlineData("2026-10-09 14:00", "2026-10-13")] // Fri at cutoff -> Tue
+    [InlineData("2026-10-10 00:01", "2026-10-13")] // Sat early morning -> Tue (Griffin, 2026-10-05)
+    [InlineData("2026-10-10 09:00", "2026-10-13")] // Sat before 2pm -> Tue
+    [InlineData("2026-10-10 18:00", "2026-10-13")] // Sat evening -> Tue
+    [InlineData("2026-10-11 09:00", "2026-10-13")] // Sun before 2pm -> Tue
+    [InlineData("2026-10-11 23:59", "2026-10-13")] // Sun night -> Tue
+    [InlineData("2026-10-12 00:00", "2026-10-13")] // Mon midnight -> Tue
+    [InlineData("2026-10-12 15:00", "2026-10-14")] // Mon after cutoff -> Wed
+    public void GetAllowedDateRangeUtcNow_PinnedClock_ReturnsExpectedMinDate(string localNow, string expectedMin)
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time");
+        var service = TimeRuleServiceTestFactory.CreateAt(zone, DateTime.Parse(localNow));
+
+        var result = service.GetAllowedDateRangeUtcNow();
+
+        Assert.Equal(DateOnly.Parse(expectedMin), result.MinDate);
+    }
+
+    [Fact]
+    public void GetAvailableSlotsForDate_OnWeekend_MondayHasNoSlotsAndTuesdayDoes()
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time");
+        var service = TimeRuleServiceTestFactory.CreateAt(zone, new DateTime(2026, 10, 10, 9, 0, 0));
+
+        Assert.Empty(service.GetAvailableSlotsForDate(new DateOnly(2026, 10, 12), []));
+        Assert.NotEmpty(service.GetAvailableSlotsForDate(new DateOnly(2026, 10, 13), []));
+    }
+
+    // Admin-only weekend bookings use the calendar-day cutoff.
+    [Theory]
+    [InlineData("2026-10-09 09:00", "2026-10-10")] // Fri before cutoff -> Sat
+    [InlineData("2026-10-09 15:00", "2026-10-11")] // Fri after cutoff -> Sun
+    [InlineData("2026-10-10 09:00", "2026-10-11")] // Sat before cutoff -> Sun
+    [InlineData("2026-10-07 15:00", "2026-10-09")] // Wed after cutoff -> Fri (any later weekend is open)
+    public void GetWeekendMinDateUtcNow_PinnedClock_UsesCalendarDayCutoff(string localNow, string expectedMin)
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time");
+        var service = TimeRuleServiceTestFactory.CreateAt(zone, DateTime.Parse(localNow));
+
+        Assert.Equal(DateOnly.Parse(expectedMin), service.GetWeekendMinDateUtcNow());
+    }
+
+    [Fact]
+    public void GetAvailableSlotsForDate_Saturday_OnlyReturnsSlotsWhenWeekendAllowed()
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time");
+        var service = TimeRuleServiceTestFactory.CreateAt(zone, new DateTime(2026, 10, 9, 9, 0, 0)); // Fri morning
+        var saturday = new DateOnly(2026, 10, 10);
+        var weekendMin = service.GetWeekendMinDateUtcNow();
+
+        Assert.Empty(service.GetAvailableSlotsForDate(saturday, [])); // public path
+        Assert.Empty(service.GetAvailableSlotsForDate(saturday, [], minDateOverride: weekendMin));
+        Assert.NotEmpty(service.GetAvailableSlotsForDate(saturday, [], minDateOverride: weekendMin, allowWeekend: true));
+    }
+
     [Fact]
     public void IsCancellationAllowed_BookingInPast_ReturnsFalse()
     {

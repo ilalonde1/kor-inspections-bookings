@@ -115,6 +115,32 @@ public class AdminIndexModelCreateBookingTests
         Assert.Equal(90, durationMinutes);
     }
 
+    [Fact]
+    public async Task OnPostCreateAsync_WeekendDateWithoutOverride_CreatesBooking()
+    {
+        // Griffin: weekend inspections are admin-only (never offered publicly),
+        // but staff must be able to book them on a client's behalf.
+        if (!TryGetCalendarZone(out var zone)) { Assert.True(true); return; }
+
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminIndexCreateTests_");
+        await using var db = fixture.CreateContext();
+        var model = CreateModel(db, out var nowLocal);
+
+        // First Sat/Sun 2-7 days out: past any cutoff, inside the 7-day window.
+        var weekendDate = Enumerable.Range(2, 6)
+            .Select(offset => nowLocal.Date.AddDays(offset))
+            .First(d => d.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday);
+        model.ManualBooking = CreateManualBooking(weekendDate, overrideCutoff: false);
+
+        var result = await model.OnPostCreateAsync();
+
+        Assert.IsType<RedirectToPageResult>(result);
+        await using var verifyDb = fixture.CreateContext();
+        var booking = Assert.Single(await verifyDb.Bookings.AsNoTracking().ToListAsync());
+        var startLocal = TimeZoneInfo.ConvertTimeFromUtc(booking.StartUtc, zone);
+        Assert.Equal(weekendDate.Date, startLocal.Date);
+    }
+
     private static IndexModel.ManualBookingInput CreateManualBooking(DateTime requestedDateLocal, bool overrideCutoff)
     {
         return new IndexModel.ManualBookingInput
