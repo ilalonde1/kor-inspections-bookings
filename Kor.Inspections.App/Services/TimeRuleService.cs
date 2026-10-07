@@ -16,10 +16,12 @@ namespace Kor.Inspections.App.Services
         private readonly InspectionRulesOptions _options;
         private readonly TimeZoneInfo _tz;
         private readonly int _maxBookingsPerSlot;
+        private readonly TimeProvider _clock;
 
-        public TimeRuleService(IOptions<InspectionRulesOptions> options)
+        public TimeRuleService(IOptions<InspectionRulesOptions> options, TimeProvider? clock = null)
         {
             _options = options.Value;
+            _clock = clock ?? TimeProvider.System;
             var maxBookingsPerSlot = options.Value.MaxBookingsPerSlot;
             _maxBookingsPerSlot = Math.Max(1, maxBookingsPerSlot);
             _tz = TimeZoneInfo.FindSystemTimeZoneById(_options.TimeZoneId);
@@ -50,7 +52,7 @@ namespace Kor.Inspections.App.Services
 
         public (DateOnly MinDate, DateOnly MaxDate) GetAllowedDateRangeUtcNow()
         {
-            var nowUtc = DateTime.UtcNow;
+            var nowUtc = _clock.GetUtcNow().UtcDateTime;
             var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, _tz);
 
             var cutoff = new TimeOnly(_options.CutoffHourLocal, 0);
@@ -64,7 +66,13 @@ namespace Kor.Inspections.App.Services
             // business day; cutoff blocks it). IsCancellationAllowed already
             // walks backward in business-day steps, so doing the forward walk
             // in business days too keeps both rules symmetric.
-            var businessDaysToAdd = TimeOnly.FromDateTime(nowLocal) < cutoff ? 1 : 2;
+            //
+            // Weekends count as past Friday's cutoff: booking on Sat/Sun must
+            // not open Monday (Monday's cutoff was Fri at CutoffHourLocal), so
+            // the earliest date is Tuesday.
+            var isWeekend = today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+            var pastCutoff = isWeekend || TimeOnly.FromDateTime(nowLocal) >= cutoff;
+            var businessDaysToAdd = pastCutoff ? 2 : 1;
             var minDate = today;
             for (int i = 0; i < businessDaysToAdd; i++)
             {
@@ -156,7 +164,7 @@ namespace Kor.Inspections.App.Services
 
         public bool IsCancellationAllowed(DateTime bookingStartUtc)
         {
-            var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _tz);
+            var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(_clock.GetUtcNow().UtcDateTime, _tz);
             var bookingLocal = TimeZoneInfo.ConvertTimeFromUtc(bookingStartUtc, _tz);
 
             if (bookingLocal <= nowLocal)

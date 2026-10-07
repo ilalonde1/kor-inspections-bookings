@@ -136,6 +136,39 @@ public class TimeRuleServiceTests
         Assert.NotEqual(DayOfWeek.Sunday, result.MinDate.DayOfWeek);
     }
 
+    // Pinned-clock cases (Pacific time, 2pm cutoff). 2026-10-09 is a Friday.
+    [Theory]
+    [InlineData("2026-10-08 09:00", "2026-10-09")] // Thu before cutoff -> Fri
+    [InlineData("2026-10-08 15:00", "2026-10-12")] // Thu after cutoff -> Mon
+    [InlineData("2026-10-09 09:00", "2026-10-12")] // Fri before cutoff -> Mon
+    [InlineData("2026-10-09 14:00", "2026-10-13")] // Fri at cutoff -> Tue
+    [InlineData("2026-10-10 00:01", "2026-10-13")] // Sat early morning -> Tue (Griffin, 2026-10-05)
+    [InlineData("2026-10-10 09:00", "2026-10-13")] // Sat before 2pm -> Tue
+    [InlineData("2026-10-10 18:00", "2026-10-13")] // Sat evening -> Tue
+    [InlineData("2026-10-11 09:00", "2026-10-13")] // Sun before 2pm -> Tue
+    [InlineData("2026-10-11 23:59", "2026-10-13")] // Sun night -> Tue
+    [InlineData("2026-10-12 00:00", "2026-10-13")] // Mon midnight -> Tue
+    [InlineData("2026-10-12 15:00", "2026-10-14")] // Mon after cutoff -> Wed
+    public void GetAllowedDateRangeUtcNow_PinnedClock_ReturnsExpectedMinDate(string localNow, string expectedMin)
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time");
+        var service = TimeRuleServiceTestFactory.CreateAt(zone, DateTime.Parse(localNow));
+
+        var result = service.GetAllowedDateRangeUtcNow();
+
+        Assert.Equal(DateOnly.Parse(expectedMin), result.MinDate);
+    }
+
+    [Fact]
+    public void GetAvailableSlotsForDate_OnWeekend_MondayHasNoSlotsAndTuesdayDoes()
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time");
+        var service = TimeRuleServiceTestFactory.CreateAt(zone, new DateTime(2026, 10, 10, 9, 0, 0));
+
+        Assert.Empty(service.GetAvailableSlotsForDate(new DateOnly(2026, 10, 12), []));
+        Assert.NotEmpty(service.GetAvailableSlotsForDate(new DateOnly(2026, 10, 13), []));
+    }
+
     [Fact]
     public void IsCancellationAllowed_BookingInPast_ReturnsFalse()
     {
