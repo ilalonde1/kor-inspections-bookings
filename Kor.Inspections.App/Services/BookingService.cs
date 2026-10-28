@@ -469,11 +469,16 @@ namespace Kor.Inspections.App.Services
         // --------------------------------------------------
         // RESCHEDULED EMAILS (CLIENT + INSPECTOR if assigned)
         // --------------------------------------------------
+        /// <param name="unassignedInspector">
+        /// Inspector (email or display name) who was taken off the booking because
+        /// of this reschedule; they get a "no longer assigned" version.
+        /// </param>
         public async Task SendRescheduledEmailsAsync(
             Booking booking,
             DateTime oldStartUtc,
             DateTime oldEndUtc,
-            string? oldTimePreference)
+            string? oldTimePreference,
+            string? unassignedInspector = null)
         {
             try
             {
@@ -509,16 +514,23 @@ namespace Kor.Inspections.App.Services
                     clientBody);
 
                 // -------------------------
-                // INSPECTOR EMAIL (only if assigned)
+                // INSPECTOR EMAIL (assigned, or just unassigned by this reschedule)
                 // -------------------------
-                if (!string.IsNullOrWhiteSpace(booking.AssignedTo))
+                var inspectorKey = !string.IsNullOrWhiteSpace(booking.AssignedTo)
+                    ? booking.AssignedTo
+                    : unassignedInspector;
+                var inspectorRemoved = string.IsNullOrWhiteSpace(booking.AssignedTo) &&
+                                       !string.IsNullOrWhiteSpace(unassignedInspector);
+
+                if (!string.IsNullOrWhiteSpace(inspectorKey))
                 {
-                    var inspector = await GetAssignedInspectorAsync(booking.AssignedTo, requireEnabled: true);
+                    var inspector = await GetAssignedInspectorAsync(inspectorKey, requireEnabled: true);
 
                     if (inspector != null && !string.IsNullOrWhiteSpace(inspector.Email))
                     {
-                        var inspectorSubject =
-                            $"Field Review Rescheduled – {FormatJobLine(booking)} – {newStartLocal:yyyy-MM-dd HH:mm}";
+                        var inspectorSubject = inspectorRemoved
+                            ? $"Field Review Rescheduled (No Longer Assigned) – {FormatJobLine(booking)} – {newStartLocal:yyyy-MM-dd HH:mm}"
+                            : $"Field Review Rescheduled – {FormatJobLine(booking)} – {newStartLocal:yyyy-MM-dd HH:mm}";
 
                         var inspectorBody = BuildRescheduledEmailHtml(
                             booking,
@@ -527,7 +539,8 @@ namespace Kor.Inspections.App.Services
                             displayName,
                             manageUrl: null,
                             projectInspectionsUrl: null,
-                            isInspector: true);
+                            isInspector: true,
+                            inspectorRemoved: inspectorRemoved);
 
                         await _graphMail.SendHtmlAsync(
                             fromMailbox,
@@ -683,11 +696,15 @@ namespace Kor.Inspections.App.Services
             string displayName,
             string? manageUrl,
             string? projectInspectionsUrl,
-            bool isInspector)
+            bool isInspector,
+            bool inspectorRemoved = false)
         {
             var sb = new StringBuilder();
 
-            if (isInspector)
+            if (isInspector && inspectorRemoved)
+                sb.Append("<p><strong>A field review you were assigned to has been rescheduled, and you are no longer assigned to it.</strong> ")
+                  .Append("The office will reassign it. Please do not attend at the previous or new time unless you are reassigned.</p>");
+            else if (isInspector)
                 sb.Append("<p><strong>A field review you are assigned to has been rescheduled.</strong></p>");
             else
                 sb.Append("<p><strong>Your field review has been rescheduled.</strong></p>");

@@ -312,6 +312,12 @@
                                                     <option value="@t" selected="@(b.TimePreference == null && b.StartLocal.ToString("HH:mm") == t)">@t</option>
                                                 }
                                             </select>
+                                            <label class="admin-edit-label" for="edit-details-@b.BookingId">Details</label>
+                                            <textarea id="edit-details-@b.BookingId"
+                                                      name="edit.Comments"
+                                                      class="form-control comments-textarea admin-edit-details"
+                                                      maxlength="500"
+                                                      placeholder="Specify floor and element details">@b.Comments</textarea>
                                             <label class="admin-edit-cutoff">
                                                 <input type="checkbox" name="edit.OverrideCutoff" value="true" />
                                                 Override 2 p.m. cutoff
