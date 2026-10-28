@@ -121,7 +121,7 @@ public class AdminIndexModelConcurrencyTests
 
     private static bool TryGetCalendarZone(out TimeZoneInfo zone) =>
         TimeRuleServiceTestFactory.TryFindZone(nowLocal =>
-            nowLocal.AddDays(1).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
+            TimeRuleServiceTestFactory.IsBusinessDay(nowLocal.AddDays(1)) &&
             nowLocal.Hour <= 22, out zone);
 
     private static IndexModel CreateModel(InspectionsContext db)

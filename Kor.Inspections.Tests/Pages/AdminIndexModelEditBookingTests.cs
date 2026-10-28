@@ -290,7 +290,7 @@ public class AdminIndexModelEditBookingTests
     private static bool TryPickWeekdayAfternoonZone(out TimeZoneInfo zone, out DateTime nowLocal)
     {
         if (!TimeRuleServiceTestFactory.TryFindZone(local =>
-                local.AddDays(1).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
+                TimeRuleServiceTestFactory.IsBusinessDay(local.AddDays(1)) &&
                 local.Hour <= 22, out zone))
         {
             nowLocal = default;
@@ -318,13 +318,13 @@ public class AdminIndexModelEditBookingTests
         var date = DateOnly.FromDateTime(nowLocal.Date)
             .AddDays(nowLocal.Hour < cutoffHourLocal ? 1 : 2);
 
-        while (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+        while (!TimeRuleServiceTestFactory.IsBusinessDay(date))
             date = date.AddDays(1);
 
         for (int i = 0; i < dayOffset; i++)
         {
             date = date.AddDays(1);
-            while (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            while (!TimeRuleServiceTestFactory.IsBusinessDay(date))
                 date = date.AddDays(1);
         }
 

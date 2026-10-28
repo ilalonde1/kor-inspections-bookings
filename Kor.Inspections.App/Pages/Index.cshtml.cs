@@ -108,6 +108,14 @@ namespace Kor.Inspections.App.Pages
         public List<string> AvailableTimes { get; private set; } = new();
         public (DateOnly MinDate, DateOnly MaxDate) AllowedDates { get; private set; }
 
+        /// <summary>Weekends/holidays inside the booking window, greyed out in the date picker.</summary>
+        public string NonBusinessDaysCsv =>
+            AllowedDates.MaxDate < AllowedDates.MinDate || AllowedDates.MinDate == default
+                ? string.Empty
+                : string.Join(",", _timeRules
+                    .GetNonBusinessDays(AllowedDates.MinDate, AllowedDates.MaxDate)
+                    .Select(d => d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)));
+
         // Legacy (still safe to keep)
         public ProjectProfileResult? LoadedProfile { get; private set; }
 
@@ -821,10 +829,10 @@ namespace Kor.Inspections.App.Pages
                 return Page();
             }
 
-            if (requestDateOnly.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            if (!_timeRules.IsBusinessDay(requestDateOnly))
             {
                 await LoadAllowedDatesAndTimesAsync();
-                ModelState.AddModelError(string.Empty, "Field reviews are only available Monday through Friday.");
+                ModelState.AddModelError(string.Empty, "Field reviews are only available Monday through Friday, excluding statutory holidays.");
                 return Page();
             }
 

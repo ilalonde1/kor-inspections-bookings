@@ -17,6 +17,7 @@ namespace Kor.Inspections.App.Services
         private readonly TimeZoneInfo _tz;
         private readonly int _maxBookingsPerSlot;
         private readonly TimeProvider _clock;
+        private readonly Dictionary<int, HashSet<DateOnly>> _closedWeekdaysByYear = new();
 
         public TimeRuleService(IOptions<InspectionRulesOptions> options, TimeProvider? clock = null)
         {
@@ -29,6 +30,36 @@ namespace Kor.Inspections.App.Services
 
         public TimeZoneInfo TimeZone => _tz;
         public int DefaultDurationMinutes => _options.DefaultDurationMinutes;
+
+        /// <summary>
+        /// Mon-Fri, excluding BC statutory holidays and configured closures
+        /// (with weekend holidays observed on the next weekday).
+        /// </summary>
+        public bool IsBusinessDay(DateOnly date)
+        {
+            if (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                return false;
+
+            if (!_closedWeekdaysByYear.TryGetValue(date.Year, out var closed))
+            {
+                closed = BcHolidayCalendar.GetClosedWeekdays(date.Year, _options.ClosedDates);
+                _closedWeekdaysByYear[date.Year] = closed;
+            }
+
+            return !closed.Contains(date);
+        }
+
+        /// <summary>Non-business days in [from, to], for disabling them in the date picker.</summary>
+        public List<DateOnly> GetNonBusinessDays(DateOnly from, DateOnly to)
+        {
+            var days = new List<DateOnly>();
+            for (var d = from; d <= to; d = d.AddDays(1))
+            {
+                if (!IsBusinessDay(d))
+                    days.Add(d);
+            }
+            return days;
+        }
 
         public async Task<List<Booking>> GetExistingBookingsForLocalDateAsync(
             InspectionsContext db,
@@ -67,17 +98,17 @@ namespace Kor.Inspections.App.Services
             // walks backward in business-day steps, so doing the forward walk
             // in business days too keeps both rules symmetric.
             //
-            // Weekends count as past Friday's cutoff: booking on Sat/Sun must
-            // not open Monday (Monday's cutoff was Fri at CutoffHourLocal), so
-            // the earliest date is Tuesday.
-            var isWeekend = today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
-            var pastCutoff = isWeekend || TimeOnly.FromDateTime(nowLocal) >= cutoff;
+            // Weekends and BC stat holidays are non-business days. Booking on one
+            // counts as past the last business day's cutoff: on a weekend before
+            // a normal Monday the earliest date is Tuesday; before a holiday
+            // Monday it is Wednesday.
+            var pastCutoff = !IsBusinessDay(today) || TimeOnly.FromDateTime(nowLocal) >= cutoff;
             var businessDaysToAdd = pastCutoff ? 2 : 1;
             var minDate = today;
             for (int i = 0; i < businessDaysToAdd; i++)
             {
                 minDate = minDate.AddDays(1);
-                while (minDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                while (!IsBusinessDay(minDate))
                     minDate = minDate.AddDays(1);
             }
 
@@ -87,12 +118,13 @@ namespace Kor.Inspections.App.Services
         }
 
         /// <summary>
-        /// Earliest date for an admin-only weekend booking (weekends are never
-        /// offered publicly). Uses the calendar-day form of the cutoff - before
-        /// CutoffHourLocal the next day is open, after it the day after - so
-        /// staff can book this Saturday on Friday morning without an override.
+        /// Earliest date for an admin-only booking on a non-business day (weekend
+        /// or holiday; never offered publicly). Uses the calendar-day form of the
+        /// cutoff - before CutoffHourLocal the next day is open, after it the day
+        /// after - so staff can book this Saturday on Friday morning without an
+        /// override.
         /// </summary>
-        public DateOnly GetWeekendMinDateUtcNow()
+        public DateOnly GetNonBusinessDayMinDateUtcNow()
         {
             var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(_clock.GetUtcNow().UtcDateTime, _tz);
             var today = DateOnly.FromDateTime(nowLocal.Date);
@@ -108,7 +140,7 @@ namespace Kor.Inspections.App.Services
             DateOnly date,
             IEnumerable<Booking> existingBookingsUtc,
             DateOnly? minDateOverride = null,
-            bool allowWeekend = false)
+            bool allowNonBusinessDays = false)
         {
             var (defaultMinDate, maxDate) = GetAllowedDateRangeUtcNow();
             var effectiveMinDate = minDateOverride ?? defaultMinDate;
@@ -116,7 +148,7 @@ namespace Kor.Inspections.App.Services
             if (date < effectiveMinDate || date > maxDate)
                 return Enumerable.Empty<TimeOnly>();
 
-            if (!allowWeekend && date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            if (!allowNonBusinessDays && !IsBusinessDay(date))
                 return Enumerable.Empty<TimeOnly>();
 
             var workStart = TimeOnly.ParseExact(
@@ -187,9 +219,9 @@ namespace Kor.Inspections.App.Services
 
             var bookingDate = bookingLocal.Date;
 
+            // Notice is due by the cutoff on the previous business day.
             var cutoffDay = bookingDate.AddDays(-1);
-            while (cutoffDay.DayOfWeek == DayOfWeek.Saturday ||
-                   cutoffDay.DayOfWeek == DayOfWeek.Sunday)
+            while (!IsBusinessDay(DateOnly.FromDateTime(cutoffDay)))
             {
                 cutoffDay = cutoffDay.AddDays(-1);
             }

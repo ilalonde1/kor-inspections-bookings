@@ -300,7 +300,7 @@ namespace Kor.Inspections.App.Pages.Admin
                     return Page();
                 }
 
-                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate, allowWeekend: true).ToList();
+                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate, allowNonBusinessDays: true).ToList();
 
                 if (!availableSlots.Contains(requestedTime))
                 {
@@ -599,7 +599,7 @@ namespace Kor.Inspections.App.Pages.Admin
             var existingExcludingSelf = existingForDate.Where(b => b.BookingId != id).ToList();
 
             var slots = _timeRules
-                .GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate, allowWeekend: true)
+                .GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate, allowNonBusinessDays: true)
                 .Select(t => t.ToString("HH:mm"))
                 .ToList();
 
@@ -668,7 +668,7 @@ namespace Kor.Inspections.App.Pages.Admin
                 // Slot availability — EXCLUDE the booking being edited so it doesn't conflict with itself.
                 var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
                 var existingExcludingSelf = existingForDate.Where(b => b.BookingId != id).ToList();
-                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate, allowWeekend: true).ToList();
+                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate, allowNonBusinessDays: true).ToList();
 
                 if (!availableSlots.Contains(requestedTime))
                 {
@@ -780,7 +780,7 @@ namespace Kor.Inspections.App.Pages.Admin
 
             var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
             var defaultDate = nowLocal.Date.AddDays(1);
-            while (defaultDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            while (!_timeRules.IsBusinessDay(DateOnly.FromDateTime(defaultDate)))
                 defaultDate = defaultDate.AddDays(1);
             NextWorkdayDate = DateOnly.FromDateTime(defaultDate);
             var windowStartLocal = defaultDate;
@@ -916,17 +916,17 @@ namespace Kor.Inspections.App.Pages.Admin
             const int DayQuickAccessCount = 6;
 
             var todayLocal = DateOnly.FromDateTime(nowLocal.Date);
-            var weekdays = new List<DateOnly>(DayQuickAccessCount);
+            var businessDays = new List<DateOnly>(DayQuickAccessCount);
             var cursor = todayLocal;
-            while (weekdays.Count < DayQuickAccessCount)
+            while (businessDays.Count < DayQuickAccessCount)
             {
-                if (cursor.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
-                    weekdays.Add(cursor);
+                if (_timeRules.IsBusinessDay(cursor))
+                    businessDays.Add(cursor);
                 cursor = cursor.AddDays(1);
             }
 
             var rangeStart = todayLocal;
-            var rangeEnd = weekdays[^1];
+            var rangeEnd = businessDays[^1];
             var rangeStartUtc = TimeZoneInfo.ConvertTimeToUtc(
                 rangeStart.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), tz);
             var rangeEndUtc = TimeZoneInfo.ConvertTimeToUtc(
@@ -946,12 +946,11 @@ namespace Kor.Inspections.App.Pages.Admin
                 .GroupBy(s => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(s, tz)))
                 .ToDictionary(g => g.Key, g => g.Count());
 
-            // Weekend days only get a button when an (admin-booked) inspection falls on them.
+            // Weekends/holidays only get a button when an (admin-booked) inspection falls on them.
             var days = new List<DateOnly>();
             for (var d = rangeStart; d <= rangeEnd; d = d.AddDays(1))
             {
-                if (d.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday ||
-                    countsByDate.GetValueOrDefault(d, 0) > 0)
+                if (_timeRules.IsBusinessDay(d) || countsByDate.GetValueOrDefault(d, 0) > 0)
                 {
                     days.Add(d);
                 }
@@ -1033,10 +1032,10 @@ namespace Kor.Inspections.App.Pages.Admin
         {
             var (minDate, _) = _timeRules.GetAllowedDateRangeUtcNow();
 
-            // Weekend inspections are admin-only and rare (not offered on the
-            // public site); they follow the calendar-day cutoff instead.
-            if (requestedDate?.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
-                minDate = _timeRules.GetWeekendMinDateUtcNow();
+            // Weekend/holiday inspections are admin-only and rare (not offered on
+            // the public site); they follow the calendar-day cutoff instead.
+            if (requestedDate is { } date && !_timeRules.IsBusinessDay(date))
+                minDate = _timeRules.GetNonBusinessDayMinDateUtcNow();
 
             if (!overrideCutoff)
                 return minDate;
@@ -1057,7 +1056,7 @@ namespace Kor.Inspections.App.Pages.Admin
             var minDate = GetMinimumManualBookingDate(ManualBooking.OverrideCutoff, requestedDate);
             var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
             AvailableManualTimes = _timeRules
-                .GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate, allowWeekend: true)
+                .GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate, allowNonBusinessDays: true)
                 .Select(t => t.ToString("HH:mm"))
                 .ToList();
 

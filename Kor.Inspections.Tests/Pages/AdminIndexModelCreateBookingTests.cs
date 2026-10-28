@@ -159,7 +159,7 @@ public class AdminIndexModelCreateBookingTests
 
     private static bool TryGetCalendarZone(out TimeZoneInfo zone) =>
         TimeRuleServiceTestFactory.TryFindZone(localNow =>
-            localNow.AddDays(1).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
+            TimeRuleServiceTestFactory.IsBusinessDay(localNow.AddDays(1)) &&
             localNow.Hour <= 22, out zone);
 
     private static IndexModel CreateModel(InspectionsContext db, out DateTime nowLocal, int defaultDurationMinutes = 60)
