@@ -52,26 +52,33 @@ namespace Kor.Inspections.App.Services
         /// </param>
         public static HashSet<DateOnly> GetClosedWeekdays(int year, IEnumerable<string>? closedDates)
         {
-            var annual = GetStatutoryHolidays(year).Select(h => h.Date).ToList();
-            var oneOff = new List<DateOnly>();
+            var entries = (closedDates ?? Enumerable.Empty<string>()).ToList();
+            var annual = new List<DateOnly>();
+            var closed = new HashSet<DateOnly>();
 
-            foreach (var entry in closedDates ?? Enumerable.Empty<string>())
+            // Work across the neighbouring years too, so a late-December day
+            // observed in January (or colliding with New Year's) shifts correctly.
+            for (var y = year - 1; y <= year + 1; y++)
             {
-                if (!TryParseClosedDate(entry, out var month, out var day, out var specificDate))
-                    throw new FormatException($"Invalid InspectionRules:ClosedDates entry '{entry}'. Use MM-dd or yyyy-MM-dd.");
+                annual.AddRange(GetStatutoryHolidays(y).Select(h => h.Date));
 
-                if (specificDate is { } d)
+                foreach (var entry in entries)
                 {
-                    if (d.Year == year)
-                        oneOff.Add(d);
-                }
-                else if (DateTime.DaysInMonth(year, month) >= day)
-                {
-                    annual.Add(new DateOnly(year, month, day));
+                    if (!TryParseClosedDate(entry, out var month, out var day, out var specificDate))
+                        throw new FormatException($"Invalid InspectionRules:ClosedDates entry '{entry}'. Use MM-dd or yyyy-MM-dd.");
+
+                    if (specificDate is { } d)
+                    {
+                        if (d.Year == y && !IsWeekend(d))
+                            closed.Add(d);
+                    }
+                    else if (DateTime.DaysInMonth(y, month) >= day)
+                    {
+                        annual.Add(new DateOnly(y, month, day));
+                    }
                 }
             }
 
-            var closed = new HashSet<DateOnly>();
             foreach (var date in annual.Distinct().OrderBy(d => d))
             {
                 var observed = date;
@@ -80,12 +87,7 @@ namespace Kor.Inspections.App.Services
                 closed.Add(observed);
             }
 
-            foreach (var date in oneOff)
-            {
-                if (!IsWeekend(date))
-                    closed.Add(date);
-            }
-
+            closed.RemoveWhere(d => d.Year != year);
             return closed;
         }
 

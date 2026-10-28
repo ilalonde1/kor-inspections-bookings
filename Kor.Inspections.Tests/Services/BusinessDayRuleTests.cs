@@ -109,6 +109,19 @@ public class BusinessDayRuleTests
     }
 
     [Fact]
+    public void IsBusinessDay_LateDecemberClosureObservedInJanuary()
+    {
+        // A configured 12-31 closure in 2028 falls on Sunday; Mon Jan 1 2029 is
+        // New Year's, so the closure is observed on Tue Jan 2 2029.
+        var service = TimeRuleServiceTestFactory.CreateAt(
+            Pacific, new DateTime(2028, 12, 20, 10, 0, 0), closedDates: ["12-31"]);
+
+        Assert.False(service.IsBusinessDay(new DateOnly(2029, 1, 1)));  // New Year's (Mon)
+        Assert.False(service.IsBusinessDay(new DateOnly(2029, 1, 2)));  // observed 12-31 closure
+        Assert.True(service.IsBusinessDay(new DateOnly(2029, 1, 3)));
+    }
+
+    [Fact]
     public void GetNonBusinessDays_ListsWeekendsAndHolidaysInWindow()
     {
         var days = At("2026-10-07 10:00").GetNonBusinessDays(new DateOnly(2026, 10, 8), new DateOnly(2026, 10, 14));
