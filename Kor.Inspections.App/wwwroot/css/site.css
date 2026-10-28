@@ -1272,6 +1272,18 @@ ASSIGN + ACTION BUTTONS
     background: #f8fafc;
 }
 
+.admin-edit-label {
+    font-size: .77rem;
+    font-weight: 600;
+    color: #44586b;
+    margin: 2px 0 -2px;
+}
+
+.admin-edit-details {
+    min-height: 90px;
+    font-size: .85rem;
+}
+
 .admin-edit-cutoff {
     display: flex;
     gap: 6px;

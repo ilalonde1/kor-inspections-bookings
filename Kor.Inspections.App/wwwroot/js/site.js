@@ -218,6 +218,12 @@ document.addEventListener("click", function (e) {
                 minDate: dateInput.dataset.mindate,
                 maxDate: dateInput.dataset.maxdate,
 
+                // Public page only: grey out weekends and BC holidays listed by
+                // the server. (Server-side validation is still the authority.)
+                disable: dateInput.dataset.closeddates
+                    ? dateInput.dataset.closeddates.split(",")
+                    : [],
+
                 //---------------------------------------
                 // Fix Razor postback timing bug
                 //---------------------------------------

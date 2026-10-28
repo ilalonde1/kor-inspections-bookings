@@ -6,12 +6,23 @@ namespace Kor.Inspections.Tests.Helpers;
 
 internal static class TimeRuleServiceTestFactory
 {
+    /// <summary>
+    /// Mon-Fri and not a BC statutory holiday (matches the factory's default
+    /// options, which configure no extra closed dates).
+    /// </summary>
+    public static bool IsBusinessDay(DateOnly date) =>
+        date.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
+        !BcHolidayCalendar.GetClosedWeekdays(date.Year, null).Contains(date);
+
+    public static bool IsBusinessDay(DateTime date) => IsBusinessDay(DateOnly.FromDateTime(date));
+
     public static TimeRuleService Create(
         TimeZoneInfo timeZone,
         int cutoffHourLocal,
         int maxBookingsPerSlot = 3,
         int defaultDurationMinutes = 60,
-        TimeProvider? clock = null)
+        TimeProvider? clock = null,
+        List<string>? closedDates = null)
     {
         var options = Options.Create(new InspectionRulesOptions
         {
@@ -23,7 +34,8 @@ internal static class TimeRuleServiceTestFactory
             MaxBookingsPerSlot = maxBookingsPerSlot,
             WorkStart = "07:30",
             WorkEnd = "16:00",
-            TimeZoneId = timeZone.Id
+            TimeZoneId = timeZone.Id,
+            ClosedDates = closedDates ?? new List<string>()
         });
 
         return new TimeRuleService(options, clock);
@@ -33,11 +45,22 @@ internal static class TimeRuleServiceTestFactory
     /// Creates a service whose clock is pinned to <paramref name="localNow"/> in
     /// <paramref name="timeZone"/>, so day-of-week rules can be tested on any day.
     /// </summary>
-    public static TimeRuleService CreateAt(TimeZoneInfo timeZone, DateTime localNow, int cutoffHourLocal = 14)
+    public static TimeRuleService CreateAt(
+        TimeZoneInfo timeZone,
+        DateTime localNow,
+        int cutoffHourLocal = 14,
+        List<string>? closedDates = null)
     {
         var utcNow = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localNow, DateTimeKind.Unspecified), timeZone);
-        return Create(timeZone, cutoffHourLocal, clock: new FixedTimeProvider(new DateTimeOffset(utcNow, TimeSpan.Zero)));
+        return Create(timeZone, cutoffHourLocal,
+            clock: new FixedTimeProvider(new DateTimeOffset(utcNow, TimeSpan.Zero)),
+            closedDates: closedDates);
     }
+
+    /// <summary>Clock pinned to an exact UTC instant (for daylight-saving edge cases).</summary>
+    public static TimeRuleService CreateAtUtc(TimeZoneInfo timeZone, DateTime utcNow, int cutoffHourLocal = 14) =>
+        Create(timeZone, cutoffHourLocal,
+            clock: new FixedTimeProvider(new DateTimeOffset(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc))));
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {

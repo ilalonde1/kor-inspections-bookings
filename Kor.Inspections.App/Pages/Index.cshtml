@@ -159,7 +159,8 @@
                        autocomplete="off"
                        class="form-control"
                        data-mindate="@minDate.ToString("yyyy-MM-dd")"
-                       data-maxdate="@maxDate.ToString("yyyy-MM-dd")" />
+                       data-maxdate="@maxDate.ToString("yyyy-MM-dd")"
+                       data-closeddates="@Model.NonBusinessDaysCsv" />
 
                 <span asp-validation-for="RequestedDate" class="text-danger"></span>
             </div>

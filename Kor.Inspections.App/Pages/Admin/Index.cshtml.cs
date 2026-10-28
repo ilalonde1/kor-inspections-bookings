@@ -300,7 +300,7 @@ namespace Kor.Inspections.App.Pages.Admin
                     return Page();
                 }
 
-                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate, allowWeekend: true).ToList();
+                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate, allowNonBusinessDays: true).ToList();
 
                 if (!availableSlots.Contains(requestedTime))
                 {
@@ -565,7 +565,7 @@ namespace Kor.Inspections.App.Pages.Admin
         }
 
         // --------------------------------------------------
-        // EDIT (reschedule) — date/time only
+        // EDIT — reschedule and/or change inspection details
         // --------------------------------------------------
 
         public sealed class EditBookingInput
@@ -578,6 +578,9 @@ namespace Kor.Inspections.App.Pages.Admin
             public string RequestedTime { get; set; } = string.Empty;
 
             public bool OverrideCutoff { get; set; }
+
+            // Null when the form didn't post the field (leave details unchanged).
+            public string? Comments { get; set; }
         }
 
         /// <summary>
@@ -599,7 +602,7 @@ namespace Kor.Inspections.App.Pages.Admin
             var existingExcludingSelf = existingForDate.Where(b => b.BookingId != id).ToList();
 
             var slots = _timeRules
-                .GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate, allowWeekend: true)
+                .GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate, allowNonBusinessDays: true)
                 .Select(t => t.ToString("HH:mm"))
                 .ToList();
 
@@ -632,20 +635,11 @@ namespace Kor.Inspections.App.Pages.Admin
             }
 
             var requestedDate = DateOnly.FromDateTime(edit.RequestedDate.Value);
-            var (_, maxDate) = _timeRules.GetAllowedDateRangeUtcNow();
-            var minDate = GetMinimumManualBookingDate(edit.OverrideCutoff, requestedDate);
-
-            if (requestedDate < minDate || requestedDate > maxDate)
-            {
-                StatusMessage = edit.OverrideCutoff
-                    ? "Selected date is outside the allowed booking window, even with the cutoff override."
-                    : "Selected date is outside the allowed booking window.";
-                return RedirectToPage(redirectArgs);
-            }
 
             DateTime newStartUtc;
             DateTime newEndUtc;
             string? newTimePreference = null;
+            TimeOnly? requestedTime = null;
 
             if (edit.RequestedTime == "AM" || edit.RequestedTime == "PM")
             {
@@ -659,73 +653,149 @@ namespace Kor.Inspections.App.Pages.Admin
             }
             else
             {
-                if (!TimeOnly.TryParseExact(edit.RequestedTime, "HH:mm", out var requestedTime))
+                if (!TimeOnly.TryParseExact(edit.RequestedTime, "HH:mm", out var parsedTime))
                 {
                     StatusMessage = "Invalid time selected.";
                     return RedirectToPage(redirectArgs);
                 }
 
-                // Slot availability — EXCLUDE the booking being edited so it doesn't conflict with itself.
-                var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
-                var existingExcludingSelf = existingForDate.Where(b => b.BookingId != id).ToList();
-                var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate, allowWeekend: true).ToList();
-
-                if (!availableSlots.Contains(requestedTime))
-                {
-                    StatusMessage = "Selected time is no longer available. Please choose another time.";
-                    return RedirectToPage(redirectArgs);
-                }
-
-                newStartUtc = _timeRules.ConvertLocalToUtc(requestedDate, requestedTime);
+                requestedTime = parsedTime;
+                newStartUtc = _timeRules.ConvertLocalToUtc(requestedDate, parsedTime);
                 newEndUtc = newStartUtc.AddMinutes(_timeRules.DefaultDurationMinutes);
             }
 
             var oldStartUtc = booking.StartUtc;
             var oldEndUtc = booking.EndUtc;
             var oldTimePreference = booking.TimePreference;
+            var oldComments = booking.Comments;
 
-            // Skip if nothing actually changed.
-            if (newStartUtc == oldStartUtc &&
-                newEndUtc == oldEndUtc &&
-                string.Equals(newTimePreference, oldTimePreference, StringComparison.Ordinal))
+            var scheduleChanged =
+                newStartUtc != oldStartUtc ||
+                newEndUtc != oldEndUtc ||
+                !string.Equals(newTimePreference, oldTimePreference, StringComparison.Ordinal);
+
+            var newComments = oldComments;
+            if (edit.Comments is not null)
+            {
+                var trimmed = edit.Comments.Trim();
+                newComments = trimmed.Length == 0 ? null : trimmed;
+            }
+            var commentsChanged = !string.Equals(newComments ?? string.Empty, oldComments ?? string.Empty, StringComparison.Ordinal);
+
+            if (!scheduleChanged && !commentsChanged)
             {
                 StatusMessage = "No changes made.";
                 return RedirectToPage(redirectArgs);
             }
 
-            // Authoritative overlap check (exclude self). Protects AM/PM branches that
-            // otherwise wouldn't catch a slot that's already at capacity, and tightens
-            // the HH:mm race window between the upstream availableSlots check and save.
-            var slotAvailable = await _bookingService.IsSlotAvailableAsync(
-                newStartUtc,
-                newEndUtc,
-                excludeBookingId: id,
-                ct: HttpContext.RequestAborted);
-            if (!slotAvailable)
+            // Same rules as admin manual create (ManualBookingInput.Comments).
+            if (commentsChanged && (newComments is null || newComments.Length < 5 || newComments.Length > 500))
             {
-                StatusMessage = "Selected time is no longer available. Please choose another time.";
+                StatusMessage = "Inspection details must be between 5 and 500 characters.";
                 return RedirectToPage(redirectArgs);
             }
 
-            booking.StartUtc = newStartUtc;
-            booking.EndUtc = newEndUtc;
-            booking.TimePreference = newTimePreference;
-
-            // If the local date changed, the saved RouteOrder is meaningless on the new day.
-            var tz = _timeRules.TimeZone;
-            var oldDateLocal = TimeZoneInfo.ConvertTimeFromUtc(oldStartUtc, tz).Date;
-            var newDateLocal = TimeZoneInfo.ConvertTimeFromUtc(newStartUtc, tz).Date;
-            if (oldDateLocal != newDateLocal)
-                booking.RouteOrder = null;
-
-            _db.BookingActions.Add(new BookingAction
+            // Date/time rules only apply when the schedule changes, so details can
+            // still be corrected on a booking that is already inside the cutoff.
+            if (scheduleChanged)
             {
-                BookingId = booking.BookingId,
-                ActionType = BookingActionType.Edited,
-                PerformedBy = User.Identity?.Name,
-                Notes = $"From {oldStartUtc:yyyy-MM-dd HH:mm}Z to {newStartUtc:yyyy-MM-dd HH:mm}Z",
-                ActionUtc = DateTime.UtcNow
-            });
+                var (_, maxDate) = _timeRules.GetAllowedDateRangeUtcNow();
+                var minDate = GetMinimumManualBookingDate(edit.OverrideCutoff, requestedDate);
+
+                if (requestedDate < minDate || requestedDate > maxDate)
+                {
+                    StatusMessage = edit.OverrideCutoff
+                        ? "Selected date is outside the allowed booking window, even with the cutoff override."
+                        : "Selected date is outside the allowed booking window.";
+                    return RedirectToPage(redirectArgs);
+                }
+
+                if (requestedTime is { } slotTime)
+                {
+                    // Slot availability — EXCLUDE the booking being edited so it doesn't conflict with itself.
+                    var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
+                    var existingExcludingSelf = existingForDate.Where(b => b.BookingId != id).ToList();
+                    var availableSlots = _timeRules.GetAvailableSlotsForDate(requestedDate, existingExcludingSelf, minDateOverride: minDate, allowNonBusinessDays: true).ToList();
+
+                    if (!availableSlots.Contains(slotTime))
+                    {
+                        StatusMessage = "Selected time is no longer available. Please choose another time.";
+                        return RedirectToPage(redirectArgs);
+                    }
+                }
+
+                // Authoritative overlap check (exclude self). Protects AM/PM branches that
+                // otherwise wouldn't catch a slot that's already at capacity, and tightens
+                // the HH:mm race window between the upstream availableSlots check and save.
+                var slotAvailable = await _bookingService.IsSlotAvailableAsync(
+                    newStartUtc,
+                    newEndUtc,
+                    excludeBookingId: id,
+                    ct: HttpContext.RequestAborted);
+                if (!slotAvailable)
+                {
+                    StatusMessage = "Selected time is no longer available. Please choose another time.";
+                    return RedirectToPage(redirectArgs);
+                }
+            }
+
+            string? unassignedInspector = null;
+
+            if (scheduleChanged)
+            {
+                booking.StartUtc = newStartUtc;
+                booking.EndUtc = newEndUtc;
+                booking.TimePreference = newTimePreference;
+
+                // If the local date changed, the saved RouteOrder is meaningless on the new day.
+                var tz = _timeRules.TimeZone;
+                var oldDateLocal = TimeZoneInfo.ConvertTimeFromUtc(oldStartUtc, tz).Date;
+                var newDateLocal = TimeZoneInfo.ConvertTimeFromUtc(newStartUtc, tz).Date;
+                if (oldDateLocal != newDateLocal)
+                    booking.RouteOrder = null;
+
+                _db.BookingActions.Add(new BookingAction
+                {
+                    BookingId = booking.BookingId,
+                    ActionType = BookingActionType.Edited,
+                    PerformedBy = User.Identity?.Name,
+                    Notes = $"From {oldStartUtc:yyyy-MM-dd HH:mm}Z to {newStartUtc:yyyy-MM-dd HH:mm}Z",
+                    ActionUtc = DateTime.UtcNow
+                });
+
+                // A rescheduled inspection goes back to the unassigned pool so the
+                // office re-plans it; the previous inspector is emailed that they're off it.
+                if (!string.IsNullOrWhiteSpace(booking.AssignedTo))
+                {
+                    unassignedInspector = booking.AssignedTo;
+                    booking.AssignedTo = null;
+                    booking.Status = BookingStatus.Unassigned;
+                    booking.RouteOrder = null;
+
+                    _db.BookingActions.Add(new BookingAction
+                    {
+                        BookingId = booking.BookingId,
+                        ActionType = BookingActionType.Unassigned,
+                        PerformedBy = User.Identity?.Name,
+                        Notes = $"Unassigned due to reschedule (was: {unassignedInspector})",
+                        ActionUtc = DateTime.UtcNow
+                    });
+                }
+            }
+
+            if (commentsChanged)
+            {
+                booking.Comments = newComments;
+
+                _db.BookingActions.Add(new BookingAction
+                {
+                    BookingId = booking.BookingId,
+                    ActionType = BookingActionType.Edited,
+                    PerformedBy = User.Identity?.Name,
+                    Notes = $"Details changed. Previous: {oldComments ?? "(none)"}",
+                    ActionUtc = DateTime.UtcNow
+                });
+            }
 
             try
             {
@@ -748,16 +818,26 @@ namespace Kor.Inspections.App.Pages.Admin
             }
 
             _logger.LogInformation(
-                "Admin booking edit: BookingId={BookingId} OldStartUtc={OldStartUtc} NewStartUtc={NewStartUtc} By={AdminUser} OverrideCutoff={OverrideCutoff}",
+                "Admin booking edit: BookingId={BookingId} OldStartUtc={OldStartUtc} NewStartUtc={NewStartUtc} DetailsChanged={DetailsChanged} UnassignedInspector={UnassignedInspector} By={AdminUser} OverrideCutoff={OverrideCutoff}",
                 booking.BookingId,
                 oldStartUtc,
                 newStartUtc,
+                commentsChanged,
+                unassignedInspector,
                 User.Identity?.Name,
                 edit.OverrideCutoff);
 
-            await _bookingService.SendRescheduledEmailsAsync(booking, oldStartUtc, oldEndUtc, oldTimePreference);
+            // Details-only changes send no email.
+            if (scheduleChanged)
+                await _bookingService.SendRescheduledEmailsAsync(booking, oldStartUtc, oldEndUtc, oldTimePreference, unassignedInspector);
 
-            StatusMessage = "Booking rescheduled.";
+            StatusMessage = (scheduleChanged, unassignedInspector is not null, commentsChanged) switch
+            {
+                (true, true, _) => "Booking rescheduled and set to Unassigned — please assign an inspector.",
+                (true, false, true) => "Booking rescheduled and details updated.",
+                (true, false, false) => "Booking rescheduled.",
+                _ => "Booking details updated."
+            };
             return RedirectToPage(redirectArgs);
         }
 
@@ -780,7 +860,7 @@ namespace Kor.Inspections.App.Pages.Admin
 
             var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
             var defaultDate = nowLocal.Date.AddDays(1);
-            while (defaultDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            while (!_timeRules.IsBusinessDay(DateOnly.FromDateTime(defaultDate)))
                 defaultDate = defaultDate.AddDays(1);
             NextWorkdayDate = DateOnly.FromDateTime(defaultDate);
             var windowStartLocal = defaultDate;
@@ -916,17 +996,17 @@ namespace Kor.Inspections.App.Pages.Admin
             const int DayQuickAccessCount = 6;
 
             var todayLocal = DateOnly.FromDateTime(nowLocal.Date);
-            var weekdays = new List<DateOnly>(DayQuickAccessCount);
+            var businessDays = new List<DateOnly>(DayQuickAccessCount);
             var cursor = todayLocal;
-            while (weekdays.Count < DayQuickAccessCount)
+            while (businessDays.Count < DayQuickAccessCount)
             {
-                if (cursor.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
-                    weekdays.Add(cursor);
+                if (_timeRules.IsBusinessDay(cursor))
+                    businessDays.Add(cursor);
                 cursor = cursor.AddDays(1);
             }
 
             var rangeStart = todayLocal;
-            var rangeEnd = weekdays[^1];
+            var rangeEnd = businessDays[^1];
             var rangeStartUtc = TimeZoneInfo.ConvertTimeToUtc(
                 rangeStart.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), tz);
             var rangeEndUtc = TimeZoneInfo.ConvertTimeToUtc(
@@ -946,12 +1026,11 @@ namespace Kor.Inspections.App.Pages.Admin
                 .GroupBy(s => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(s, tz)))
                 .ToDictionary(g => g.Key, g => g.Count());
 
-            // Weekend days only get a button when an (admin-booked) inspection falls on them.
+            // Weekends/holidays only get a button when an (admin-booked) inspection falls on them.
             var days = new List<DateOnly>();
             for (var d = rangeStart; d <= rangeEnd; d = d.AddDays(1))
             {
-                if (d.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday ||
-                    countsByDate.GetValueOrDefault(d, 0) > 0)
+                if (_timeRules.IsBusinessDay(d) || countsByDate.GetValueOrDefault(d, 0) > 0)
                 {
                     days.Add(d);
                 }
@@ -1033,10 +1112,10 @@ namespace Kor.Inspections.App.Pages.Admin
         {
             var (minDate, _) = _timeRules.GetAllowedDateRangeUtcNow();
 
-            // Weekend inspections are admin-only and rare (not offered on the
-            // public site); they follow the calendar-day cutoff instead.
-            if (requestedDate?.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
-                minDate = _timeRules.GetWeekendMinDateUtcNow();
+            // Weekend/holiday inspections are admin-only and rare (not offered on
+            // the public site); they follow the calendar-day cutoff instead.
+            if (requestedDate is { } date && !_timeRules.IsBusinessDay(date))
+                minDate = _timeRules.GetNonBusinessDayMinDateUtcNow();
 
             if (!overrideCutoff)
                 return minDate;
@@ -1057,7 +1136,7 @@ namespace Kor.Inspections.App.Pages.Admin
             var minDate = GetMinimumManualBookingDate(ManualBooking.OverrideCutoff, requestedDate);
             var existingForDate = await _timeRules.GetExistingBookingsForLocalDateAsync(_db, requestedDate);
             AvailableManualTimes = _timeRules
-                .GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate, allowWeekend: true)
+                .GetAvailableSlotsForDate(requestedDate, existingForDate, minDateOverride: minDate, allowNonBusinessDays: true)
                 .Select(t => t.ToString("HH:mm"))
                 .ToList();
 

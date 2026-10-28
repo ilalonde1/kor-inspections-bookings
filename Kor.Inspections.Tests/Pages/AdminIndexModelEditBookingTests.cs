@@ -283,6 +283,161 @@ public class AdminIndexModelEditBookingTests
         Assert.Contains("modified by another user", model.StatusMessage, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task OnPostEditAsync_RescheduleAssignedBooking_UnassignsAndRecordsAudit()
+    {
+        // Griffin (2026-10-27): a rescheduled inspection goes back to Unassigned.
+        if (!TryPickWeekdayAfternoonZone(out _, out _)) { Assert.True(true); return; }
+
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminEditTests_");
+        var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
+        var date = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
+        var seeded = await SeedBookingAsync(
+            fixture,
+            status: "Assigned",
+            startUtc: ToUtc(timeZone, date.ToDateTime(TimeOnly.MinValue), 12, 0),
+            endUtc: ToUtc(timeZone, date.ToDateTime(TimeOnly.MinValue), 16, 0),
+            timePreference: "PM",
+            routeOrder: 2,
+            assignedTo: "inspector@example.com");
+
+        await using var db = fixture.CreateContext();
+        var model = CreateModel(db, timeZone);
+
+        var result = await model.OnPostEditAsync(seeded.BookingId, new IndexModel.EditBookingInput
+        {
+            RequestedDate = date.ToDateTime(TimeOnly.MinValue),
+            RequestedTime = "AM", // same-day time change still counts as a reschedule
+            Comments = seeded.Comments
+        });
+
+        Assert.IsType<RedirectToPageResult>(result);
+        Assert.Contains("Unassigned", model.StatusMessage, StringComparison.Ordinal);
+
+        await using var verify = fixture.CreateContext();
+        var updated = await verify.Bookings.AsNoTracking().SingleAsync(b => b.BookingId == seeded.BookingId);
+        Assert.Null(updated.AssignedTo);
+        Assert.Equal("Unassigned", updated.Status);
+        Assert.Null(updated.RouteOrder);
+
+        var actions = await verify.BookingActions.AsNoTracking().ToListAsync();
+        Assert.Contains(actions, a => a.ActionType == "Edited" && a.Notes!.StartsWith("From ", StringComparison.Ordinal));
+        Assert.Contains(actions, a => a.ActionType == "Unassigned" && a.Notes!.Contains("inspector@example.com", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task OnPostEditAsync_DetailsOnly_UpdatesDetailsAndKeepsInspector()
+    {
+        if (!TryPickWeekdayAfternoonZone(out _, out _)) { Assert.True(true); return; }
+
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminEditTests_");
+        var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
+        var date = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
+        var seeded = await SeedBookingAsync(
+            fixture,
+            status: "Assigned",
+            startUtc: ToUtc(timeZone, date.ToDateTime(TimeOnly.MinValue), 12, 0),
+            endUtc: ToUtc(timeZone, date.ToDateTime(TimeOnly.MinValue), 16, 0),
+            timePreference: "PM",
+            routeOrder: 4,
+            assignedTo: "inspector@example.com");
+
+        await using var db = fixture.CreateContext();
+        var model = CreateModel(db, timeZone);
+
+        var result = await model.OnPostEditAsync(seeded.BookingId, new IndexModel.EditBookingInput
+        {
+            RequestedDate = date.ToDateTime(TimeOnly.MinValue),
+            RequestedTime = "PM",
+            Comments = "  Tilt panels #21-#30 on the west casting bed.  "
+        });
+
+        Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("Booking details updated.", model.StatusMessage);
+
+        await using var verify = fixture.CreateContext();
+        var updated = await verify.Bookings.AsNoTracking().SingleAsync(b => b.BookingId == seeded.BookingId);
+        Assert.Equal("Tilt panels #21-#30 on the west casting bed.", updated.Comments);
+        Assert.Equal("inspector@example.com", updated.AssignedTo);
+        Assert.Equal(4, updated.RouteOrder);
+        Assert.Equal(seeded.StartUtc, updated.StartUtc);
+
+        var action = Assert.Single(await verify.BookingActions.AsNoTracking().ToListAsync());
+        Assert.Equal("Edited", action.ActionType);
+        Assert.Contains("Original details for the review.", action.Notes, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OnPostEditAsync_DetailsOnlyInsideCutoff_StillSaves()
+    {
+        // The booking is today (already inside the cutoff window). Editing only
+        // the details must not trip the date-window check meant for reschedules.
+        if (!TryPickWeekdayAfternoonZone(out _, out _)) { Assert.True(true); return; }
+
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminEditTests_");
+        var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
+        var today = DateOnly.FromDateTime(nowLocal.Date);
+        var seeded = await SeedBookingAsync(
+            fixture,
+            status: "Unassigned",
+            startUtc: ToUtc(timeZone, today.ToDateTime(TimeOnly.MinValue), 12, 0),
+            endUtc: ToUtc(timeZone, today.ToDateTime(TimeOnly.MinValue), 16, 0),
+            timePreference: "PM");
+
+        await using var db = fixture.CreateContext();
+        var model = CreateModel(db, timeZone);
+
+        var result = await model.OnPostEditAsync(seeded.BookingId, new IndexModel.EditBookingInput
+        {
+            RequestedDate = today.ToDateTime(TimeOnly.MinValue),
+            RequestedTime = "PM",
+            Comments = "Updated details for today's review."
+        });
+
+        Assert.IsType<RedirectToPageResult>(result);
+        Assert.Equal("Booking details updated.", model.StatusMessage);
+
+        await using var verify = fixture.CreateContext();
+        var updated = await verify.Bookings.AsNoTracking().SingleAsync(b => b.BookingId == seeded.BookingId);
+        Assert.Equal("Updated details for today's review.", updated.Comments);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("abc")]
+    public async Task OnPostEditAsync_DetailsTooShort_RejectedWithoutSaving(string comments)
+    {
+        if (!TryPickWeekdayAfternoonZone(out _, out _)) { Assert.True(true); return; }
+
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminEditTests_");
+        var (timeZone, nowLocal) = PickWeekdayAfternoonZone();
+        var date = GetAllowedDate(nowLocal, nowLocal.Hour + 1, dayOffset: 0);
+        var seeded = await SeedBookingAsync(
+            fixture,
+            status: "Unassigned",
+            startUtc: ToUtc(timeZone, date.ToDateTime(TimeOnly.MinValue), 12, 0),
+            endUtc: ToUtc(timeZone, date.ToDateTime(TimeOnly.MinValue), 16, 0),
+            timePreference: "PM");
+
+        await using var db = fixture.CreateContext();
+        var model = CreateModel(db, timeZone);
+
+        var result = await model.OnPostEditAsync(seeded.BookingId, new IndexModel.EditBookingInput
+        {
+            RequestedDate = date.ToDateTime(TimeOnly.MinValue),
+            RequestedTime = "PM",
+            Comments = comments
+        });
+
+        Assert.IsType<RedirectToPageResult>(result);
+        Assert.Contains("between 5 and 500", model.StatusMessage, StringComparison.Ordinal);
+
+        await using var verify = fixture.CreateContext();
+        var updated = await verify.Bookings.AsNoTracking().SingleAsync(b => b.BookingId == seeded.BookingId);
+        Assert.Equal("Original details for the review.", updated.Comments);
+        Assert.Empty(await verify.BookingActions.AsNoTracking().ToListAsync());
+    }
+
     // --------------------------------------------------
     // HELPERS
     // --------------------------------------------------
@@ -290,7 +445,7 @@ public class AdminIndexModelEditBookingTests
     private static bool TryPickWeekdayAfternoonZone(out TimeZoneInfo zone, out DateTime nowLocal)
     {
         if (!TimeRuleServiceTestFactory.TryFindZone(local =>
-                local.AddDays(1).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
+                TimeRuleServiceTestFactory.IsBusinessDay(local.AddDays(1)) &&
                 local.Hour <= 22, out zone))
         {
             nowLocal = default;
@@ -318,13 +473,13 @@ public class AdminIndexModelEditBookingTests
         var date = DateOnly.FromDateTime(nowLocal.Date)
             .AddDays(nowLocal.Hour < cutoffHourLocal ? 1 : 2);
 
-        while (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+        while (!TimeRuleServiceTestFactory.IsBusinessDay(date))
             date = date.AddDays(1);
 
         for (int i = 0; i < dayOffset; i++)
         {
             date = date.AddDays(1);
-            while (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            while (!TimeRuleServiceTestFactory.IsBusinessDay(date))
                 date = date.AddDays(1);
         }
 
@@ -397,7 +552,9 @@ public class AdminIndexModelEditBookingTests
         DateTime endUtc,
         string? timePreference,
         int? routeOrder = null,
-        string contactEmail = "jane@example.com")
+        string contactEmail = "jane@example.com",
+        string? assignedTo = null,
+        string? comments = "Original details for the review.")
     {
         var booking = new Booking
         {
@@ -413,6 +570,8 @@ public class AdminIndexModelEditBookingTests
             TimePreference = timePreference,
             RouteOrder = routeOrder,
             Status = status,
+            AssignedTo = assignedTo,
+            Comments = comments,
             CreatedUtc = DateTime.UtcNow
         };
 

@@ -176,13 +176,52 @@ public class AdminIndexModelReassignmentTests
         Assert.Contains("not found", message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task OnPostEditAsync_RescheduleAssignedBooking_EmailsRemovedInspector()
+    {
+        // Griffin (2026-10-27): reschedule unassigns; the previous inspector must
+        // be told they're off it so they don't attend at the old or new time.
+        if (!TryGetCalendarZone(out var zone)) { Assert.True(true); return; }
+
+        await using var fixture = await SqlServerFixture.CreateAsync("KorAdminReassignTests_");
+
+        var inspectorA = await SeedInspectorAsync(fixture, "Inspector A", "a@example.com");
+        var booking = await SeedAssignedBookingAsync(fixture, inspectorA.Email);
+
+        var emailHandler = new CountingHttpMessageHandler();
+        await using var db = fixture.CreateContext();
+        var model = CreateModel(db, emailHandler);
+
+        var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zone);
+        var minDate = TimeRuleServiceTestFactory.Create(zone, nowLocal.Hour + 1).GetAllowedDateRangeUtcNow().MinDate;
+
+        var result = await model.OnPostEditAsync(booking.BookingId, new IndexModel.EditBookingInput
+        {
+            RequestedDate = minDate.ToDateTime(TimeOnly.MinValue),
+            RequestedTime = "AM"
+        });
+
+        Assert.IsType<RedirectToPageResult>(result);
+
+        await using var verify = fixture.CreateContext();
+        var updated = await verify.Bookings.AsNoTracking().SingleAsync(b => b.BookingId == booking.BookingId);
+        Assert.Null(updated.AssignedTo);
+
+        // Client + removed inspector.
+        Assert.Equal(2, emailHandler.RequestCount);
+        Assert.Contains(
+            emailHandler.CapturedBodies,
+            body => body.Contains("no longer assigned", StringComparison.Ordinal) &&
+                    body.Contains(inspectorA.Email, StringComparison.Ordinal));
+    }
+
     // --------------------------------------------------
     // HELPERS
     // --------------------------------------------------
 
     private static bool TryGetCalendarZone(out TimeZoneInfo zone) =>
         TimeRuleServiceTestFactory.TryFindZone(nowLocal =>
-            nowLocal.AddDays(1).DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
+            TimeRuleServiceTestFactory.IsBusinessDay(nowLocal.AddDays(1)) &&
             nowLocal.Hour <= 22, out zone);
 
     private static IndexModel CreateModel(InspectionsContext db, CountingHttpMessageHandler emailHandler)
