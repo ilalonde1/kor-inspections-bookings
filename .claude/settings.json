@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "env": {
+    "CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION": "1000"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_bash_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking against the repo's hard rules"
+          },
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_asked_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking remote actions were asked for"
+          },
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_sql_schema_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking the table's schema was read before writing to it"
+          },
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_prior_art_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Recording the search"
+          },
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_api_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking the command does not spend the Anthropic API"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_prior_art_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking the prior art was looked for"
+          },
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_api_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking no Anthropic API call enters the BD work"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_api_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking no Anthropic API call enters the BD work"
+          }
+        ]
+      },
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_prior_art_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Recording the search"
+          }
+        ]
+      },
+      {
+        "matcher": "Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_prior_art_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Recording the search"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_prior_art_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Recording what was read"
+          }
+        ]
+      },
+      {
+        "matcher": "SendMessage",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_look_guard.py\"",
+            "timeout": 30,
+            "statusMessage": "Checking every change was LOOKED at before telling a peer it is done"
+          },
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_instrument_guard.py\"",
+            "timeout": 30,
+            "statusMessage": "Checking a reported zero came from an instrument tested on a known answer"
+          }
+        ]
+      },
+      {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_bash_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking against the repo's hard rules"
+          },
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_asked_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking remote actions were asked for"
+          },
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_sql_schema_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking the table's schema was read before writing to it"
+          },
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_prior_art_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Recording the search"
+          },
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_api_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking the command does not spend the Anthropic API"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_absence_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking any claim that something is missing carries its proof"
+          },
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_look_guard.py\"",
+            "timeout": 30,
+            "statusMessage": "Checking every change was LOOKED at before any claim it is done"
+          },
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_instrument_guard.py\"",
+            "timeout": 30,
+            "statusMessage": "Checking a reported zero came from an instrument tested on a known answer"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_prompt_recorder.py\"",
+            "timeout": 20
+          },
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/PlanDocCheck/check_plan_doc_current.py\" owed --hook --ledger \"C:/VIsual Studio Projects/KOR.Drafter/work/*/doc-owed.jsonl\"",
+            "timeout": 20,
+            "statusMessage": "Is the plan doc behind the pipeline?"
+          },
+          {
+            "type": "command",
+            "command": "C:/KOR-Operations/cli/netops.exe signin-status --hook",
+            "timeout": 10,
+            "statusMessage": "Is the NetworkOps sign-in about to lapse?"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_bash_sample_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Marking truncated output as a sample"
+          }
+        ]
+      },
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_grep_sample_guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Marking a truncated search as a sample"
+          }
+        ]
+      }
+    ]
+  }
+}
