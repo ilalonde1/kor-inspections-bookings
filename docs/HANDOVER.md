@@ -18,7 +18,8 @@ block with its own state. Until then, these are the verified facts:
   `f50771f`, as the memory says.
 - **Open item in memory, not started:** Teams meeting for "(Virtual)" inspectors (`project_teams_meeting_feature.md`),
   deferred on an Azure AD permission grant only Ian can make.
-- **Framework:** enrolled 2 Nov - start routine in `CLAUDE.md`, the 26 guard hooks in `.claude/settings.json`
+- **Framework:** enrolled 2 Nov - start routine in `CLAUDE.md`, 25 guard hooks in `.claude/settings.json` (KOR.Drafter's set less its
+  Drafter-only plan-doc check)
   (`.claude/settings.local.json` is Ian's and untouched), this handover.
 
 ## Five questions to answer before any work
