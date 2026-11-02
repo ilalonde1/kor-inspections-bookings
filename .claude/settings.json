@@ -188,12 +188,6 @@
           },
           {
             "type": "command",
-            "command": "python \"C:/VIsual Studio Projects/Operations/tools/PlanDocCheck/check_plan_doc_current.py\" owed --hook --ledger \"C:/VIsual Studio Projects/KOR.Drafter/work/*/doc-owed.jsonl\"",
-            "timeout": 20,
-            "statusMessage": "Is the plan doc behind the pipeline?"
-          },
-          {
-            "type": "command",
             "command": "C:/KOR-Operations/cli/netops.exe signin-status --hook",
             "timeout": 10,
             "statusMessage": "Is the NetworkOps sign-in about to lapse?"
