@@ -4,6 +4,18 @@
     "CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION": "1000"
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -I \"C:/VIsual Studio Projects/Framework/tools/board_render.py\" --owner \"Inspections Bookings\"",
+            "timeout": 200,
+            "statusMessage": "Reading this lead's rows off the board (the source of truth)"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
