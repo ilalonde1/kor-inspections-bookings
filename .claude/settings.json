@@ -12,6 +12,12 @@
             "command": "python -I \"C:/VIsual Studio Projects/Framework/tools/board_render.py\" --owner \"Inspections Bookings\"",
             "timeout": 200,
             "statusMessage": "Reading this lead's rows off the board (the source of truth)"
+          },
+          {
+            "type": "command",
+            "command": "python -I \"C:/VIsual Studio Projects/Framework/tools/kor_brain.py\" render --lane \"KOR Inspections Bookings\"",
+            "timeout": 200,
+            "statusMessage": "Reading this lead's memory and resume state from the DB (F7)"
           }
         ]
       }
