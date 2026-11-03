@@ -192,6 +192,12 @@
             "command": "python \"C:/VIsual Studio Projects/Operations/tools/claude_instrument_guard.py\"",
             "timeout": 30,
             "statusMessage": "Checking a reported zero came from an instrument tested on a known answer"
+          },
+          {
+            "type": "command",
+            "command": "python -I \"C:/VIsual Studio Projects/Framework/tools/claude_board_guard.py\"",
+            "timeout": 30,
+            "statusMessage": "Checking the reply does not contradict the board (the source of truth)"
           }
         ]
       }
