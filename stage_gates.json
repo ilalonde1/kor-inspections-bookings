@@ -1,0 +1,20 @@
+{
+  "pipeline": "kor-inspections-bookings",
+  "stages": [
+    {
+      "name": "build solution",
+      "cost": "seconds",
+      "command": ["dotnet", "build", "Kor.Inspections.App/Kor.Inspections.App.sln", "-nologo"],
+      "pass_when": {"exit_code": 0, "output_regex": "^Build succeeded\\.\\s*$"},
+      "timeout_seconds": 600
+    },
+    {
+      "name": "unit tests without LocalDB",
+      "cost": "minutes",
+      "command": ["dotnet", "test", "Kor.Inspections.Tests/Kor.Inspections.Tests.csproj", "--no-build", "-nologo",
+                  "--filter", "FullyQualifiedName!~Kor.Inspections.Tests.Pages.AdminIndexModelConcurrencyTests.&FullyQualifiedName!~Kor.Inspections.Tests.Pages.AdminIndexModelCreateBookingTests.&FullyQualifiedName!~Kor.Inspections.Tests.Pages.AdminIndexModelEditBookingTests.&FullyQualifiedName!~Kor.Inspections.Tests.Pages.AdminIndexModelLoggingTests.&FullyQualifiedName!~Kor.Inspections.Tests.Pages.AdminIndexModelReassignmentTests.&FullyQualifiedName!~Kor.Inspections.Tests.Pages.CancelInspectionConcurrencyTests.&FullyQualifiedName!~Kor.Inspections.Tests.Services.BookingActionFkTests.&FullyQualifiedName!~Kor.Inspections.Tests.Services.BookingCancellationConcurrencyTests.&FullyQualifiedName!~Kor.Inspections.Tests.Services.BookingUniqueIndexTests.&FullyQualifiedName!~Kor.Inspections.Tests.Services.InspectorUniqueEmailTests."],
+      "pass_when": {"exit_code": 0, "output_regex": "Passed!\\s+-\\s+Failed:\\s+0, Passed:\\s+[1-9]"},
+      "timeout_seconds": 900
+    }
+  ]
+}
